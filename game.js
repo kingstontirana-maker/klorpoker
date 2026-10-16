@@ -5,6 +5,9 @@ import {deck,distribute,evaluate,compare,rankNames,bestFive} from './poker.js';
 
 export const LIVE=['preflop','flop','turn','river'];
 export const ACTION_MS=30000,BETWEEN_HANDS_MS=8000,RESULT_REVEAL_MS=8000,REBUY_WINDOW_MS=30000,SIT_OUT_MS=10*60000;
+// A seated player whose browser stops checking in is protected: sat out after
+// AWAY_MS, cashed out to the wallet after AWAY_CASHOUT_MS.
+export const AWAY_MS=25000,AWAY_CASHOUT_MS=5*60000;
 // All-in runouts reveal one street at a time; the time bank extends a decision.
 export const RUNOUT_STEP_MS=1800,TIME_BANK_START=30000,TIME_BANK_MAX=60000,TIME_BANK_REFILL=2000,TIME_BANK_CHUNK=20000,CHAT_LIMIT=40;
 const uid=()=>crypto.randomUUID();
@@ -17,7 +20,7 @@ const suitSymbols={c:'♣',d:'♦',h:'♥',s:'♠'};
 export const cardText=c=>(c[0]==='T'?'10':c[0])+suitSymbols[c[1]];
 const phaseNames={flop:'FLOP',turn:'TURN',river:'RIVER'};
 const rankNamesSq={'High Card':'Letra e lartë','One Pair':'Çift','Two Pair':'Dy çifte','Three of a Kind':'Tris','Straight':'Shkallë','Flush':'Ngjyrë','Full House':'Full House','Four of a Kind':'Poker','Straight Flush':'Shkallë me ngjyrë'};
-const exitNames={INACTIVE:'pasivitet',REBUY_EXPIRED:'pa fonde',SIT_OUT:'pushim i gjatë',LEFT:'dalje'};
+const exitNames={INACTIVE:'pasivitet',REBUY_EXPIRED:'pa fonde',SIT_OUT:'pushim i gjatë',LEFT:'dalje',DISCONNECTED:'u shkëput nga loja'};
 
 export const inHand=s=>!!s&&s.inHand&&!s.folded;
 export const actionable=s=>inHand(s)&&!s.allIn;
@@ -158,7 +161,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
    event(t,`${s.username} ${opening?'bën bet':'ngre në'} ${eur(target)}${s.allIn?' · all-in':''}`);
   }
   else fail('Veprim i pavlefshëm');
-  if(automatic){if(s.lastTimeoutHand!==t.hand){s.inactiveHands=(s.inactiveHands||0)+1;s.lastTimeoutHand=t.hand;}}else{s.inactiveHands=0;s.lastTimeoutHand=null;}
+  if(automatic){if(s.lastTimeoutHand!==t.hand){s.inactiveHands=(s.inactiveHands||0)+1;s.lastTimeoutHand=t.hand;}}else{s.inactiveHands=0;s.lastTimeoutHand=null;s.lastSeen=Date.now();}
   progress(t);save();
  }
 
@@ -171,7 +174,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
   u.balance-=amount;u.tableExit=null;
   // Joining a running game requires a live big blind before the first hand.
   const running=t.hand>0&&t.seats.filter(s=>eligible(t,s)).length>=2;
-  t.seats[pos]={id:u.id,userId:u.id,username:u.username,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,timeBank:TIME_BANK_START};
+  t.seats[pos]={id:u.id,userId:u.id,username:u.username,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
   db.ledger.push({id:uid(),type:'BUY_IN',from:u.id,tableId:t.id,amount,time:Date.now()});event(t,`${u.username} u ul në vendin ${pos+1}${LIVE.includes(t.phase)?' · luan nga dora e ardhshme':''}`);save();
  }
 
@@ -193,10 +196,24 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
   u.balance-=amount;s.stack+=amount;delete s.rebuyDeadline;delete s.rebuyAvailableAt;db.ledger.push({id:uid(),type:'REBUY',from:u.id,tableId:t.id,amount,time:Date.now()});save();
  }
 
+ function markAway(t,s,reason){
+  if(!s||s.sittingOut)return;s.sittingOut=true;s.autoSitOut=true;s.sitOutSince=Date.now();s.awayHand=t.hand;
+  event(t,`${s.username} ${reason||'u shkëput'} · nuk merr letra derisa të kthehet`);save();
+ }
+ // A returning player only posts to re-enter if hands were dealt without them.
+ function comeBack(t,s){
+  s.sittingOut=false;s.autoSitOut=false;delete s.sitOutSince;s.inactiveHands=0;s.lastTimeoutHand=null;
+  s.mustPost=t.hand>(s.awayHand??t.hand)&&t.seats.filter(o=>o!==s&&eligible(t,o)).length>=2;
+  event(t,`${s.username} u rikthye në lojë`);save();
+ }
+ // The tab was closed: if the player is not back within 5 seconds (a reload is),
+ // the normal away protection takes over.
+ function away(t,u){const s=t.seats[seatOf(t,u.id)];if(s&&!s.sittingOut)s.lastSeen=Math.min(s.lastSeen??Date.now(),Date.now()-AWAY_MS+5000);}
+
  function sitOut(t,u,value){
   const s=t.seats[seatOf(t,u.id)];if(!s)fail('Nuk je ulur në tavolinë');
   if(value){if(!s.sittingOut){s.sittingOut=true;s.sitOutSince=Date.now();event(t,`${s.username} bën pushim`);}}
-  else if(s.sittingOut){s.sittingOut=false;delete s.sitOutSince;s.inactiveHands=0;s.lastTimeoutHand=null;s.mustPost=t.seats.filter(o=>o!==s&&eligible(t,o)).length>=2;event(t,`${s.username} u kthye në lojë`);}
+  else if(s.sittingOut){s.sittingOut=false;s.autoSitOut=false;delete s.sitOutSince;s.inactiveHands=0;s.lastTimeoutHand=null;s.mustPost=t.seats.filter(o=>o!==s&&eligible(t,o)).length>=2;event(t,`${s.username} u kthye në lojë`);}
   save();
  }
 
@@ -221,6 +238,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
  function buyinLimits(t){return {min:Math.max(2000,t.bb*10),max:Math.max(100000,t.bb*100)};}
 
  function snapshot(t,userId){
+  const present=t.seats.find(s=>s?.userId===userId);if(present){present.lastSeen=Date.now();if(present.autoSitOut)comeBack(t,present);}
   const mine=t.seats.find(s=>s?.userId===userId),shown=new Set(t.phase==='finished'?t.lastResult?.shown||[]:t.runout?t.seats.filter(inHand).map(s=>s.id):[]);
   const myScore=mine?.inHand&&mine.cards.length===2&&t.board.length>=3?evaluate([...mine.cards,...t.board]):null;
   const ready=t.seats.filter(s=>eligible(t,s)).length;
@@ -245,13 +263,16 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
  // Timers are authoritative even when the browser disconnects.
  function tickTable(t,now=Date.now()){
   let changed=false;
+  const real=Date.now();
   for(let i=0;i<t.seats.length;i++){const s=t.seats[i];if(!s)continue;const idle=!s.inHand||!LIVE.includes(t.phase);
+   if(!s.sittingOut&&real-(s.lastSeen??real)>=AWAY_MS){markAway(t,s);changed=true;}
+   if(s.autoSitOut&&real-s.sitOutSince>=AWAY_CASHOUT_MS&&idle){cashOutSeat(t,i,'DISCONNECTED');changed=true;continue;}
    if(s.rebuyDeadline&&now>=s.rebuyDeadline&&idle){cashOutSeat(t,i,'REBUY_EXPIRED');changed=true;}
    else if(s.sittingOut&&now-s.sitOutSince>=SIT_OUT_MS&&idle){cashOutSeat(t,i,'SIT_OUT');changed=true;}}
-  if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}if(t.turn>=0&&now>=t.deadline)act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}
+  if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}if(t.turn>=0&&(now>=t.deadline||t.seats[t.turn].autoSitOut))act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}
   if(now-t.lastActionAt>=BETWEEN_HANDS_MS){if(t.seats.some(s=>(s?.inactiveHands||0)>=2)){removeInactive(t);changed=true;}if(t.seats.filter(s=>eligible(t,s)).length>=2){startHand(t);changed=true;}}
   if(changed)save();
  }
 
- return {makeTable,startHand,act,sit,leave,rebuy,sitOut,show,useTimeBank,chat,snapshot,tickTable,cashOutSeat,buyinLimits};
+ return {makeTable,startHand,act,sit,leave,rebuy,sitOut,away,show,useTimeBank,chat,snapshot,tickTable,cashOutSeat,buyinLimits};
 }

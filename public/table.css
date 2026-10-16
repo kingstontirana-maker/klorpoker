@@ -334,8 +334,9 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
    over the top corners and the actions form a narrow column at the right. */
 @media(max-height:560px) and (orientation:landscape){
  body[data-view="table"] header{display:none}
- .game{min-height:100dvh;grid-template-columns:minmax(0,1fr) 184px;grid-template-rows:minmax(var(--stage-min,280px),1fr);column-gap:8px;padding:0 8px 0 4px}
- .tableToolbar{position:absolute;z-index:60;left:6px;right:196px;top:4px;min-height:0;padding:0;pointer-events:none;align-items:flex-start}
+ body[data-view="table"]{overflow:hidden;overscroll-behavior:none}
+ .game{min-height:100dvh;grid-template-columns:minmax(0,1fr) 168px;grid-template-rows:minmax(var(--stage-min,280px),1fr);column-gap:8px;padding:0 8px 0 4px}
+ .tableToolbar{position:absolute;z-index:60;left:6px;right:180px;top:4px;min-height:0;padding:0;pointer-events:none;align-items:flex-start}
  .tableToolbar>*{pointer-events:auto}
  .tableTitle{gap:6px}.tableTitle h2{font-size:12px;max-width:150px}.tableSessionMeta{font-size:9px;margin-top:1px;gap:6px}
  .tableTitle .iconTool{width:28px;height:28px;font-size:13px}
@@ -344,19 +345,26 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .tableStage{grid-column:1;grid-row:1}
  .dock{grid-column:2;grid-row:1;position:relative;bottom:auto;align-self:center;align-content:center;grid-template-columns:1fr;gap:7px;margin:6px 0;padding:9px;--dock-h:0px;border-radius:14px;max-height:calc(100dvh - 12px);overflow:auto}
  .dockInfo{flex-direction:column;gap:2px}#handStrength{font-size:13px}.actionSummary{font-size:10px}#blindInfo{display:none}
- .betPicker{grid-template-columns:1fr auto}.betSlider{grid-column:1 / -1;grid-template-columns:24px minmax(36px,1fr) 24px 58px;gap:4px}
+ .betPicker{grid-template-columns:1fr auto}.betSlider{grid-column:1 / -1;grid-template-columns:minmax(40px,1fr) 60px;gap:6px}.betStep{display:none}
  .betPresets{overflow-x:auto;gap:4px}.betPresets button{padding:0 5px;font-size:11px;height:26px;min-width:0}.betPicker #allIn{height:26px;padding:0 7px;font-size:11px}
  .betStep,#betInput{height:28px;font-size:13px}
  .actionButtons{grid-template-columns:1fr;gap:6px}.actionButtons button{height:40px;font-size:15px}.actionButtons kbd{display:none}
  .preActions{grid-template-columns:1fr;gap:6px}.preActions label{height:36px;font-size:12px}
- .tableStage{--board-w:clamp(34px,calc(var(--felt-h,260px)*.16),60px);--me-hole-h:clamp(48px,calc(var(--felt-h,260px)*.22),82px);--hole-w:30px;--hole-h:42px}
+ .tableStage{--board-w:clamp(32px,calc(var(--felt-h,260px)*.185),62px);--me-hole-h:clamp(44px,calc(var(--felt-h,260px)*.27),88px);--me-hole-w:calc(var(--me-hole-h)/1.4);--hole-w:34px;--hole-h:48px}
+ /* Small cards use a phone-style face: a large rank and suit in one corner and a
+    clear suit in the other, so nothing overlaps and every card reads at a glance. */
+ .game .card .cardCorner,.game .seat .seatCards .card .cardCorner,.game .community .card .cardCorner{width:44%;left:6%;top:5%}
+ .game .card .cardCorner.bottomCorner,.game .seat .seatCards .card .cardCorner.bottomCorner,.game .seat.me .seatCards .card .cardCorner.bottomCorner,.game .community .card .cardCorner.bottomCorner{display:none}
+ .game .card.face .centerSuit{left:auto;top:auto;right:7%;bottom:6%;width:48%;height:48%;transform:none}
+ .game .card.face{border-radius:6px}
+ .game .seat.me .seatCards .card:first-child{transform:rotate(-3deg)}.game .seat.me .seatCards .card:nth-child(2){transform:rotate(3deg)}
  .game .pot{top:24%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
  .game .winnerBanner{top:26%}
  .game .community{top:50%;gap:4px}.feltBrand{display:none}
  .game .emptySeat span{font-size:16px;line-height:16px}.game .emptySeat b{font-size:8px}
  .tableBet .chipStacks{display:none}
  .game .seat{width:52px;height:52px}.game .seat.me{width:56px;height:56px}
- .game .seatName{width:96px;padding:3px 5px 4px}.game .seatName strong{font-size:13px}.game .seat.me .seatName{width:110px}
+ .game .seatName{width:96px;padding:3px 5px 4px}.game .seatName strong{font-size:13px}.game .seat.me .seatName{width:110px;top:calc(100% - 16px);padding:2px 6px 3px}.game .seat.me .seatName strong{font-size:14px}
  .game .seatAction{top:calc(100% + 22px);font-size:9px;line-height:14px}.game .seat.me .seatAction{display:none}
  .game .winBadge{font-size:13px;line-height:18px;padding:2px 9px}
  .drawer{top:0}

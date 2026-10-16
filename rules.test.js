@@ -156,3 +156,32 @@ test('rake is a flat 5% of the contested pot with no per-hand cap',()=>{
  assert.equal(t.seats[0].stack,68170+62237-6223);assert.equal(db.users.find(u=>u.role==='CENTER').balance,6223);
  assert.equal(total(),before,'every cent is accounted for');
 });
+
+test('a player who leaves without standing up is sat out, loses no blinds and is cashed out later',()=>{
+ const {e,t,user,total}=setup([10000,10000,10000]);const before=total();
+ const realNow=Date.now;let clock=realNow();Date.now=()=>clock;
+ try{
+  e.startHand(t);
+  // p2 stops checking in; the others keep polling.
+  const poll=()=>{e.snapshot(t,'p0');e.snapshot(t,'p1');};
+  clock+=26000;poll();e.tickTable(t,clock);
+  assert.equal(t.seats[2].sittingOut,true);assert.equal(t.seats[2].autoSitOut,true);
+  // In the current hand the absent player acts at once instead of holding the table.
+  while(LIVE.includes(t.phase)&&t.turn>=0){const who=t.seats[t.turn];if(who.autoSitOut){e.tickTable(t,clock);continue;}e.act(t,who.userId,t.currentBet>who.roundBet?'call':'check');}
+  const stack=t.seats[2].stack;clock+=9000;poll();e.tickTable(t,clock);
+  assert.equal(t.seats[2].inHand,false,'not dealt in');assert.equal(t.seats[2].stack,stack,'no blinds while away');
+  // Coming back resumes play automatically.
+  e.snapshot(t,'p2');assert.equal(t.seats[2].sittingOut,false);
+  // Leaving for good: after 5 minutes the chips return to the wallet.
+  e.away(t,user(2));clock+=6000;poll();e.tickTable(t,clock);assert.equal(t.seats[2].autoSitOut,true);
+  while(LIVE.includes(t.phase)&&t.turn>=0){const who=t.seats[t.turn];if(who.autoSitOut){e.tickTable(t,clock);continue;}e.act(t,who.userId,t.currentBet>who.roundBet?'call':'check');}
+  const left=t.seats[2].stack,wallet=user(2).balance;clock+=5*60000;poll();e.tickTable(t,clock);
+  assert.equal(t.seats[2],null);assert.equal(user(2).balance,wallet+left);assert.equal(total(),before);
+ }finally{Date.now=realNow;}
+});
+
+test('a reload (tab closed and reopened within seconds) changes nothing',()=>{
+ const {e,t,user}=setup([10000,10000]);e.startHand(t);const turn=t.turn;
+ e.away(t,user(turn));e.snapshot(t,'p'+turn);e.tickTable(t,Date.now()+1000);
+ assert.equal(t.seats[turn].sittingOut,false);assert.equal(t.turn,turn,'still their decision');
+});

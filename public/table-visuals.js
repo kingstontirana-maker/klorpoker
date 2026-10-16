@@ -106,13 +106,13 @@ export function preActionFor(choice,toCall){if(choice==='checkFold')return toCal
 // player-relative positions 0..5; position 3 is always the local player.
 export function seatLayout(portrait=false){
  return portrait?{seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[66,17],[70,36],[76,63],[50,63],[24,63],[30,36]],dealer:[[34,12],[84,9],[84,86],[74,86],[16,86],[16,9]]}
-  :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[74,36],[74,64],[36,74],[26,64],[26,36]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
+  :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[77,32],[77,68],[36,74],[23,68],[23,32]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
 }
 // Felt size from the free stage area; text and cards never scale with it.
 export function feltBox(width,height,portrait=false){
  // Short screens (phones in landscape, small phones) use tighter margins.
  const short=portrait?height<620:height<480;
- const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?54:78),bottom=portrait?(short?80:92):(short?62:92),side=portrait?50:(short?26:36);
+ const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?56:78),bottom=portrait?(short?80:92):(short?58:92),side=portrait?50:(short?18:36);
  const minWidth=portrait?Math.min(262,width-2*side):(short?340:520),maxWidth=1240;
  const byHeight=(height-top-bottom)*ratio,w=Math.max(Math.min(minWidth,width-2*side),Math.min(width-2*side,byHeight,maxWidth));
  const h=w/ratio,minStage=top+bottom+Math.max(minWidth,0)/ratio;

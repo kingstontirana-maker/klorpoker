@@ -175,3 +175,15 @@ Rake është gjithmonë përqindja e konfiguruar (5%) e pot-it të konkurruar, p
 
 ## Telefoni: luhet horizontalisht
 Në telefon vertikal, tavolina mbulohet nga njoftimi "Rrotullo telefonin" me animacion. Kur telefoni kthehet anash, njoftimi zhduket dhe tavolina hapet e madhe në gjithë lartësinë e ekranit: titulli dhe veglat qëndrojnë mbi cepin e sipërm, butonat e veprimeve në kolonë djathtas. Në Android, kur tavolina hyn në ekran të plotë, orientimi bllokohet horizontalisht. Kompjuterët dhe tabletët nuk preken.
+
+## Mbrojtja e lojtarit që largohet pa u ngritur
+Më parë, një lojtar që mbyllte skedën ose humbiste lidhjen mbetej i ulur dhe vazhdonte të paguante blinds pa dijeninë e tij. Tani:
+- Shfletuesi i lojtarit njofton serverin çdo 1.3 s (në skedë të fshehur çdo ~5 s). Kur skeda mbyllet, dërgon menjëherë sinjal largimi.
+- Pa sinjal për 25 s (ose 5 s pas mbylljes së skedës), lojtari kalon në **pushim automatik**: nuk merr letra dhe nuk paguan blinds. Në dorën aktuale bën check nëse është falas, përndryshe fold, pa e mbajtur tavolinën 30 s.
+- Kur kthehet, rihyn automatikisht në lojë. Big blind për rihyrje paguhet vetëm nëse janë luajtur duar pa të.
+- Nëse nuk kthehet brenda 5 minutave, çipat kthehen në portofol (arsyeja: "u shkëput nga loja").
+- Rifreskimi i faqes nuk ndikon (ka 5 s kohë rikthimi).
+Dy teste të reja e kontrollojnë këtë rrjedhë dhe që nuk humbet asnjë cent.
+
+## Letrat dhe tavolina në telefon
+Në telefon horizontal tavolina është më e madhe, p.sh. 516×246 në vend të 484×230 në një ekran 740×360, dhe zë saktësisht ekranin, pa scroll. Letrat e vogla kanë pamje si në aplikacionet e pokerit: numër dhe simbol të mëdhenj në cepin e sipërm dhe simbolin në cepin e poshtëm, pa mbivendosje. Kontrollet automatike nuk gjejnë mbivendosje në 568×320, 740×360, 844×390 dhe 1366×768.

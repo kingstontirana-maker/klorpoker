@@ -13,7 +13,7 @@ const me=token=>{const id=tokens.get(token);return db.users.find(u=>u.id===id)||
 function stateFor(u){return {user:{id:u.id,username:u.username,role:u.role,parentId:u.parentId,balance:clean(u.balance)},lastTableExit:u.tableExit||null,...(u.role!=='USER'?{rakePercent:db.rakePercent}:{}),seatedTableId:[...runtime.values()].find(t=>t.seats.some(s=>s?.userId===u.id))?.id||null,minBuyin:clean(config.minBuyin),maxBuyin:clean(config.maxBuyin),tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,sb:clean(t.sb),bb:clean(t.bb),players:t.seats.filter(Boolean).length,minBuyin:clean(l.min),maxBuyin:clean(l.max),phase:t.phase,hand:t.hand};})};}
 function staffRakeReport(u){const r=rakeReport(db,u);return {...r,total:clean(r.total),today:clean(r.today),legacyTotal:clean(r.legacyTotal),percent:db.rakePercent,serverNow:Date.now(),rows:r.rows.map(x=>({...x,amount:clean(x.amount)}))};}
 function publishRake(){for(const [res,token] of rakeClients){const u=me(token);if(!u||u.role==='USER'){res.end();rakeClients.delete(res);continue;}res.write('data: '+JSON.stringify(staffRakeReport(u))+'\n\n');}}
-async function route(req,res,url,body){const p=url.pathname,token=(req.headers.authorization||'').replace(/^Bearer /,'');if(p==='/api/login'){const user=db.users.find(x=>x.username.toLowerCase()===String(body.username||'').toLowerCase());if(!user||hash(String(body.password||''),user.salt)!==user.passHash)fail('Invalid credentials',401);const t=secret();tokens.set(t,user.id);return {token:t,...stateFor(user)};}
+async function route(req,res,url,body){const p=url.pathname,token=(req.headers.authorization||'').replace(/^Bearer /,'')||(p.endsWith('/away')&&typeof body.token==='string'?body.token:'');if(p==='/api/login'){const user=db.users.find(x=>x.username.toLowerCase()===String(body.username||'').toLowerCase());if(!user||hash(String(body.password||''),user.salt)!==user.passHash)fail('Invalid credentials',401);const t=secret();tokens.set(t,user.id);return {token:t,...stateFor(user)};}
 if(p==='/api/logout'){tokens.delete(token);for(const [client,t] of rakeClients)if(t===token)client.end();return {ok:true};}const u=me(token);if(!u)fail('Login required',401);
 if(p==='/api/state')return stateFor(u);
 if(p==='/api/users'){roleCheck(u,'CENTER','ADMIN','AGENT');return db.users.filter(x=>x.parentId===u.id).map(x=>({id:x.id,username:x.username,role:x.role,balance:clean(x.balance)}));}
@@ -30,6 +30,7 @@ if(parts[4]==='sit'){engine.sit(t,u,body.position,body.buyin,[...runtime.values(
 if(parts[4]==='leave')return engine.leave(t,u);
 if(parts[4]==='sitout'){engine.sitOut(t,u,!!body.value);return {ok:true};}
 if(parts[4]==='show'){engine.show(t,u);return {ok:true};}
+if(parts[4]==='away'){engine.away(t,u);return {ok:true};}
 if(parts[4]==='timebank'){engine.useTimeBank(t,u);return {ok:true};}
 if(parts[4]==='chat'){engine.chat(t,u,body.text);return {ok:true};}
 if(parts[4]==='start'){if(!['waiting','finished'].includes(t.phase))fail('Dora është duke u luajtur');if(!seated)fail('Nuk je ulur në tavolinë');if(!engine.startHand(t))fail('Duhen të paktën dy lojtarë me fonde në tavolinë');save();return {ok:true};}
