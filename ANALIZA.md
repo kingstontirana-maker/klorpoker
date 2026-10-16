@@ -169,3 +169,9 @@ Platforma u riemërua në **Klor Poker**: login, header, lobby, tavolinë, titul
 
 ## Sfondi i tavolinës
 Pas tavolinës është një gradient i errët me ngjyrat e faqes: dritë e butë smeraldi aty ku është tavolina, që kalon në jeshile të thellë dhe pothuajse të zezë në skaje. Musteri Art Deco i mëparshëm u hoq.
+
+## Rake pa kufi
+Rake është gjithmonë përqindja e konfiguruar (5%) e pot-it të konkurruar, pa kufi për dorë. Fusha "Kufiri për dorë" u hoq nga konfigurimi. Mbeten rregullat standarde: pa flop nuk merret rake, dhe bastet që askush nuk i ndoqi kthehen pa rake. Testi i ri riprodhon përplasjen €681.70 kundër €622.37: rake = €62.23 (5% e €1,244.74, rrumbullakosur poshtë në cent).
+
+## Telefoni: luhet horizontalisht
+Në telefon vertikal, tavolina mbulohet nga njoftimi "Rrotullo telefonin" me animacion. Kur telefoni kthehet anash, njoftimi zhduket dhe tavolina hapet e madhe në gjithë lartësinë e ekranit: titulli dhe veglat qëndrojnë mbi cepin e sipërm, butonat e veprimeve në kolonë djathtas. Në Android, kur tavolina hyn në ekran të plotë, orientimi bllokohet horizontalisht. Kompjuterët dhe tabletët nuk preken.

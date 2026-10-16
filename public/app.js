@@ -10,7 +10,7 @@ function leaveTableTab(){try{window.close();}catch{}setTimeout(()=>location.repl
 // Browsers allow fullscreen only after a click, so the table enters it on the first one.
 // Browsers only grant fullscreen inside a user action, so every click, tap or key
 // at the table re-enters it whenever it is not active (also after Esc).
-const enterFullscreen=()=>{if(!TABLE_MODE||document.fullscreenElement||!document.documentElement.requestFullscreen)return;document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(()=>{});};
+const enterFullscreen=()=>{if(!TABLE_MODE||document.fullscreenElement||!document.documentElement.requestFullscreen)return;document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{if(matchMedia('(pointer:coarse)').matches)screen.orientation?.lock?.('landscape').catch(()=>{});}).catch(()=>{});};
 for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,enterFullscreen,{capture:true});
 const roleNames={CENTER:'Qendra',ADMIN:'Administratori',AGENT:'Agjenti',USER:'Lojtari'};
 function setView(){const player=profile.user.role==='USER';if(player&&TABLE_MODE&&!tableId)return leaveTableTab();if(!TABLE_MODE)tableId=null;$('#lobby').hidden=!player||!!tableId;$('.game').hidden=!player||!tableId;$('#sidebar').hidden=!player||!tableId;$('#backLobby').hidden=!player||!tableId;$('.selectWrap').hidden=true;$('#dashboard').hidden=player;$('#closeDashboard').hidden=!player;$('#adminToggle').hidden=true;$('#workspaceLabel').textContent=player?'Hapësira e lojtarit':'Paneli · '+roleNames[profile.user.role];document.body.dataset.role=profile.user.role;document.body.dataset.view=player?(tableId?'table':'lobby'):'management';}

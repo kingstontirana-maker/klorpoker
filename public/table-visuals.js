@@ -112,7 +112,7 @@ export function seatLayout(portrait=false){
 export function feltBox(width,height,portrait=false){
  // Short screens (phones in landscape, small phones) use tighter margins.
  const short=portrait?height<620:height<480;
- const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?58:78),bottom=portrait?(short?80:92):(short?66:92),side=portrait?50:(short?28:36);
+ const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?54:78),bottom=portrait?(short?80:92):(short?62:92),side=portrait?50:(short?26:36);
  const minWidth=portrait?Math.min(262,width-2*side):(short?340:520),maxWidth=1240;
  const byHeight=(height-top-bottom)*ratio,w=Math.max(Math.min(minWidth,width-2*side),Math.min(width-2*side,byHeight,maxWidth));
  const h=w/ratio,minStage=top+bottom+Math.max(minWidth,0)/ratio;

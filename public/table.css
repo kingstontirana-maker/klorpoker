@@ -330,29 +330,35 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .dock{--dock-h:150px}.dock.myTurn .actionSummary{display:none}
  .actionButtons button{height:44px}.betPresets button,.betPicker #allIn{height:28px}.betStep,#betInput{height:30px}
 }
-/* Phones in landscape: like a poker app, the actions form a column at the right
-   and the site header steps aside so the whole table fits without scrolling. */
+/* Phones in landscape: the table takes the whole height. Title and tools float
+   over the top corners and the actions form a narrow column at the right. */
 @media(max-height:560px) and (orientation:landscape){
  body[data-view="table"] header{display:none}
- .game{min-height:100dvh;grid-template-columns:minmax(0,1fr) 196px;grid-template-rows:auto minmax(var(--stage-min,300px),1fr);column-gap:10px;padding:0 10px}
- .tableToolbar{grid-column:1 / -1;min-height:40px;padding:4px 2px}
- .tableTitle h2{font-size:14px}.tableTools .tool{height:30px}
- .dock{grid-column:2;grid-row:2;position:relative;bottom:auto;align-self:stretch;align-content:center;grid-template-columns:1fr;gap:8px;margin:0 0 8px;padding:10px;--dock-h:0px;border-radius:14px}
- .dockInfo{flex-direction:column;gap:2px}#handStrength{font-size:14px}.actionSummary{font-size:11px}#blindInfo{display:none}
- .betPicker{grid-template-columns:1fr auto}.betSlider{grid-column:1 / -1;grid-template-columns:26px minmax(40px,1fr) 26px 64px;gap:4px}
- .betPresets{overflow-x:auto}.betPresets button{padding:0 6px;font-size:11px;height:26px}.betPicker #allIn{height:26px;padding:0 8px;font-size:11px}
+ .game{min-height:100dvh;grid-template-columns:minmax(0,1fr) 184px;grid-template-rows:minmax(var(--stage-min,280px),1fr);column-gap:8px;padding:0 8px 0 4px}
+ .tableToolbar{position:absolute;z-index:60;left:6px;right:196px;top:4px;min-height:0;padding:0;pointer-events:none;align-items:flex-start}
+ .tableToolbar>*{pointer-events:auto}
+ .tableTitle{gap:6px}.tableTitle h2{font-size:12px;max-width:150px}.tableSessionMeta{font-size:9px;margin-top:1px;gap:6px}
+ .tableTitle .iconTool{width:28px;height:28px;font-size:13px}
+ .tableTools{gap:4px}.tableTools .tool{height:28px;padding:0 8px;font-size:12px;background:#0a1210cc}
+ #connectionStatus{font-size:0;margin:0}#connectionStatus:before{margin:0}
+ .tableStage{grid-column:1;grid-row:1}
+ .dock{grid-column:2;grid-row:1;position:relative;bottom:auto;align-self:center;align-content:center;grid-template-columns:1fr;gap:7px;margin:6px 0;padding:9px;--dock-h:0px;border-radius:14px;max-height:calc(100dvh - 12px);overflow:auto}
+ .dockInfo{flex-direction:column;gap:2px}#handStrength{font-size:13px}.actionSummary{font-size:10px}#blindInfo{display:none}
+ .betPicker{grid-template-columns:1fr auto}.betSlider{grid-column:1 / -1;grid-template-columns:24px minmax(36px,1fr) 24px 58px;gap:4px}
+ .betPresets{overflow-x:auto;gap:4px}.betPresets button{padding:0 5px;font-size:11px;height:26px;min-width:0}.betPicker #allIn{height:26px;padding:0 7px;font-size:11px}
  .betStep,#betInput{height:28px;font-size:13px}
- .actionButtons{grid-template-columns:1fr}.actionButtons button{height:40px;font-size:15px}.actionButtons kbd{display:none}
- .preActions{grid-template-columns:1fr}.preActions label{height:38px;font-size:12px}
- .tableStage{--board-w:clamp(32px,calc(var(--felt-h,240px)*.15),56px);--me-hole-h:clamp(46px,calc(var(--felt-h,240px)*.21),78px);--hole-w:30px;--hole-h:42px}
+ .actionButtons{grid-template-columns:1fr;gap:6px}.actionButtons button{height:40px;font-size:15px}.actionButtons kbd{display:none}
+ .preActions{grid-template-columns:1fr;gap:6px}.preActions label{height:36px;font-size:12px}
+ .tableStage{--board-w:clamp(34px,calc(var(--felt-h,260px)*.16),60px);--me-hole-h:clamp(48px,calc(var(--felt-h,260px)*.22),82px);--hole-w:30px;--hole-h:42px}
  .game .pot{top:24%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
- .game .winnerBanner{top:26%}.winnerChoice{padding:4px 10px;font-size:12px}.winnerChoice small{display:none}
+ .game .winnerBanner{top:26%}
  .game .community{top:50%;gap:4px}.feltBrand{display:none}
  .game .emptySeat span{font-size:16px;line-height:16px}.game .emptySeat b{font-size:8px}
  .tableBet .chipStacks{display:none}
  .game .seat{width:52px;height:52px}.game .seat.me{width:56px;height:56px}
  .game .seatName{width:96px;padding:3px 5px 4px}.game .seatName strong{font-size:13px}.game .seat.me .seatName{width:110px}
  .game .seatAction{top:calc(100% + 22px);font-size:9px;line-height:14px}.game .seat.me .seatAction{display:none}
+ .game .winBadge{font-size:13px;line-height:18px;padding:2px 9px}
  .drawer{top:0}
 }
 
@@ -381,3 +387,18 @@ body[data-view="table"] .game:before{content:'';position:fixed;inset:0;pointer-e
 body[data-view="table"] .tableStage{background:none}
 body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at center,#2bd99012 0%,transparent 65%)}
 .game:fullscreen{background:#050a08}
+
+/* ---------- Phones held upright: ask for landscape ----------
+   The game is played sideways on a phone; the notice disappears as soon as
+   the phone is turned. Desktop windows and tablets are not affected. */
+.rotateNotice{display:none}
+@media(pointer:coarse) and (orientation:portrait) and (max-width:600px){
+ body[data-view="table"] .rotateNotice{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;background:radial-gradient(ellipse 90% 70% at 50% 40%,#12382a 0%,#0a1612 55%,#040806 100%);color:var(--ink)}
+ body[data-view="table"] .rotateNotice h3{margin:10px 0 0;font-size:22px;letter-spacing:.02em;color:var(--ink)}
+ body[data-view="table"] .rotateNotice p{margin:0;max-width:280px;font-size:14px;line-height:1.55;color:var(--ink-2)}
+ body[data-view="table"] .game>:not(.rotateNotice){visibility:hidden}
+}
+.rotatePhone{position:relative;width:64px;height:108px;border:3px solid var(--mint);border-radius:14px;box-shadow:0 0 30px #5ef0a840;animation:rotatePhone 2.4s cubic-bezier(.6,0,.3,1) infinite}
+.rotatePhone:before{content:'';position:absolute;left:50%;top:7px;width:18px;height:3px;border-radius:2px;background:var(--mint);transform:translateX(-50%)}
+.rotatePhone span{position:absolute;inset:16px 7px;border-radius:6px;background:radial-gradient(ellipse at 50% 40%,#25b07f,#0e6448 70%)}
+@keyframes rotatePhone{0%,20%{transform:rotate(0)}50%,75%{transform:rotate(-90deg)}100%{transform:rotate(-90deg);opacity:.0}}
