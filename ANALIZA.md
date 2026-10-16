@@ -187,3 +187,15 @@ Dy teste të reja e kontrollojnë këtë rrjedhë dhe që nuk humbet asnjë cent
 
 ## Letrat dhe tavolina në telefon
 Në telefon horizontal tavolina është më e madhe, p.sh. 516×246 në vend të 484×230 në një ekran 740×360, dhe zë saktësisht ekranin, pa scroll. Letrat e vogla kanë pamje si në aplikacionet e pokerit: numër dhe simbol të mëdhenj në cepin e sipërm dhe simbolin në cepin e poshtëm, pa mbivendosje. Kontrollet automatike nuk gjejnë mbivendosje në 568×320, 740×360, 844×390 dhe 1366×768.
+
+### Rrotullimi automatik
+Njoftimi "Rrotullo telefonin" ka butonin "▶ Luaj horizontalisht". Në Android, një prekje e vendos lojën në ekran të plotë dhe e rrotullon ekranin horizontalisht vetë. Në aplikacionin e instaluar (PWA) rrotullimi provohet automatikisht sapo hapet tavolina. Në iPhone Apple nuk e lejon, prandaj butoni fshihet dhe mbetet udhëzimi për ta kthyer telefonin.
+
+## Kontrollet në telefon (horizontal)
+- Tavolina zë gjithë ekranin. Paneli anësor u hoq; titulli dhe veglat qëndrojnë mbi cepin e sipërm.
+- Në cepin poshtë djathtas ka **3 butona të rrumbullakët**: Fold, Check/Call, Raise (Bet). Kur ka bast, Check bëhet **Call** dhe poshtë tij shfaqet shuma që duhet vënë.
+- **Raise me dy prekje:** prekja e parë hap panelin e shumës (⅓, ½, ¾, Pot, All-in, slider), butoni bëhet "OK €X" dhe prekja e dytë konfirmon. Kështu shmangen ngritjet aksidentale.
+- Kur nuk është radha jote, në vend të butonave dalin tre rrathë për veprimet paraprake (Check/Fold, Check, Call çdo bast).
+- Info e dorës (radha, kombinimi, time bank) del në një etiketë të vogël poshtë majtas.
+- Për lojë praktike: telefoni dridhet kur vjen radha, ekrani nuk fiket gjatë lojës (Wake Lock) dhe zmadhimi me prekje të dyfishtë është çaktivizuar.
+- Kontrolli automatik me 6 lojtarë në tavolinë nuk gjen mbivendosje në 568×320, 667×375, 740×360, 844×390 dhe 915×412. Në ekranet më të ngushta tavolina zhvendoset pak majtas që butonat të mos mbulojnë lojtarët.

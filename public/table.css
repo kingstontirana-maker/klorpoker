@@ -180,6 +180,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .actionSummary{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}#blindInfo{color:var(--ink-3)}
 .dockActions{display:grid;gap:8px;min-width:0}
 .betPicker{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:8px;align-items:center}
+.sizingHead{display:none}
 .betPicker #allIn{height:30px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:700}
 .betPresets{display:flex;gap:6px;justify-content:flex-end;min-height:30px}
 .betPresets button{height:30px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:600;background:#ffffff0a;border:1px solid var(--line-2);color:var(--ink-2)}
@@ -330,26 +331,66 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .dock{--dock-h:150px}.dock.myTurn .actionSummary{display:none}
  .actionButtons button{height:44px}.betPresets button,.betPicker #allIn{height:28px}.betStep,#betInput{height:30px}
 }
-/* Phones in landscape: the table takes the whole height. Title and tools float
-   over the top corners and the actions form a narrow column at the right. */
+/* Phones in landscape: the table fills the screen. Title and tools float over the
+   top corner; three round action buttons sit in the bottom-right corner, with the
+   bet panel opening beside them only when the player taps Raise. */
 @media(max-height:560px) and (orientation:landscape){
  body[data-view="table"] header{display:none}
  body[data-view="table"]{overflow:hidden;overscroll-behavior:none}
- .game{min-height:100dvh;grid-template-columns:minmax(0,1fr) 168px;grid-template-rows:minmax(var(--stage-min,280px),1fr);column-gap:8px;padding:0 8px 0 4px}
- .tableToolbar{position:absolute;z-index:60;left:6px;right:180px;top:4px;min-height:0;padding:0;pointer-events:none;align-items:flex-start}
+ .game{min-height:100dvh;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(var(--stage-min,280px),1fr);padding:0;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+ .tableToolbar{position:absolute;z-index:60;left:6px;right:6px;top:4px;min-height:0;padding:0;pointer-events:none;align-items:flex-start}
  .tableToolbar>*{pointer-events:auto}
  .tableTitle{gap:6px}.tableTitle h2{font-size:12px;max-width:150px}.tableSessionMeta{font-size:9px;margin-top:1px;gap:6px}
- .tableTitle .iconTool{width:28px;height:28px;font-size:13px}
- .tableTools{gap:4px}.tableTools .tool{height:28px;padding:0 8px;font-size:12px;background:#0a1210cc}
+ .tableTitle .iconTool{width:30px;height:30px;font-size:13px}
+ .tableTools{gap:4px}.tableTools .tool{height:30px;padding:0 9px;font-size:12px;background:#0a1210cc}
  #connectionStatus{font-size:0;margin:0}#connectionStatus:before{margin:0}
  .tableStage{grid-column:1;grid-row:1}
- .dock{grid-column:2;grid-row:1;position:relative;bottom:auto;align-self:center;align-content:center;grid-template-columns:1fr;gap:7px;margin:6px 0;padding:9px;--dock-h:0px;border-radius:14px;max-height:calc(100dvh - 12px);overflow:auto}
- .dockInfo{flex-direction:column;gap:2px}#handStrength{font-size:13px}.actionSummary{font-size:10px}#blindInfo{display:none}
- .betPicker{grid-template-columns:1fr auto}.betSlider{grid-column:1 / -1;grid-template-columns:minmax(40px,1fr) 60px;gap:6px}.betStep{display:none}
- .betPresets{overflow-x:auto;gap:4px}.betPresets button{padding:0 5px;font-size:11px;height:26px;min-width:0}.betPicker #allIn{height:26px;padding:0 7px;font-size:11px}
- .betStep,#betInput{height:28px;font-size:13px}
- .actionButtons{grid-template-columns:1fr;gap:6px}.actionButtons button{height:40px;font-size:15px}.actionButtons kbd{display:none}
- .preActions{grid-template-columns:1fr;gap:6px}.preActions label{height:36px;font-size:12px}
+
+ /* The dock dissolves into floating pieces over the table. */
+ .dock{position:fixed;inset:auto 0 0 0;z-index:70;display:block;width:auto;max-width:none;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;backdrop-filter:none;pointer-events:none;animation:none}
+ .dock>*{pointer-events:auto}
+ .dock.myTurn{animation:none;box-shadow:none}
+ .dock.idle:not(.hasExtras){visibility:visible;opacity:1}
+ .dock.idle .dockActions{display:none}
+
+ /* Hand info: a small pill at the bottom-left. */
+ .dockInfo{position:fixed;left:8px;bottom:8px;max-width:34vw;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 10px;border-radius:12px;background:#07100dd9;border:1px solid var(--line-2);text-align:left}
+ .dock.idle .dockInfo{align-items:flex-start;text-align:left}
+ .dock.idle:not(.hasExtras) .dockInfo{display:none}
+ #turnInfo{font-size:9px}#handStrength{font-size:13px}.actionSummary{display:none}#blindInfo{display:none}#inactivityNotice{font-size:9px}
+ .timeBankButton{height:22px;font-size:10px;padding:0 8px}
+
+ /* Three round buttons stacked in the bottom-right corner. */
+ .dockActions{position:fixed;right:10px;bottom:10px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+ .actionButtons{display:flex;flex-direction:column;gap:9px;align-items:center}
+ .actionButtons button{width:64px;height:64px;padding:0;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;font-size:13px;font-weight:800;line-height:1.1;box-shadow:0 6px 16px #000b,inset 0 1px 0 #ffffff26}
+ .actionButtons button span{display:flex;flex-direction:column;align-items:center}
+ .actionButtons button small{display:block;font-size:10px;font-weight:700;opacity:.95}
+ .actionButtons kbd{display:none}
+ .actionButtons #check,.actionButtons #call{order:2}.actionButtons .fold{order:1}.actionButtons .raise{order:3}
+ .dock.myTurn .actionButtons .raise{box-shadow:0 6px 16px #000b,0 0 0 2px #7dffc455,0 0 20px #2bd99066}
+ .actionButtons button:disabled{opacity:.3}
+ .dock.waitingTurn .actionButtons{display:none}
+
+ /* Pre-actions take the same round shape when it is not your turn. */
+ .preActions{display:flex;flex-direction:column;gap:9px;align-items:center}
+ .preActions>span{display:none}
+ .preActions label{width:64px;height:64px;padding:4px;border-radius:50%;flex-direction:column;justify-content:center;gap:2px;font-size:10px;line-height:1.1;text-align:center;white-space:normal;background:#07100dcc;border:1.5px dashed #ffffff40}
+ .preActions input{width:14px;height:14px}
+
+ /* Bet sizes appear beside the buttons only after a first tap on Raise. */
+ .betPicker{display:none}
+ .dock.sizing .betPicker{position:fixed;right:86px;bottom:10px;z-index:75;display:grid;grid-template-columns:1fr;gap:8px;width:min(270px,48vw);padding:10px;border-radius:16px;background:#0a1411f2;border:1px solid #5ef0a855;box-shadow:0 14px 40px #000d}
+ .sizingHead{display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+ .sizingHead button{width:26px;height:26px;padding:0;border-radius:50%;font-size:12px;background:#ffffff10;border:1px solid var(--line-2)}
+ .betPresets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;min-height:0}
+ .betPresets button{height:34px;padding:0;font-size:13px;min-width:0}
+ .betPicker #allIn{height:34px;font-size:13px}
+ .betSlider{grid-template-columns:34px minmax(40px,1fr) 34px 70px;gap:6px}
+ .betStep{display:block;height:34px;font-size:18px}
+ #betInput{height:34px;font-size:14px}
+ .dockExtras{display:flex;justify-content:flex-end}.dockExtras button{height:34px;border-radius:999px;font-size:12px}
+
  .tableStage{--board-w:clamp(32px,calc(var(--felt-h,260px)*.185),62px);--me-hole-h:clamp(44px,calc(var(--felt-h,260px)*.27),88px);--me-hole-w:calc(var(--me-hole-h)/1.4);--hole-w:34px;--hole-h:48px}
  /* Small cards use a phone-style face: a large rank and suit in one corner and a
     clear suit in the other, so nothing overlaps and every card reads at a glance. */
@@ -358,9 +399,10 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .game .card.face .centerSuit{left:auto;top:auto;right:7%;bottom:6%;width:48%;height:48%;transform:none}
  .game .card.face{border-radius:6px}
  .game .seat.me .seatCards .card:first-child{transform:rotate(-3deg)}.game .seat.me .seatCards .card:nth-child(2){transform:rotate(3deg)}
- .game .pot{top:24%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
- .game .winnerBanner{top:26%}
- .game .community{top:50%;gap:4px}.feltBrand{display:none}
+ .game .pot{top:34%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
+ .game .winnerBanner{top:34%}
+ .game .community{top:53%;gap:4px}.feltBrand{display:none}
+ .game .seat[data-visual-position="0"] .seatAction{display:none}
  .game .emptySeat span{font-size:16px;line-height:16px}.game .emptySeat b{font-size:8px}
  .tableBet .chipStacks{display:none}
  .game .seat{width:52px;height:52px}.game .seat.me{width:56px;height:56px}
@@ -410,3 +452,14 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 .rotatePhone:before{content:'';position:absolute;left:50%;top:7px;width:18px;height:3px;border-radius:2px;background:var(--mint);transform:translateX(-50%)}
 .rotatePhone span{position:absolute;inset:16px 7px;border-radius:6px;background:radial-gradient(ellipse at 50% 40%,#25b07f,#0e6448 70%)}
 @keyframes rotatePhone{0%,20%{transform:rotate(0)}50%,75%{transform:rotate(-90deg)}100%{transform:rotate(-90deg);opacity:.0}}
+
+.rotateButton{margin-top:10px;padding:14px 26px;border-radius:999px;font-size:16px;font-weight:700;color:#04140d;background:linear-gradient(180deg,#7dffc4,#2fd38a);border:0;box-shadow:0 10px 30px #2bd99055}
+.rotateButton[hidden]{display:none}
+/* Narrow phones in landscape: shift the table left so the round buttons never
+   cover the right-hand players, and keep the top tools clear of their cards. */
+@media(max-height:560px) and (orientation:landscape) and (max-width:700px){
+ .tableStage{margin-right:74px}
+ .tableTools .tool,.tableTitle .iconTool{height:26px}.tableTitle .iconTool{width:26px}
+ .tableToolbar{top:2px}
+ .game .pot{top:35.5%;padding:2px 9px}.game .pot>strong{font-size:14px}.game .winnerBanner{top:35.5%}
+}

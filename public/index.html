@@ -8,7 +8,7 @@
 <section id="lobby" hidden><div class="pageIntro"><div><span class="eyebrow">KLOR POKER / LOBBY</span><h1>Gjej tavolinën tënde.</h1><p>Texas Hold’em · No Limit · Deri në 6 lojtarë</p></div><div class="walletCard"><span>PORTOFOLI YT</span><strong id="lobbyBalance">0.00</strong><small>Kredit virtual</small></div></div><div class="lobbyStrip"><div><span class="statusDot"></span> Tavolinat e disponueshme <b id="tableCount">0</b></div><span id="creditNotice"></span><button type="button" class="rulesLink" data-open-rules>♠ Renditja e duarve</button></div><div id="lobbyTables"></div><div class="lobbyGuide"><div><b>01</b><span>Zgjidh tavolinën<small>Krahaso blinds dhe buy-in.</small></span></div><div><b>02</b><span>Zgjidh vendin<small>Vendos shumën nga portofoli.</small></span></div><div><b>03</b><span>Fillo lojën<small>Dora nis me të paktën dy lojtarë.</small></span></div></div></section>
 
 <section class="game" hidden>
-<div class="rotateNotice" role="alert" aria-live="assertive"><div class="rotatePhone" aria-hidden="true"><span></span></div><h3>Rrotullo telefonin</h3><p>Klor Poker luhet horizontalisht. Ktheje telefonin anash për të vazhduar lojën.</p></div>
+<div class="rotateNotice" role="alert" aria-live="assertive"><div class="rotatePhone" aria-hidden="true"><span></span></div><h3>Rrotullo telefonin</h3><p>Klor Poker luhet horizontalisht. Ktheje telefonin anash për të vazhduar lojën.</p><button id="rotateNow" class="rotateButton" type="button" hidden>▶ Luaj horizontalisht</button></div>
 <div class="tableToolbar">
  <div class="tableTitle"><button id="backLobby" class="iconTool" hidden aria-label="Kthehu në lobby" title="Lobby">←</button><div><h2 id="activeTableName">Tavolina</h2><div class="tableSessionMeta"><span id="tableHandInfo"></span><span id="nextHandCountdown"></span></div></div></div>
  <div class="tableTools">
@@ -37,6 +37,7 @@
  <div class="dockActions">
   <div id="preActions" class="preActions" hidden><span>Veprim paraprak</span><label><input type="checkbox" data-pre="checkFold"> Check/Fold</label><label><input type="checkbox" data-pre="check"> Check</label><label><input type="checkbox" data-pre="call"> Call çdo bast</label></div>
   <div class="betPicker">
+   <div class="sizingHead"><span>Shuma e bastit</span><button id="closeSizing" type="button" aria-label="Mbyll">✕</button></div>
    <div class="betPresets" id="betPresets"></div><button id="allIn" class="allInButton">All-in</button>
    <div class="betSlider"><button id="stepBetDown" class="betStep" aria-label="Zvogëlo bastin">−</button><input type="range" id="betRange" min="0" max="100" value="0" step="0.01" aria-label="Shuma e bastit"><button id="stepBetUp" class="betStep" aria-label="Rrit bastin">+</button><label class="betValue"><span class="srOnly">Shuma</span><input id="betInput" type="number" min="0" step="0.01" value="0" aria-label="Shuma e bastit"><b id="betLabel" class="srOnly">0.00</b></label></div>
   </div>

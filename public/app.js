@@ -12,11 +12,19 @@ function leaveTableTab(){try{window.close();}catch{}setTimeout(()=>location.repl
 // at the table re-enters it whenever it is not active (also after Esc).
 const enterFullscreen=()=>{if(!TABLE_MODE||document.fullscreenElement||!document.documentElement.requestFullscreen)return;document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{if(matchMedia('(pointer:coarse)').matches)screen.orientation?.lock?.('landscape').catch(()=>{});}).catch(()=>{});};
 for(const type of ['pointerdown','keydown','touchend'])document.addEventListener(type,enterFullscreen,{capture:true});
+// Turning the screen sideways: Android allows it inside fullscreen (one tap) and in the
+// installed app (no tap at all). iPhone does not, so there the notice asks the player.
+const lockLandscape=()=>screen.orientation?.lock?.('landscape').catch(()=>{});
+const canRotate=!!(document.documentElement.requestFullscreen&&screen.orientation?.lock);
+if(TABLE_MODE){$('#rotateNow').hidden=!canRotate;lockLandscape();}
+$('#rotateNow').onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen({navigationUI:'hide'});await screen.orientation.lock('landscape');}catch{toast('Ktheje telefonin anash për të vazhduar.');}};
 const roleNames={CENTER:'Qendra',ADMIN:'Administratori',AGENT:'Agjenti',USER:'Lojtari'};
 function setView(){const player=profile.user.role==='USER';if(player&&TABLE_MODE&&!tableId)return leaveTableTab();if(!TABLE_MODE)tableId=null;$('#lobby').hidden=!player||!!tableId;$('.game').hidden=!player||!tableId;$('#sidebar').hidden=!player||!tableId;$('#backLobby').hidden=!player||!tableId;$('.selectWrap').hidden=true;$('#dashboard').hidden=player;$('#closeDashboard').hidden=!player;$('#adminToggle').hidden=true;$('#workspaceLabel').textContent=player?'Hapësira e lojtarit':'Paneli · '+roleNames[profile.user.role];document.body.dataset.role=profile.user.role;document.body.dataset.view=player?(tableId?'table':'lobby'):'management';}
 function showApp(){profile&&($('#login').hidden=true,$('#app').hidden=false);$('#userTag').textContent=profile.user.username+' · '+roleNames[profile.user.role];$('#balanceTag').textContent=fmt(profile.user.balance);$('#adminToggle').hidden=profile.user.role==='USER';}
 async function refreshProfile(){const oldSeat=profile?.seatedTableId;profile=await api('state');if(oldSeat&&!profile.seatedTableId&&tableId===oldSeat){tableId=null;current=null;visuals.reset();for(const id of ['#rebuyDialog','#chipDialog'])if($(id).open)$(id).close();toast(profile.lastTableExit?.reason==='INACTIVE'?'U largove nga tavolina pas dy duarve pa veprim. Çipat u kthyen në portofol.':'U largove nga tavolina. Çipat e mbetur u kthyen në portofol.');}showApp();const prev=$('#tables').value;$('#tables').innerHTML=profile.tables.map(t=>`<option value="${t.id}">${safe(t.name)} • ${fmt(t.sb)}/${fmt(t.bb)} • ${t.players}/6</option>`).join('');$('#tables').value=profile.tables.some(t=>t.id===tableId)?tableId:profile.tables[0]?.id;setView();renderLobby();if(profile.user.role!=='USER'&&!$('#rakeForm').contains(document.activeElement)){$('#rakePct').value=profile.rakePercent;}if(profile.user.role!=='USER')renderManagedTables();if($('#chipDialog').open)syncDeposit('chip');}
 const portraitQuery=window.matchMedia('(max-width:900px) and (orientation:portrait), (max-width:520px)');const isPortrait=()=>portraitQuery.matches;
+// Phones in landscape get the app-style controls: round buttons, a bet panel on demand.
+const phoneQuery=window.matchMedia('(max-height:560px) and (orientation:landscape)');const isPhone=()=>phoneQuery.matches;
 const visuals=new TableVisuals($('#table'));
 // Animations are part of the game feel; the ⋯ menu turns them off.
 visuals.motion=sessionStorage.getItem('pokerMotion')!=='off';$('.game').classList.toggle('reducedMotion',!visuals.motion);
@@ -32,7 +40,7 @@ function render(t){
  $('#activeTableName').textContent=t.name;$('#tableHandInfo').textContent='Dora #'+t.hand+' · '+(t.runout?'All-in · '+phaseLabel(t.phase):phaseLabel(t.phase));$('#runoutLabel').hidden=!t.runout;$('#potValue').textContent=fmt(t.pot);$('#potCaption').textContent=t.phase==='finished'?'POTI I DORËS':'POTI';$('.pot').classList.toggle('settled',t.phase==='finished');setMarkup($('#potChips'),chipStack(t.pot));
  for(let i=0;i<5;i++){let slot=$('#community').children[i];if(!slot){slot=document.createElement('div');slot.className='boardSlot';$('#community').append(slot);}const code=t.board[i];setMarkup(slot,card(code,{winning:win.board.has(code),dim:!!win.hand&&!!code&&!win.board.has(code),index:i}));}
  if(tableViewKey!==t.id){$('#seats').replaceChildren();$('#tableBets').replaceChildren();tableViewKey=t.id;}
- const layout=seatLayout(isPortrait()),relativeOf=i=>seatIdx>=0?(i-seatIdx+3+6)%6:i;
+ const layout=seatLayout(isPortrait(),isPhone()),relativeOf=i=>seatIdx>=0?(i-seatIdx+3+6)%6:i;
  // A seated player has no use for the other JOIN buttons.
  $('#table').classList.toggle('seated',seatIdx>=0);
  t.seats.forEach((seat,i)=>{
@@ -52,7 +60,7 @@ function render(t){
   const pots=result.pots.filter(p=>!p.refunded).map((p,i)=>`<span>${i?'SIDE POT '+i:'POTI KRYESOR'} <b>${fmt(p.amount)}</b></span>`).join('');setMarkup($('#result'),`<div class="winnerChoices">${payouts}</div>${result.pots.filter(p=>!p.refunded).length>1?`<div class="potBreakdown">${pots}</div>`:''}`);
  }
  const can=t.turn>=0&&t.seats[t.turn]?.isMe&&!actionBusy&&(!t.actionDeadline||t.serverNow<t.actionDeadline),call=mine?Math.max(0,t.currentBet-mine.bet):0,limits=betLimits(t,mine);
- if(can&&!wasMyTurn)visuals.beep('turn');wasMyTurn=!!can;
+ if(can&&!wasMyTurn){visuals.beep('turn');navigator.vibrate?.([40,60,40]);}if(!can)$('.dock').classList.remove('sizing');wasMyTurn=!!can;
  const dock=$('.dock'),inPlay=!!mine&&LIVE.includes(t.phase)&&mine.inHand&&!mine.folded&&!mine.allIn&&!t.leaving&&!t.runout;dock.classList.toggle('myTurn',!!can);dock.classList.toggle('waitingTurn',inPlay&&!can&&t.turn>=0);dock.classList.toggle('idle',!inPlay||t.turn<0&&!can);
  $('#turnInfo').textContent=t.runout?'All-in · letrat po hapen':actionBusy?'Duke dërguar veprimin…':can?'RADHA JOTE':t.turn>=0?(t.seats[t.turn]?.username||'Lojtari')+' është në radhë':t.phase==='finished'?'Dora përfundoi':'Në pritje të lojtarëve';
  $('#inactivityNotice').hidden=!(mine?.inactiveHands>0);$('#inactivityNotice').textContent=mine?.inactiveHands?'Pasivitet: '+mine.inactiveHands+'/2 · Dora e tretë: largim':'';$('#handStrength').textContent=describeHand(t.myHandScore)||(mine?.inHand&&LIVE.includes(t.phase)&&startingHand(t.myCards))||(mine?'Çipat e tu: '+fmt(mine.stack):'LETRAT E TUA');
@@ -76,7 +84,9 @@ $('#tables').onchange=()=>{tableId=$('#tables').value;tableRefresh();};$('#seats
 $('#sitOut').onclick=()=>mutate('table/'+tableId+'/sitout',{value:!current?.sittingOut});$('#showCards').onclick=()=>mutate('table/'+tableId+'/show',{});
 async function playAction(type,amount){if(actionBusy||!current||!current.seats[current.turn]?.isMe)return;actionBusy=true;render(current);try{await api('table/'+tableId+'/action',{type,amount});await tableRefresh();await refreshProfile();}catch(e){toast(e.message);}finally{actionBusy=false;if(current)render(current);}}
 for(const type of ['fold','check','call'])$('#'+type).onclick=()=>playAction(type);
-$('#raise').onclick=()=>playAction('raise',Number($('#betInput').value));
+// On a phone the first tap on Raise opens the bet panel and the second confirms it.
+$('#raise').onclick=()=>{const dock=$('.dock');if(isPhone()&&!dock.classList.contains('sizing')){dock.classList.add('sizing');syncBetLabel();return;}dock.classList.remove('sizing');playAction('raise',Number($('#betInput').value));};
+$('#closeSizing').onclick=()=>{$('.dock').classList.remove('sizing');syncBetLabel();};
 $('#allIn').onclick=()=>{const mine=current?.seats.find(s=>s?.isMe);if(!mine)return;const target=Math.round((mine.stack+mine.bet)*100)/100;playAction(target<=current.currentBet?'call':'raise',target);};
 $('#betPresets').onclick=e=>{const button=e.target.closest('[data-value]');if(!button||button.disabled)return;$('#betInput').value=$('#betRange').value=button.dataset.value;syncBetLabel();};
 $('#betRange').oninput=()=>{$('#betInput').value=$('#betRange').value;syncBetLabel();};$('#betInput').oninput=()=>{$('#betRange').value=$('#betInput').value;syncBetLabel();};
@@ -139,7 +149,7 @@ function stepBet(direction){if(!current)return;const mine=current.seats.find(s=>
 $('#stepBetDown').onclick=()=>stepBet(-1);$('#stepBetUp').onclick=()=>stepBet(1);
 
 
-let lastPortrait=null;function layoutTable(){const stage=$('.tableStage');if(!stage||!stage.clientWidth)return;const portrait=isPortrait(),box=feltBox(stage.clientWidth,stage.clientHeight,portrait);$('.game').style.setProperty('--stage-min',Math.ceil(box.minStage)+'px');stage.style.setProperty('--felt-w',box.width+'px');stage.style.setProperty('--felt-h',box.height+'px');stage.style.setProperty('--felt-top',box.top+'px');if(lastPortrait!==null&&lastPortrait!==portrait&&current)render(current);lastPortrait=portrait;}
+let lastPortrait=null;function layoutTable(){const stage=$('.tableStage');if(!stage||!stage.clientWidth)return;const portrait=isPortrait(),box=feltBox(stage.clientWidth,stage.clientHeight,portrait);$('.game').style.setProperty('--stage-min',Math.ceil(box.minStage)+'px');stage.style.setProperty('--felt-w',box.width+'px');stage.style.setProperty('--felt-h',box.height+'px');stage.style.setProperty('--felt-top',box.top+'px');const mode=portrait+':'+isPhone();if(lastPortrait!==null&&lastPortrait!==mode&&current)render(current);lastPortrait=mode;}
 new ResizeObserver(layoutTable).observe($('.tableStage'));
 window.addEventListener('resize',layoutTable);
 
@@ -190,7 +200,7 @@ async function startRakeStream(){
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&profile?.user.role!=='USER')loadRakeReport();});
 
 // Bet vs raise follows the rules: the first wager of a street is a bet.
-function syncBetLabel(){const value=Number($('#betInput').value)||0;$('#betLabel').textContent=fmt(value);if(!current)return;const mine=current.seats.find(s=>s?.isMe),limits=betLimits(current,mine);$('#raise span').innerHTML=`${mine&&value>=limits.max?'All-in':current.legalActions?.isBet?'Bet':'Raise'} <small>${fmt(value)}</small>`;}
+function syncBetLabel(){const value=Number($('#betInput').value)||0;$('#betLabel').textContent=fmt(value);if(!current)return;const mine=current.seats.find(s=>s?.isMe),limits=betLimits(current,mine);const word=mine&&value>=limits.max?'All-in':current.legalActions?.isBet?'Bet':'Raise';$('#raise span').innerHTML=isPhone()&&$('.dock').classList.contains('sizing')?`OK <small>${fmt(value)}</small>`:`${word} <small>${fmt(value)}</small>`;}
 // Pre-selected actions fire once when the turn arrives; a changed bet cancels "Check".
 function renderPreActions(t,mine,can,call){
  const box=$('#preActions'),eligibleNow=!!mine&&LIVE.includes(t.phase)&&mine.inHand&&!mine.folded&&!mine.allIn&&!t.leaving;
@@ -221,3 +231,7 @@ document.addEventListener('click',e=>{const menu=document.querySelector('.moreMe
 // During an all-in runout follow the server's street-by-street reveal closely.
 setInterval(()=>{if(current?.runout&&!document.hidden)tableRefresh();},450);
 
+
+// Keep the phone screen awake while a table is open.
+let wakeLock=null;const keepAwake=async()=>{if(!TABLE_MODE||document.hidden||wakeLock||!navigator.wakeLock)return;try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}catch{}};
+keepAwake();document.addEventListener('visibilitychange',keepAwake);document.addEventListener('pointerdown',keepAwake,{once:true});
