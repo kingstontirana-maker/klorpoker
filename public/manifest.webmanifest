@@ -1,0 +1,15 @@
+{
+  "name": "Klor Poker",
+  "short_name": "Klor Poker",
+  "description": "Texas Hold'em me kredit virtual",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#08100d",
+  "theme_color": "#08100d",
+  "icons": [
+    {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+    {"src": "/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable"}
+  ]
+}
