@@ -30,7 +30,8 @@ export class TableVisuals {
   constructor(root){this.root=root;this.lastSeq=0;this.tableId=null;this.hand=0;this.generation=0;this.queue=Promise.resolve();this.scheduled=0;this.clockOffset=0;this.lastSync=0;this.state=null;this.sound=false;this.motion=true;this.audio=null;this.timeoutSoundKey='';}
   reset(){this.generation++;this.root.querySelector('#chipFlights').replaceChildren();this.root.querySelectorAll('.effectActive').forEach(n=>n.classList.remove('effectActive'));this.queue=Promise.resolve();this.scheduled=0;this.lastSeq=0;this.tableId=null;this.state=null;}
   update(t){const initial=this.tableId!==t.id||t.hand<this.hand;this.clockOffset=t.serverNow-Date.now();this.lastSync=Date.now();this.state=t;this.tick();if(initial){this.reset();this.tableId=t.id;this.state=t;this.lastSeq=t.visualEvents?.at(-1)?.seq||0;this.hand=t.hand;return;}if(t.hand!==this.hand){this.generation++;this.root.querySelector('#chipFlights').replaceChildren();this.queue=Promise.resolve();this.scheduled=0;}const events=freshEvents(t.visualEvents||[],this.lastSeq,t.hand);this.lastSeq=Math.max(this.lastSeq,t.visualEvents?.at(-1)?.seq||0);this.hand=t.hand;for(const event of events)this.enqueue(event,t);}
-  enqueue(event,t){if(Date.now()+this.clockOffset-event.at>7000)return;const generation=this.generation;this.scheduled++;this.queue=this.queue.then(async()=>{if(generation!==this.generation||!this.motion||document.hidden)return;await this.play(event,t,generation);}).catch(()=>{}).finally(()=>{this.scheduled=Math.max(0,this.scheduled-1);});}
+  enqueue(event,t){if(Date.now()+this.clockOffset-event.at>7000)return;const generation=this.generation;const slots=(event.type==='street'||event.type==='board')&&this.motion&&!document.hidden?this.boardSlots(event):[];slots.forEach(s=>s.classList.add('pendingReveal'));if(slots.length)setTimeout(()=>slots.forEach(s=>s.classList.remove('pendingReveal')),6000);this.scheduled++;this.queue=this.queue.then(async()=>{if(generation!==this.generation||!this.motion||document.hidden)return;await this.play(event,t,generation);}).catch(()=>{}).finally(()=>{slots.forEach(s=>s.classList.remove('pendingReveal'));this.scheduled=Math.max(0,this.scheduled-1);});}
+  boardSlots(e){const count=e.type==='board'?5:e.count,from=e.type==='board'?e.fromCount||0:count===3?0:count===4?3:4;return [...this.root.querySelectorAll('#community .boardSlot')].slice(from,count);}
   async play(e,t,generation){if(this.state?.hand!==e.hand)return;
     const seatNode=id=>this.root.querySelector(`[data-seat-user="${id||''}"]`);
     const seat=seatNode(e.userId)?.querySelector('.avatarWrap');
@@ -56,7 +57,8 @@ export class TableVisuals {
     }else if(e.type==='deal'){
       const deck=this.root.querySelector('#dealOrigin');const cards=[...this.root.querySelectorAll('.seatCards .card')];this.beep('card');await Promise.all(cards.map((node,i)=>this.dealCard(deck,node,i*65)));
     }else if(e.type==='street'||e.type==='board'){
-      this.beep('card');const count=e.type==='board'?5:e.count;const from=e.type==='board'?e.fromCount||0:count===3?0:count===4?3:4;await Promise.all([...this.root.querySelectorAll('#community .face')].slice(from,count).map((node,i)=>this.flipBoard(node,i*140)));
+      // like a dealer: each card slides from the deck face down, then turns over
+      const slots=this.boardSlots(e);slots.forEach((_,i)=>setTimeout(()=>this.beep('card'),i*150));await Promise.all(slots.map((slot,i)=>this.turnCard(slot,i*150)));
     }else if(e.type==='fold'&&seat){this.beep('fold');const cards=seat.closest('.seat').querySelector('.seatCards');await this.animate(cards,[{opacity:1,transform:'translateX(-50%) translateY(0)'},{opacity:.25,transform:'translateX(-50%) translateY(14px) rotate(-6deg)'}],{duration:320});}
     else if(e.type==='check'){this.beep('check');const node=seatNode(e.userId);this.animate(node?.querySelector('.avatarWrap'),[{transform:'scale(1)'},{transform:'scale(1.07)'},{transform:'scale(1)'}],{duration:300});}
     if(generation!==this.generation)return;
@@ -64,6 +66,19 @@ export class TableVisuals {
   // The position of a player's bet spot, even while the stack itself is hidden.
   betSpot(seatNode){const index=seatNode?.id?.replace('seat-','');const bet=index!=null&&this.root.querySelector('#tableBet-'+index);if(!bet)return null;if(!bet.hidden&&bet.getBoundingClientRect().width)return bet;const table=this.root.getBoundingClientRect();const x=parseFloat(bet.style.getPropertyValue('--bx')),y=parseFloat(bet.style.getPropertyValue('--by'));if(!Number.isFinite(x)||!Number.isFinite(y))return null;return {getBoundingClientRect:()=>({left:table.left+table.width*x/100,top:table.top+table.height*y/100,width:0,height:0})};}
   land(node,value,amount,win){const plate=node?.querySelector('.seatName');if(!plate)return;const strong=plate.querySelector('strong');if(strong)strong.textContent=fmtChips(value);if(!this.motion)return;this.animate(plate,[{transform:'translateX(-50%) scale(1)'},{transform:'translateX(-50%) scale(1.08)',offset:.35},{transform:'translateX(-50%) scale(1)'}],{duration:520});if(win&&amount>0){const badge=node.querySelector('.winBadge');if(badge)this.animate(badge,[{transform:'translateX(-50%) scale(.4)',opacity:0},{transform:'translateX(-50%) scale(1.25)',opacity:1,offset:.6},{transform:'translateX(-50%) scale(1)',opacity:1}],{duration:520});}}
+  async turnCard(slot,delay=0){
+    const face=slot.querySelector('.card');const layer=this.root.querySelector('#chipFlights'),deck=this.root.querySelector('#dealOrigin');
+    if(!face||!layer||!deck||!this.motion){slot.classList.remove('pendingReveal');return;}
+    const r=layer.getBoundingClientRect(),b=slot.getBoundingClientRect(),a=deck.getBoundingClientRect(),sx=r.width/layer.offsetWidth||1,sy=r.height/layer.offsetHeight||1;
+    const back=document.createElement('div');back.className='flyingCard';back.innerHTML=renderCard('BACK');
+    const w=b.width/sx,h=b.height/sy,x=(b.left-r.left)/sx,y=(b.top-r.top)/sy;Object.assign(back.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});layer.append(back);
+    const dx=(a.left-b.left)/sx-w/2,dy=(a.top-b.top)/sy-h/2;
+    try{
+      await this.animate(back,[{transform:`translate(${dx}px,${dy}px) rotate(-14deg) scale(.55)`,opacity:0},{transform:`translate(${dx*.25}px,${dy*.25}px) rotate(-3deg) scale(.92)`,opacity:1,offset:.6},{transform:'translate(0,0) rotate(0) scale(1)',opacity:1}],{duration:340,delay,fill:'backwards'});
+      await this.animate(back,[{transform:'perspective(600px) rotateY(0deg)'},{transform:'perspective(600px) rotateY(90deg)'}],{duration:120,easing:'ease-in',fill:'forwards'});
+    }finally{back.remove();slot.classList.remove('pendingReveal');}
+    await this.animate(face,[{transform:'perspective(600px) rotateY(-90deg)',filter:'brightness(.7)'},{transform:'perspective(600px) rotateY(0deg)',filter:'brightness(1)'}],{duration:170,easing:'ease-out'});
+  }
   flipBoard(node,delay){if(!node)return Promise.resolve();const from=this.root.querySelector('#dealOrigin');return this.dealCard(from,node,delay,true);}
   animate(node,keyframes,options){if(!node||!this.motion||!node.animate)return Promise.resolve();return node.animate(keyframes,{easing:'cubic-bezier(.2,.75,.25,1)',...options}).finished.catch(()=>{});}
   async dealCard(from,to,delay,flip=false){if(!from||!to)return;const a=from.getBoundingClientRect(),b=to.getBoundingClientRect(),sx=b.width/to.offsetWidth||1,sy=b.height/to.offsetHeight||1;const dx=(a.left-b.left)/sx,dy=(a.top-b.top)/sy;await this.animate(to,flip?[{transform:`translate(${dx}px,${dy}px) rotateY(180deg) scale(.5)`,opacity:0,filter:'brightness(.4)'},{transform:'translate(0,0) rotateY(90deg) scale(1)',opacity:1,filter:'brightness(.6)',offset:.55},{transform:'translate(0,0) rotateY(0) scale(1)',opacity:1,filter:'brightness(1)'}]:[{transform:`translate(${dx}px,${dy}px) rotate(-18deg) scale(.3)`,opacity:0},{transform:'translate(0,0) rotate(0) scale(1)',opacity:1}],{duration:flip?620:480,delay});}
@@ -109,14 +124,16 @@ export function seatLayout(portrait=false,phone=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action
  // buttons own the bottom-right corner.
- if(phone&&!portrait)return {seats:[[50,4],[86,16],[92,61],[50,100],[8,61],[14,16]],bets:[[66,25],[72,36],[80,54],[35,84],[20,54],[28,36]],dealer:[[42,21],[77,25],[83,48],[62,84],[17,48],[23,25]]};
+ if(phone&&!portrait)return {seats:[[50,1],[93,25],[93,72],[50,100],[7,72],[7,25]],bets:[[64,22],[74,40],[74,60],[37,83],[26,60],[26,40]],dealer:[[38,18],[86,44],[86,54],[62,85],[14,54],[14,44]]};
  return portrait?{seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[66,17],[70,36],[76,63],[50,63],[24,63],[30,36]],dealer:[[34,12],[84,9],[84,86],[74,86],[16,86],[16,9]]}
   :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[77,32],[77,68],[36,74],[23,68],[23,32]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
 }
 // Felt size from the free stage area; text and cards never scale with it.
 export function feltBox(width,height,portrait=false,phone=false){
  // Phones in landscape: the felt fills the whole screen, edge to edge.
- if(phone&&!portrait){const top=50,bottom=48,side=Math.max(24,Math.round(width*.05)),w0=width-2*side,h0=height-top-bottom,w=Math.min(w0,h0*3),h=Math.min(h0,w/1.7);return {width:w,height:h,top:top+Math.max(0,(h0-h)/2),minStage:top+bottom+180,ratio:w/h};}
+ if(phone&&!portrait){const top=58,side=Math.max(24,Math.round(width*.05)),button=height<=340?64:74,
+  hMax=Math.min(height-top-52,(height-top-12-button-6-62)/.72),w=Math.min(width-2*side,hMax*3),h=Math.min(hMax,w/1.9);
+  return {width:w,height:h,top,minStage:top+h+52,ratio:w/h};}
  // Short screens (phones in landscape, small phones) use tighter margins.
  const short=portrait?height<620:height<=560;
  const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?50:78),bottom=portrait?(short?80:92):(short?48:92),side=portrait?50:(short?14:36);

@@ -102,31 +102,57 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     assert.equal((await call('table/1/sit',tokens[3],{position:0,buyin:20})).status,200);
     assert.equal((await call('table/1/sit',tokens[4],{position:1,buyin:20})).status,200);
     const room=runtime.get('1');
-    const timeoutPlayer=async()=>{
-      if(!['preflop','flop','turn','river'].includes(room.phase)){const start=await call('table/1/start',tokens[3],{});assert.ok(start.status===200||['preflop','flop','turn','river'].includes(room.phase),JSON.stringify(start.data));}
-      // A timeout folds only when facing a bet; a free option is auto-checked.
-      if(room.seats[room.turn].userId==='4')assert.equal((await call('table/1/action',tokens[4],{type:'raise',amount:4})).status,200);
-      assert.equal(room.seats[room.turn].userId,'3');
-      tickTable(room,room.lastActionAt+30001);
-      assert.equal(room.phase,'finished');
-      const state=(await call('table/1/state',tokens[3])).data;
-      assert.equal(state.seats.find(s=>s?.id==='3').lastAction.type,'AUTO-FOLD');
-      return state.seats.find(s=>s?.id==='3').inactiveHands;
-    };
-    assert.equal(await timeoutPlayer(),1);
+    // A missed decision folds (or checks) and sits the player out at once:
+    // no further blind is taken until they come back themselves.
     await call('table/1/start',tokens[3],{});
-    if(room.seats[room.turn].userId==='4')await call('table/1/action',tokens[4],{type:'call'});
-    await call('table/1/action',tokens[3],{type:room.currentBet>room.seats[room.turn].roundBet?'call':'check'});
-    assert.equal((await call('table/1/state',tokens[3])).data.seats.find(s=>s?.id==='3').inactiveHands,0);
+    if(room.seats[room.turn].userId==='4')assert.equal((await call('table/1/action',tokens[4],{type:'raise',amount:4})).status,200);
+    assert.equal(room.seats[room.turn].userId,'3');
+    tickTable(room,room.lastActionAt+30001);
+    assert.equal(room.phase,'finished');
+    let mine=(await call('table/1/state',tokens[3])).data;
+    assert.equal(mine.seats.find(s=>s?.id==='3').lastAction.type,'AUTO-FOLD');
+    assert.equal(mine.sittingOut,true);assert.equal(mine.timedOut,true);
+    const stackOut=room.seats.find(s=>s?.userId==='3').stack;
+    assert.equal((await call('table/1/start',tokens[3],{})).status,400,'no hand without a second active player');
+    assert.equal(room.seats.find(s=>s?.userId==='3').stack,stackOut,'no blind is taken while sitting out');
+    // Coming back by choice makes the player eligible again.
+    assert.equal((await call('table/1/sitout',tokens[3],{value:false})).status,200);
+    assert.equal((await call('table/1/start',tokens[3],{})).status,200);
     await call('table/1/action',tokens[Number(room.seats[room.turn].userId)],{type:'fold'});
-    assert.equal(await timeoutPlayer(),1);
-    assert.equal(await timeoutPlayer(),2);
+    // A break that is never ended returns the chips to the wallet.
+    if(room.seats[room.turn]?.userId==='3'||['preflop','flop','turn','river'].includes(room.phase))tickTable(room,room.lastActionAt+30001);
+    await call('table/1/sitout',tokens[3],{value:true});
     const chips=room.seats.find(s=>s?.userId==='3').stack;
     const before=(await call('state',tokens[3])).data.user.balance;
-    const handBefore=room.hand;
-    await call('table/1/start',tokens[3],{});
+    tickTable(room,Date.now()+5*60000+1000);
     const removed=(await call('state',tokens[3])).data;
-    assert.equal(removed.seatedTableId,null);assert.equal(removed.lastTableExit.reason,'INACTIVE');
-    assert.equal(removed.user.balance,before+chips/100);assert.equal(room.hand,handBefore);
+    assert.equal(removed.seatedTableId,null);assert.equal(removed.lastTableExit.reason,'SIT_OUT');
+    assert.equal(removed.user.balance,before+chips/100);
+
+    // Security: one session per account, sign-in lockout, password rules, blocking, headers.
+    const fresh=(await call('login','',{username:'test3',password})).data.token;
+    const old=await call('state',tokens[3]);assert.equal(old.status,401);assert.match(old.data.error,/pajisje tjetër/);
+    assert.equal((await call('state',fresh)).status,200);
+    assert.equal((await call('users/create',tokens[2],{username:'weakpass',password:'short'})).status,400);
+    assert.equal((await call('users/create',tokens[2],{username:'goodpass',password:'Fjalekalim9'})).status,200);
+    const t4=(await call('users',tokens[2])).data.find(k=>k.username==='test4');assert.ok('lastLoginAt' in t4&&'blocked' in t4);
+    assert.equal((await call('users/status',tokens[2],{userId:t4.id,blocked:true})).status,200);
+    assert.equal((await call('login','',{username:'test4',password})).status,403);
+    assert.equal((await call('state',tokens[4])).status,401);
+    assert.equal((await call('users/status',tokens[1],{userId:t4.id,blocked:false})).status,404,'only the direct manager');
+    assert.equal((await call('users/status',tokens[2],{userId:t4.id,blocked:false})).status,200);
+    const t4b=(await call('login','',{username:'test4',password})).data.token;
+    assert.equal((await call('password',t4b,{current:password,next:'abc'})).status,400);
+    assert.equal((await call('password',t4b,{current:'wrong',next:'NewPass987'})).status,400);
+    assert.equal((await call('password',t4b,{current:password,next:'NewPass987'})).status,200);
+    assert.equal((await call('login','',{username:'test4',password:'NewPass987'})).status,200);
+    for(let i=0;i<5;i++)assert.equal((await call('login','',{username:'test1',password:'wrong'})).status,401);
+    assert.equal((await call('login','',{username:'test1',password})).status,429,'locked after five wrong passwords');
+    // Live table stream: the first message is the player's own view of the table.
+    {const ctl=new AbortController();const r=await fetch(base+'/api/table/1/stream',{headers:{Authorization:'Bearer '+fresh},signal:AbortSignal.any([ctl.signal,AbortSignal.timeout(5000)])});
+     assert.match(r.headers.get('content-type'),/text\/event-stream/);const reader=r.body.getReader();let buf='';while(!buf.includes(String.fromCharCode(10,10))){const {value}=await reader.read();buf+=new TextDecoder().decode(value);}
+     const first=JSON.parse(buf.slice(buf.indexOf('data: ')+6,buf.indexOf(String.fromCharCode(10,10))));assert.equal(first.id,'1');assert.ok(Array.isArray(first.seats));ctl.abort();
+     assert.equal((await fetch(base+'/api/table/1/stream')).status,401);}
+    const page=await fetch(base+'/');assert.equal(page.headers.get('x-frame-options'),'DENY');assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));fs.rmSync(dir,{recursive:true,force:true});}
 });

@@ -18,3 +18,11 @@
 .loginBox button{background:linear-gradient(180deg,#f1dfb2 0%,#d6b57b 55%,#b8935a 100%);border:1px solid #f4e3b9;color:#1c150a;font-weight:800;letter-spacing:.04em;box-shadow:0 10px 26px #00000080,inset 0 1px 0 #fff8e4}
 .loginBox button:hover{filter:brightness(1.06)}
 .loginBox{border-color:#d9bb8340}
+
+/* Account security UI */
+.loginNotice{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#3a1418;border:1px solid #ef5d6b66;color:#ffd0d4;font-size:13px;text-align:center}
+.loginNotice[hidden]{display:none}
+.accountMeta{display:block;margin-top:4px;font-size:10px;letter-spacing:0;color:#8eaaa1;white-space:nowrap}
+.statusOnline{color:#5ef0a8;font-weight:600}.statusBlocked{color:#ff8b95;font-weight:600}
+.ghostButton{background:transparent;border-color:#34433e;font-size:12px}
+.dangerButton{color:#ffb3b9;border-color:#ef5d6b55}

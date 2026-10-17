@@ -502,3 +502,62 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
  .dockActions,.dock.sizing .betPicker{right:clamp(10px,calc(50vw - 274px),60px)}
  .actionButtons,.preActions{gap:12px}
 }
+
+/* ---------- Phones in landscape: safe areas, round buttons, compact pot ---------- */
+@media(max-height:560px) and (orientation:landscape){
+ /* stay inside the visible screen on phones with a notch or a home indicator */
+ .game{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+ .tableToolbar{left:calc(6px + env(safe-area-inset-left));right:calc(6px + env(safe-area-inset-right));top:calc(4px + env(safe-area-inset-top))}
+ .dockInfo{left:calc(8px + env(safe-area-inset-left));bottom:calc(8px + env(safe-area-inset-bottom))}
+ .tableStage{--me-hole-h:clamp(44px,calc(var(--felt-h,220px)*.24),80px)}
+ .game .pot,.game .pot.settled{top:38%}.game .community{top:57%}
+ .game .seat[data-visual-position="0"] .seatAction{display:none}
+ /* bigger buttons, well in from the corner, never over your own seat */
+ .actionButtons button,.preActions label{width:74px;height:74px;font-size:14px}
+ .actionButtons button small{font-size:11px}
+ .actionButtons,.preActions{gap:16px}
+ .dockActions{right:calc(clamp(16px,calc(50vw - 317px),120px) + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom))}
+ .dock.sizing .betPicker{right:calc(clamp(16px,calc(50vw - 317px),120px) + env(safe-area-inset-right));bottom:calc(98px + env(safe-area-inset-bottom))}
+}
+@media(max-height:340px) and (orientation:landscape){
+ .actionButtons button,.preActions label{width:64px;height:64px;font-size:12px}
+ .actionButtons,.preActions{gap:12px}
+ .dockActions{right:clamp(10px,calc(50vw - 279px),60px)}
+ .dock.sizing .betPicker{right:clamp(10px,calc(50vw - 279px),60px);bottom:84px}
+}
+
+/* Phones in landscape: the other players' cards sit beside their avatar, on the
+   table side, so every seat is compact and the six seats stay evenly spaced. */
+@media(max-height:560px) and (orientation:landscape){
+ .game .seat:not(.me) .seatCards{bottom:auto;top:50%;transform:translateY(-50%);gap:2px}
+ .game .seat[data-visual-position="0"]:not(.me) .seatCards,.game .seat[data-visual-position="4"] .seatCards,.game .seat[data-visual-position="5"] .seatCards{left:calc(100% - 2px);right:auto}
+ .game .seat[data-visual-position="1"] .seatCards,.game .seat[data-visual-position="2"] .seatCards{right:calc(100% - 2px);left:auto}
+ .game .seat:not(.me) .winBadge{bottom:calc(100% + 2px)}
+ .game .seat:not(.me) .blindBadge{top:auto;bottom:-4px}
+}
+@media(max-height:560px) and (orientation:landscape){
+ .game .pot,.game .pot.settled{top:35%;gap:1px}
+ .game #potChips{height:15px;min-height:15px}.game #potChips .chipStacks{transform:scale(.42)}
+ .game #potValue{font-size:12px;padding:1px 8px}
+}
+@media(max-height:560px) and (orientation:landscape){
+ .tableStage{--me-hole-h:clamp(40px,calc(var(--felt-h,220px)*.22),80px)}
+ .game .pot,.game .pot.settled{top:37%}.game .community{top:58%}
+}
+/* Mid-width phones: slightly smaller buttons so they stay well away from the corner. */
+@media(max-height:560px) and (orientation:landscape) and (max-width:780px){
+ .actionButtons button,.preActions label{width:66px;height:66px;font-size:13px}
+ .actionButtons,.preActions{gap:14px}
+ .dockActions,.dock.sizing .betPicker{right:calc(clamp(16px,calc(50vw - 289px),90px) + env(safe-area-inset-right))}
+}
+/* Very small phones (iPhone SE): compact seats. */
+@media(max-height:340px) and (orientation:landscape){
+ .game .seat[data-visual-position="1"] .seatAction,.game .seat[data-visual-position="2"] .seatAction,.game .seat[data-visual-position="4"] .seatAction,.game .seat[data-visual-position="5"] .seatAction{display:none}
+ .tableStage{--me-hole-h:clamp(34px,calc(var(--felt-h,170px)*.22),60px);--hole-w:24px;--hole-h:34px;--board-w:clamp(26px,calc(var(--felt-w,500px)*.058),40px)}
+ .game .pot,.game .pot.settled{top:38%}
+}
+
+/* Board cards wait face down until the dealer animation turns them over. */
+.game .boardSlot.pendingReveal .card{visibility:hidden}
+.game .flyingCard{position:absolute;z-index:42;pointer-events:none;will-change:transform}
+.game .flyingCard .card{width:100%;height:100%;border-radius:8px}

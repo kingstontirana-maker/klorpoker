@@ -218,3 +218,53 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - Radha e animimeve: bastet rrëshqasin te pot-i dhe grumbulli rritet vetëm kur çipat mbërrijnë. Në showdown letrat shihen 0.75 s para se pot-i të paguhet. Çipat shkojnë te fituesi pot pas poti, pastaj del "+shuma", pas rreth 2.6 s poti zhduket dhe dora tjetër nis pas 8 s.
 - Në telefon butonat janë më larg skajit djathtas: në ekranet e mesme deri në 90 px, në të ngushtat aq sa lejon emri yt që të mos mbulohet. Midis tyre ka 18 px hapësirë.
 - Kontrolli automatik me 6 lojtarë nuk gjen mbivendosje në 568×320, 667×375, 740×360, 844×390, 915×412 dhe 1366×768.
+
+## Siguria e llogarive dhe kontrolli i tavolinave
+**Sesionet**
+- Mbyllen pas 30 minutash pa asnjë kërkesë, p.sh. kur skeda mbyllet, dhe në çdo rast pas 12 orësh. Vlerat ndryshohen me `SESSION_IDLE_MS` dhe `SESSION_MAX_MS`.
+- Një llogari ka vetëm një sesion: hyrja nga një pajisje tjetër mbyll të mëparshmin dhe faqja shfaq arsyen.
+- Pas 20 minutash pa asnjë veprim, kur lojtari nuk është i ulur në tavolinë, faqja e nxjerr automatikisht.
+
+**Hyrja**
+- Pas 5 fjalëkalimeve të gabuara, për të njëjtën adresë dhe llogari, hyrja bllokohet për 15 minuta.
+- Krahasimi i fjalëkalimit bëhet në kohë konstante.
+
+**Fjalëkalimet**
+- Kërkohen të paktën 8 karaktere, me shkronja dhe numra.
+- Përdoruesi e ndryshon vetë te "Llogaria ime"; pas ndryshimit mbyllen sesionet e tjera.
+- Menaxheri i drejtpërdrejtë mund të vendosë fjalëkalim të ri për llogaritë e veta.
+
+**Bllokimi**
+- Menaxheri i drejtpërdrejtë mund të bllokojë ose zhbllokojë llogaritë e veta.
+- Llogaria e bllokuar nuk hyn dot, sesioni i saj mbyllet menjëherë dhe çipat e tavolinës kthehen në portofol.
+- Bllokimi dhe zhbllokimi regjistrohen në historik.
+
+**Paneli i stafit**
+- Për çdo llogari tregon nëse është online, offline ose e bllokuar, dhe kur ka hyrë për herë të fundit.
+
+**Tavolinat**
+- Një vend në tavolinë ku nuk mund të luhet dorë lirohet pas 10 minutash dhe çipat kthehen në portofol.
+- Pushimi vullnetar zgjat maksimumi 5 minuta.
+- Mbeten mbrojtjet ekzistuese: 2 duar pa veprim → largim; i shkëputur 25 s → pushim automatik; 5 minuta i shkëputur → çipat në portofol.
+
+**Serveri**
+- Header-a sigurie në çdo përgjigje: CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, dhe HSTS kur faqja hapet me HTTPS.
+
+## Telefoni: brenda ekranit, vende simetrike, butona më të mëdhenj
+- **Zonat e sigurta:** faqja respekton "safe area" në telefonat me notch ose shirit shtëpie, që asgjë të mos dalë jashtë pjesës së dukshme të ekranit.
+- **Lartësia e tavolinës:** llogaritet që lojtarët e poshtëm anash të përfundojnë sipër butonave dhe ti të mbetesh brenda ekranit.
+- **Vende simetrike:** gjashtë vende fikse rreth tavolinës: një sipër, dy majtas, dy djathtas dhe ti poshtë në qendër. Letrat e lojtarëve të tjerë qëndrojnë pranë avatarit, nga ana e tavolinës.
+- **Butonat:**
+  - 74 px në telefonat e mëdhenj dhe 66 px në ata të mesëm, me 14–16 px hapësirë midis tyre;
+  - 45–120 px larg skajit djathtas, pa mbuluar emrin tënd;
+  - në iPhone SE 64 px.
+- **Poti:** në telefon është më kompakt (çipa më të vegjël, shuma poshtë), që të mos prekë lojtarin sipër dhe kartat.
+- **Kontrolli automatik me 6 lojtarë:** asnjë mbivendosje dhe asgjë jashtë ekranit në 667×375, 740×360, 844×390, 915×412 dhe 932×430. Në 568×320 (iPhone SE) mbetet vetëm një prekje prej 4 px te poti.
+- **Gabimet:** gjatë lojës nuk u gjet asnjë gabim JavaScript apo gabim serveri. Dridhja e telefonit tani provohet vetëm pasi përdoruesi ka prekur ekranin.
+
+## Loja në kohë reale dhe mbrojtja nga humbja e parave pa dijeni
+- **Tavolina live:** serveri i dërgon çdo lojtari gjendjen e tavolinës menjëherë sapo ndryshon diçka (stream `/api/table/:id/stream`), pa pritur rifreskimin. Nëse lidhja bie, faqja kalon vetë te rifreskimi periodik dhe rilidhet pas 2 sekondash.
+- **Prania vërtetohet vetëm nga vetë lojtari:** një lidhje e harruar/gjysmë e hapur nuk e mban lojtarin "të pranishëm". Kur ekrani fshihet (mbyll aplikacionin, kalon në app tjetër, fik ekranin) faqja ndalon lidhjen dhe rifreskimin e tavolinës.
+- **Pa letra pa qenë i pranishëm:** në fillim të çdo dore, kush nuk është parë në 12 sekondat e fundit vihet në pushim *para* se të merren blinds. Kush mbyll faqen vihet në pushim brenda pak sekondash; pas 3 minutash pa u kthyer, çipat i kthehen në portofol.
+- **Nuk veprove në kohë = pushim:** kur i mbaron koha, loja bën vetë check/fold dhe lojtari kalon menjëherë në pushim (asnjë blind nuk i merret më). Rikthehet vetëm kur shtyp **↺ Kthehu**; mesazhi në tavolinë ia shpjegon këtë. Pas 5 minutash pushim ngrihet automatikisht dhe çipat kthehen në portofol.
+- **Hapja e letrave të tavolinës si te dealer-i:** çdo letër e flop/turn/river del me shpinë nga kuverta, rrëshqet në vendin e saj dhe kthehet me fytyrë; tre letrat e flop-it dalin njëra pas tjetrës me një vonesë të shkurtër. Letrat e reja fshihen deri në momentin e animimit, që të mos shfaqen para kohe.

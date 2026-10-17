@@ -195,3 +195,10 @@ test('a finished hand is cleared from the felt when no new hand can start',()=>{
  assert.equal(t.phase,'waiting');assert.deepEqual(t.board,[]);assert.equal(t.lastResult,null);assert.equal(t.pot,0);
  assert.deepEqual(t.seats[0].cards,[]);assert.deepEqual(e.snapshot(t,'p0').seats[0].cards,[]);
 });
+
+test('a seat at a table that cannot deal is released after ten minutes',()=>{
+ const {e,t,user}=setup([10000]);const wallet=user(0).balance;
+ e.tickTable(t,Date.now());assert.equal(t.phase,'waiting');assert.ok(t.seats[0]);
+ e.tickTable(t,Date.now()+9*60000);assert.ok(t.seats[0],'still seated before ten minutes');
+ e.tickTable(t,Date.now()+10*60000+1000);assert.equal(t.seats[0],null);assert.equal(user(0).balance,wallet+10000);
+});
