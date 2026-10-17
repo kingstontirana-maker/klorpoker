@@ -1,7 +1,9 @@
 import {rakeReport} from './rake.js';
 import http from 'node:http';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {fileURLToPath} from 'node:url';import {createEngine,LIVE,fail} from './game.js';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));const SAVE=process.env.STATE_FILE||path.join(ROOT,'data','state.json');const PORT=Number(process.env.PORT||3000);const uid=()=>crypto.randomUUID();const money=n=>Math.round(Number(n)*100);const clean=n=>Math.round(n)/100;const secret=()=>crypto.randomBytes(28).toString('hex');const hash=(p,s)=>crypto.scryptSync(p,s,64).toString('hex');const config={minBuyin:2000,maxBuyin:100000};
-let db;try{db=JSON.parse(fs.readFileSync(SAVE,'utf8'));}catch{const salt=secret();db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(process.env.CENTER_PASSWORD||'ChangeMeNow123!',salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};}
+// A fresh database never uses a known password: CENTER_PASSWORD, or a random one
+// that is printed once in the server log.
+let db;try{db=JSON.parse(fs.readFileSync(SAVE,'utf8'));}catch{const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBytes(9).toString('base64url');if(!process.env.CENTER_PASSWORD)console.log(`[Klor Poker] Databazë e re në ${SAVE}. Fjalëkalimi i përkohshëm i "center": ${initial}`);else console.log(`[Klor Poker] Databazë e re në ${SAVE} (fjalëkalimi i "center" nga CENTER_PASSWORD).`);db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(initial,salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};}
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];

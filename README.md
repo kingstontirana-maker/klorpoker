@@ -12,7 +12,7 @@ npm test
 npm start
 ```
 
-Open http://localhost:3000. First-run center username is **center**. If `CENTER_PASSWORD` is not set the development-only password is `ChangeMeNow123!` (**never expose this deployment on a public network**). Once created, `data/state.json` stores its salted password hash; changing the environment variable alone does not reset it.
+Open http://localhost:3000. First-run center username is **center**. If `CENTER_PASSWORD` is not set, a random temporary password is generated and printed once in the server log. Once created, `data/state.json` stores its salted password hash; changing the environment variable alone does not reset it.
 
 ## How to play multiplayer
 
@@ -90,3 +90,10 @@ Timeouts check when free and fold otherwise; odd chips go to the first winner le
 ## Table redesign and all-in runout
 
 All-in runouts are dealt by the server clock: hands are tabled, then flop, turn and river arrive with pauses before the showdown. Pots with identical contenders merge, so a folded blind no longer creates a phantom side pot. `public/table.css` is a new, self-contained game-view stylesheet; the felt is sized by `feltBox()` and seats by `seatLayout()` in `public/table-visuals.js`. The action dock has a fixed height and stays in view; phones get a portrait table, and phones in landscape get a right-hand action column. Animations: bets to the bet spot, collection into the pot, flips on reveal, and pot-by-pot payouts to the winners. New endpoints: `POST /api/table/:id/timebank` and `POST /api/table/:id/chat {text}`. Keyboard: F fold, C check/call, R bet/raise.
+
+
+## Deploying with Coolify (or any container host)
+Accounts and balances live in `data/state.json`, which is **not** in Git. Containers lose their files on every deploy, so give the app persistent storage:
+1. Coolify → the application → **Persistent Storage** → add a volume, e.g. name `klorpoker-data`, destination `/data`.
+2. **Environment Variables** → `STATE_FILE=/data/state.json` (and optionally `CENTER_PASSWORD` for a brand-new database).
+3. Redeploy. To restore an existing database, copy `state.json` into the volume (Coolify → Terminal) and restart.
