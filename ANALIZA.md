@@ -313,3 +313,8 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - Letrat më të mëdha në telefon: letrat e tavolinës, letrat e tua dhe letrat e kundërshtarëve; emrat dhe krediti me shkronja më të mëdha.
 - Vendi yt u ul pak (97%) që letrat e tua të mos prekin letrat e tavolinës.
 - Matur (lojtari në dorë, me letrat e tavolinës të hapura): nga 568×280 deri te 932×430 asgjë nuk mbivendoset, asgjë nuk del jashtë ekranit, faqja është fiks sa ekrani. Letrat e tavolinës: 39×54 px në telefonin më të vogël deri në 59×83 px në më të madhin (më parë 38×53 në 640×360).
+
+## Tavolina fiks sa ekrani në çdo pajisje (rregullim përfundimtar)
+- **Pse në disa pajisje dilte shumë e madhe:** drita dekorative rreth tavolinës është 25% më e gjerë se tavolina. Në telefon ishte prerë, por jo në tablet dhe laptop. Aty ku tavolina është e gjerë krahasuar me dritaren (p.sh. iPad horizontal 1024×768), faqja bëhej më e gjerë se ekrani (1053 px) dhe shfletuesi zmadhonte/zvogëlonte gjithë faqen. Tani drita nuk mund të jetë më e gjerë se zona e tavolinës në asnjë ekran, dhe faqja e tavolinës nuk lëviz kurrë anash.
+- **Pas rrotullimit ose hyrjes në full screen**, disa shfletues (sidomos Safari në iPhone) e japin madhësinë e re me vonesë; tani tavolina rimatet edhe pas 100, 350 dhe 800 ms.
+- E kontrolluar në 24 madhësi: telefonë horizontal (568×280 deri 932×430), telefonë vertikal (360×780 deri 430×932), tablet vertikal (768×1024, 820×1180, 600×960), tablet horizontal (1024×768, 1024×600, 1112×834, 1180×820), laptop/desktop (960×600, 1280×720, 1366×657, 1440×800, 1536×730, 1920×950). Në të gjitha faqja është fiks sa ekrani dhe asnjë element nuk del jashtë.

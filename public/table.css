@@ -570,3 +570,11 @@ body.fitPhone .tableStage{--board-w:clamp(34px,min(calc(var(--felt-h,240px)*.225
 body.fitPhone .game .seat:not(.me) .seatName b{font-size:11px}
 body.fitPhone .game .seat:not(.me) .seatName strong{font-size:14px}
 body.fitPhone .game .seat.me .seatName strong{font-size:16px}
+
+/* Every screen: the felt's glow (stage ::before/::after) is wider than the felt.
+   Where the felt is wide relative to the window (e.g. an iPad in landscape,
+   1024×768) it reached past the screen edge and made the page wider than the
+   device, so the browser zoomed the whole page. The glow can never be wider
+   than the table area, and the table page never scrolls sideways. */
+.tableStage::before,.tableStage::after{max-width:100%}
+body[data-view="table"]{overflow-x:hidden}

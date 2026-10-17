@@ -314,4 +314,6 @@ async function revalidateSession(){if(!token||!profile||revalidating)return;reva
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)revalidateSession();});
 addEventListener('focus',revalidateSession);addEventListener('pageshow',revalidateSession);
 
-window.visualViewport?.addEventListener('resize',layoutTable);addEventListener('orientationchange',()=>setTimeout(layoutTable,250));
+window.visualViewport?.addEventListener('resize',layoutTable);// Some browsers (notably iOS Safari) report the new size late after a rotation
+// or a fullscreen change, so the layout is measured again a moment later too.
+for(const ev of ['orientationchange','fullscreenchange'])(ev==='fullscreenchange'?document:window).addEventListener(ev,()=>{for(const ms of [100,350,800])setTimeout(layoutTable,ms);});
