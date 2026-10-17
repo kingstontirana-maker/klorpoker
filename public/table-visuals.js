@@ -150,3 +150,23 @@ export function betPresets(t,mine){
  options.push(['Pot',t.currentBet+potAfterCall]);
  return options.map(([label,v])=>({label,value:round(Math.max(limits.min,Math.min(limits.max,v)))})).filter((o,i,a)=>a.findIndex(x=>x.value===o.value)===i);
 }
+
+// ---- Table colours: one chosen colour gives the whole felt design ----
+export const TABLE_COLORS=[['#1f9d6b','Smerald'],['#1d4fb3','Blu mbretëror'],['#8c1d36','Bordo'],['#5a2a92','Vjollcë'],['#0f7d8c','Oqean'],['#a8792a','Ar'],['#3b4148','Grafit'],['#b03a2e','E kuqe']];
+// Felt gradient (5 shades from light centre to dark edge), neon rim, halo and the
+// light pool under the table, all in the hue of the chosen colour. Greys become
+// an elegant graphite instead of a muddy colour.
+export function tablePalette(hex){
+ const m=/^#?([0-9a-f]{6})$/i.exec(hex||''),n=parseInt(m?m[1]:'1f9d6b',16);
+ const r=(n>>16&255)/255,g=(n>>8&255)/255,b=(n&255)/255,max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min,l=(max+min)/2;
+ let h=0;if(d){h=max===r?((g-b)/d)%6:max===g?(b-r)/d+2:(r-g)/d+4;h=Math.round(h*60+360)%360;}
+ const s=d?d/(1-Math.abs(2*l-1)):0,S=Math.round(Math.min(78,s*100)),grey=S<12;
+ const c=(L,sat=S,a=1)=>`hsl(${h} ${sat}% ${L}% / ${a})`;
+ const L=grey?[34,25,18,12,8]:[42,31,22,15,10],rim=Math.min(100,S+20),glow=Math.min(100,S+10);
+ return {'--t-1':c(L[0]),'--t-2':c(L[1]),'--t-3':c(L[2]),'--t-4':c(L[3]),'--t-5':c(L[4]),
+  '--t-rim':c(grey?70:74,rim,.8),'--t-ring':c(65,glow,.2),'--t-halo1':c(65,glow,.3),'--t-halo2':c(65,glow,.12),'--t-pool':c(51,S,.09),
+  '--t-icon-bg':c(16),'--t-icon-fg':c(68),'--t-swatch':c(L[1]),
+  // the room around the table takes a dark tint of the same colour
+  '--t-amb':c(14,Math.round(S*.6),.8),'--t-room1':c(9,Math.round(S*.45)),'--t-room2':c(6,Math.round(S*.4)),'--t-room3':c(4,Math.round(S*.35))};
+}
+export const paletteStyle=hex=>Object.entries(tablePalette(hex)).map(([k,v])=>k+':'+v).join(';');

@@ -153,6 +153,29 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.match(r.headers.get('content-type'),/text\/event-stream/);const reader=r.body.getReader();let buf='';while(!buf.includes(String.fromCharCode(10,10))){const {value}=await reader.read();buf+=new TextDecoder().decode(value);}
      const first=JSON.parse(buf.slice(buf.indexOf('data: ')+6,buf.indexOf(String.fromCharCode(10,10))));assert.equal(first.id,'1');assert.ok(Array.isArray(first.seats));ctl.abort();
      assert.equal((await fetch(base+'/api/table/1/stream')).status,401);}
+    // Table colour: chosen at creation, validated, shown to players, changeable by the centre only.
+    {const made=await call('tables/create',tokens[0],{name:'Ruby',sb:1,bb:2,color:'#8C1D36'});assert.equal(made.status,200);assert.equal(made.data.color,'#8c1d36');
+     assert.equal((await call('tables/create',tokens[0],{name:'Bad',sb:1,bb:2,color:'red;}'})).status,400,'only #rrggbb colours');
+     assert.equal((await call('tables/create',tokens[0],{name:'Plain',sb:1,bb:2})).data.color,'#1f9d6b','default emerald');
+     const listed=(await call('state',tokens[0])).data.tables.find(t=>t.id===made.data.id);assert.equal(listed.color,'#8c1d36');
+     assert.equal((await call('tables/color',tokens[2],{id:made.data.id,color:'#1d4fb3'})).status,403,'only the centre recolours');
+     assert.equal((await call('tables/color',tokens[0],{id:made.data.id,color:'#1d4fb3'})).status,200);
+     assert.equal(runtime.get(made.data.id).color,'#1d4fb3');}
+    // Revenue share: centre → admin (≤100%), admin → agent (≤ its own); lowering an admin caps its agents.
+    {assert.equal((await call('users/share',tokens[0],{userId:'1',share:20})).status,200);
+     assert.equal((await call('users/share',tokens[1],{userId:'2',share:25})).status,400,'an agent never above its admin');
+     assert.equal((await call('users/share',tokens[1],{userId:'2',share:15})).data.share,15);
+     assert.equal((await call('users/share',tokens[2],{userId:'3',share:5})).status,403,'agents give no share to players');
+     assert.equal((await call('users/share',tokens[0],{userId:'2',share:5})).status,404,'only the direct manager');
+     assert.equal((await call('users/share',tokens[0],{userId:'1',share:'abc'})).status,400);
+     const low=(await call('users/share',tokens[0],{userId:'1',share:10})).data;assert.deepEqual(low.capped,['test2']);
+     assert.equal((await call('users',tokens[1])).data.find(x=>x.id==='2').share,10);
+     assert.equal((await call('state',tokens[1])).data.user.share,10);}
+    {assert.equal((await call('users/create',tokens[0],{username:'admin_x',password:'Abcd12345',share:101})).status,400,'at most 100%');
+     assert.equal((await call('users/create',tokens[0],{username:'admin_x',password:'Abcd12345',share:30})).data.share,30);
+     assert.equal((await call('users/create',tokens[1],{username:'agent_x',password:'Abcd12345',share:11})).status,400,'within the admin limit of 10%');
+     assert.equal((await call('users/create',tokens[1],{username:'agent_x',password:'Abcd12345',share:7.5})).data.share,7.5);
+     assert.equal((await call('users/create',tokens[2],{username:'player_x',password:'Abcd12345',share:5})).data.share,null,'players have no share');}
     // Center inspection: only the center, every hole card exactly as dealt, and the access is logged.
     {const open=tok=>fetch(base+'/api/inspect/stream',{headers:{Authorization:'Bearer '+tok},signal:AbortSignal.timeout(5000)});
      assert.equal((await open(fresh)).status,403);assert.equal((await open(tokens[2])).status,403);assert.equal((await fetch(base+'/api/inspect/stream')).status,401);

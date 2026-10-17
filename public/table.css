@@ -592,3 +592,26 @@ html:has(body.fitPhone),body.fitPhone{overflow:hidden!important;height:100%;over
 /* The table itself never pans, bounces or zooms on a phone; taps, buttons and the
    bet slider still work. (The side drawer with history and chat is outside .game.) */
 body.fitPhone .game{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+
+/* ---------- PCs and large tablets: the table is scaled to the window ----------
+   Same idea as on phones: the full desktop layout is drawn on a canvas of at
+   least 1000×760 and scaled to fill the window exactly. The table is full size
+   as soon as the page opens; a resize or "Ekran i plotë" only scales it evenly.
+   Geometry is absolute so no other rule (fullscreen, width breakpoints) moves it. */
+body.fitDesk .game{position:fixed!important;left:0!important;top:0!important;right:auto!important;bottom:auto!important;
+ width:var(--fit-w)!important;height:var(--fit-h)!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+ margin:0!important;overflow:hidden!important;transform:scale(var(--fit-s))!important;transform-origin:0 0!important;
+ grid-template-rows:auto minmax(0,1fr) auto!important}
+html:has(body.fitDesk),body.fitDesk{overflow:hidden!important;height:100%}
+body.fitDesk .dock{margin-bottom:12px}
+
+
+/* Table colour: the felt, rim, halo and light pool come from the table's colour
+   (variables set from tablePalette); the defaults are the original emerald. */
+.game .table{background:radial-gradient(ellipse 60% 55% at 50% 38%,var(--t-1,#25b07f) 0%,var(--t-2,#16875f) 28%,var(--t-3,#0e6448) 55%,var(--t-4,#09432f) 80%,var(--t-5,#062d20) 100%);
+ box-shadow:0 0 0 1.5px var(--t-rim,#7dffc4cc),0 0 0 3px #0d1a16,0 0 0 4px var(--t-ring,#5ef0a833),0 0 22px var(--t-halo1,#5ef0a84d),0 0 70px var(--t-halo2,#5ef0a81f),inset 0 0 0 1px #ffffff1f,inset 0 18px 40px #ffffff0d,inset 0 -30px 70px #00000073,inset 0 0 120px #00000059;
+ transition:background .6s ease,box-shadow .6s ease}
+.tableStage:after,body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at center,var(--t-pool,#2bd99018) 0%,transparent 65%)}
+/* The room around the table is a dark tint of the table's colour. */
+body[data-view="table"] .game:before{background:radial-gradient(ellipse 60% 50% at 50% 45%,var(--t-amb,#12382acc) 0%,transparent 70%),radial-gradient(ellipse 120% 90% at 50% 40%,var(--t-room1,#0d2119) 0%,var(--t-room2,#0a1612) 45%,var(--t-room3,#070e0b) 75%,#040806 100%);transition:background .6s ease}

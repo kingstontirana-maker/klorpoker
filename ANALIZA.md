@@ -323,3 +323,39 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Shkaku:** kur prekje ekranin, faqja hynte në full screen dhe aktivizohej rregulli `:fullscreen body[data-view=table] .game{min-height:100dvh}`. Ky rregull ishte më specifik se shkallëzimi i tavolinës, prandaj e zgjaste kanavacën në lartësinë reale të ekranit para se të shkallëzohej. Tavolina dilte jashtë ekranit (p.sh. 844×417 në një ekran 390 px) dhe tavolina rivizatohej me përmasa të gabuara. Provat e mëparshme nuk e kapnin, sepse dritarja e provës nuk hyn dot vërtet në full screen.
 - **Zgjidhja:** në telefon, gjeometria e kanavacës (pozicioni, gjerësia, lartësia, padding-u, shkalla) është absolute (`!important`) dhe asnjë rregull tjetër, as ai i full screen-it, nuk e ndryshon dot. Faqja dhe tavolina nuk lëvizin, nuk kërcejnë dhe nuk zmadhohen me gishta (`touch-action:none`, `overscroll-behavior:none`). Butonat, slider-i i bastit dhe paneli anësor (historiku, chat-i) punojnë normalisht.
 - **Prova:** me rregullat e full screen-it aktive, 14 madhësi telefoni, secila para full screen-it (me shiritin e shfletuesit) dhe pas (lartësi e plotë): 568×264/320, 640×304/360, 667×319/375, 720×304/360, 740×304/360, 760×304/360, 780×304/360, 800×304/360, 844×334/390, 851×393, 869×356/412, 915×356/412, 932×374/430. Në të 26 provat tavolina është saktësisht sa ekrani, pa mbivendosje, asgjë jashtë kornizës, krediti yt me 20–48 px hapësirë poshtë.
+
+## PC: tavolina e plotë që në hapje, pa ndryshime
+- **Pse ndryshonte:** çdo klikim ose tast në faqen e tavolinës kërkonte full screen (edhe në PC). Faqja hapej në dritaren normale (tavolina e vogël) dhe me klikimin e parë kalonte në full screen (tavolina e madhe). Përveç kësaj, në dritaren normale paneli i butonave poshtë zinte shumë vend dhe tavolina dukej e vogël.
+- **Tani në PC:** asnjë klikim nuk e ndryshon dritaren. Full screen hapet vetëm nga menyja "⋯ → Ekran i plotë". Në telefon prekja e parë e ekranit vazhdon ta hapë full screen-in, sepse fsheh shiritat e shfletuesit.
+- **Tavolina shkallëzohet sipas dritares:** i gjithë layout-i i PC-së vizatohet në 1000×760 (ose më gjerë) dhe shkallëzohet që të mbushë saktësisht dritaren. Tavolina është e plotë që në hapje dhe ruan të njëjtat përmasa në çdo dritare (tapeti gjithmonë 53% e lartësisë); nëse ndryshon dritarja ose hyn në full screen, gjithçka shkallëzohet njësoj, pa u rirregulluar.
+- E provuar: 1024×768, 1280×650, 1366×657, 1366×768, 1440×780, 1536×730, 1920×950, 1920×1080, 2560×1300: tavolina fiks sa dritarja, asnjë mbivendosje, asgjë jashtë. Te 1366×657 tapeti u rrit nga 632×301 në 730×348 dhe letrat nga 43×60 në 50×69. Telefoni dhe lobby nuk ndryshuan.
+
+## Ngjyra e tavolinës
+- **Krijimi:** te paneli i qendrës → Tavolinat, forma ka "Ngjyra e tavolinës": 8 ngjyra të gatshme (Smerald, Blu mbretëror, Bordo, Vjollcë, Oqean, Ar, Grafit, E kuqe) dhe "Ngjyrë tjetër" për çdo ngjyrë, me parapamje të menjëhershme të tavolinës.
+- **Dizajni nga një ngjyrë:** nga ngjyra e zgjedhur gjenerohet i gjithë dizajni: 5 nuancat e gradientit të tapetit (nga qendra e ndritshme te buza e errët), vija neon e buzës, drita rreth tavolinës, drita poshtë saj dhe drita e dhomës përreth. Ngjyrat gri bëhen grafit elegant. Ndryshimi i ngjyrës kalon butë (0.6 s).
+- **Ndryshimi më vonë:** te lista "Tavolinat e platformës", klikimi mbi ikonën ♠ të tavolinës hap zgjedhësin e ngjyrës; lojtarët e shohin ngjyrën e re menjëherë.
+- **Lobby:** çdo kartë tavoline shfaqet me ngjyrën e saj.
+- **Siguria:** pranohet vetëm `#rrggbb`; vetëm qendra krijon ose ndryshon ngjyrën (403 për të tjerët); tavolinat e vjetra marrin smeraldin si parazgjedhje. E mbuluar me teste.
+
+## Lobby: 4 tavolina për rresht, me ngjyrën e secilës
+- Në kompjuter tavolinat shfaqen 4 për rresht (3 në ekrane mesatare, 2 në tablet, 1 në telefon).
+- Çdo kartë merr ngjyrën e tavolinës së saj: tavolina e vogël, drita e kartës, buza dhe butoni "Hap tavolinën".
+- Shënim: tavolinat e krijuara para veçorisë së ngjyrave marrin smeraldin; ngjyra u ndryshohet nga paneli i qendrës (Tavolinat → kliko ikonën ♠).
+
+## Raporti i të ardhurave (qendra, adminë, agjentë)
+- **Faqja "📈 Të ardhurat"** për çdo pjesëtar të hierarkisë përveç lojtarit. Çdokush sheh vetëm rrjetin e vet: qendra gjithçka, admini vetëm agjentët dhe lojtarët e vet, agjenti vetëm lojtarët e vet (serveri kthen 403 për çdo degë tjetër).
+- **Sa:** të ardhurat (rake) në periudhë me krahasim me periudhën e mëparshme të njëjtë (▲/▼ %), duart me rake, lojtarët kontribues, rake mesatar për dorë, tavolinat aktive.
+- **Nga kush:** ndarja sipas pjesëtarëve të nivelit më poshtë (adminët / agjentët / lojtarët) me shumë, përqindje, duar dhe numër lojtarësh; kliko një pjesëtar për të hyrë në rrjetin e tij (qendër › admin › agjent), me rrugën e navigimit lart. Lista e lojtarëve kontribues me agjentin dhe adminin e secilit, me kërkim.
+- **Si:** sipas tavolinës (blinds, duar, rake për dorë, ngjyra e tavolinës), orët e pikut (24 orë), grafiku ditor ose mujor (për periudha mbi 3 muaj), dhe 60 duart e fundit me ndarjen e rake-ut për lojtar.
+- **Filtrat e datave:** Sot, Dje, 7 ditët e fundit, 30 ditët e fundit, Ky muaj, Muaji i kaluar, Ky vit, Gjithë kohën, ose data të lira "Nga / Deri". Datat llogariten sipas orës së Tiranës.
+- **Eksporti CSV** (për Excel): çdo kontribut i periudhës (data, ora, tavolina, dora, lojtari, agjenti, admini, rake) me total në fund.
+- Faqja rifreskohet vetë çdo 30 sekonda kur periudha përfshin sot; kërkesat e vjetra nuk mbishkruajnë kurrë të rejat.
+- Rake i vjetër pa detaje për lojtar shfaqet te qendra si "Pa atribuim".
+- E testuar: test njësie (izolimi i degëve, ndarja, filtrat e datave, periudha e mëparshme, eksporti) dhe provë në shfletues me 19 përdorues dhe 2,038 duar.
+
+## Përqindjet e rrjetit (revenue share)
+- **Si caktohen:** qendra i cakton adminit një përqindje kur e krijon ose më vonë (te Llogaritë → "％ Përqindja"). Admini i cakton agjentit përqindjen e tij, gjithmonë brenda përqindjes së vet (serveri e refuzon çdo vlerë mbi kufi). Lojtarët nuk kanë përqindje. Lejohen vlera 0–100% me deri 2 shifra pas presjes (p.sh. 12,5%).
+- **Si ndahet rake-u:** për çdo dorë, nga rake-u që paguajnë lojtarët e një agjenti: agjenti merr përqindjen e vet (Y%), admini diferencën (X−Y)%, qendra pjesën tjetër. Paratë kalojnë automatikisht në balancën e secilit në fund të dorës; ndarja ruhet te regjistri i dorës.
+- **Saktësia:** pjesët nën 1 cent nuk humbasin: ruhen te llogaria dhe paguhen sapo mbushin 1 cent, ndaj në kohë të gjatë secili merr saktësisht përqindjen e vet (provuar: 15.00%, 20.00%, 25.00%). Shuma e ndarjes është gjithmonë e barabartë me rake-un (provuar në 2000+ ndarje të rastësishme dhe në një dorë të plotë në motor).
+- **Kur ndryshohet:** ndryshimi vlen për duart e ardhshme. Nëse qendra ia ul adminit përqindjen nën atë të agjentëve të tij, agjentët kufizohen automatikisht në kufirin e ri dhe qendra njoftohet se kush u kufizua.
+- **Ku shihet:** përqindja shfaqet pranë rolit (p.sh. "Administratori · 12%") dhe te lista e llogarive; historiku i kreditit tregon çdo komision ("Komision nga rake · Tavolina · dora") dhe çdo ndryshim përqindjeje ("18% → 12%", "Kufizuar automatikisht"); raporti i të ardhurave tregon "Fitimi yt", "Komisione për rrjetin" dhe komisionin e çdo dege.

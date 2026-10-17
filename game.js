@@ -2,6 +2,7 @@
 // accounts and persistence, the engine owns seats, betting and settlement.
 import crypto from 'node:crypto';
 import {deck,distribute,evaluate,compare,rankNames,bestFive,ranks,suits} from './poker.js';
+import {rakeShares} from './rake.js';
 
 export const LIVE=['preflop','flop','turn','river'];
 export const ACTION_MS=30000,BETWEEN_HANDS_MS=8000,RESULT_REVEAL_MS=8000,REBUY_WINDOW_MS=30000,SIT_OUT_MS=5*60000;
@@ -146,7 +147,9 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   t.phase='finished';setTurn(t,-1);
   for(let i=0;i<t.seats.length;i++)if(t.seats[i]?.leaveAfterHand)cashOutSeat(t,i,'LEFT');
   for(const s of t.seats)if(s&&s.stack<t.bb&&!s.rebuyDeadline){s.rebuyAvailableAt=t.lastResult.at+RESULT_REVEAL_MS;s.rebuyDeadline=s.rebuyAvailableAt+REBUY_WINDOW_MS;}
-  if(result.totalRake){db.users.find(u=>u.role==='CENTER').balance+=result.totalRake;db.ledger.push({id:uid(),type:'RAKE',tableId:t.id,hand:t.hand,amount:result.totalRake,allocations:Object.entries(result.rakeContributions).map(([userId,amount])=>({userId,amount})),time:Date.now()});}
+  // Rake is split at once: each admin/agent receives its percentage of the rake its
+  // players paid (revenue share), the centre keeps the rest. The split is stored.
+  if(result.totalRake){const allocations=Object.entries(result.rakeContributions).map(([userId,amount])=>({userId,amount})),split=rakeShares(db,allocations);db.users.find(u=>u.role==='CENTER').balance+=split.center;for(const sh of split.shares){const r=findUser(sh.userId);if(r)r.balance+=sh.amount;}for(const [id,c] of Object.entries(split.carry)){const r=findUser(id);if(r)r.shareCarry=c;}db.ledger.push({id:uid(),type:'RAKE',tableId:t.id,hand:t.hand,amount:result.totalRake,allocations,...(split.shares.length?{shares:split.shares}:{}),time:Date.now()});}
   save();onSettle();
  }
 
@@ -266,7 +269,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
    rebuyAvailableAt:mine?.rebuyAvailableAt||null,rebuyDeadline:mine?.rebuyDeadline||null,
    sittingOut:!!mine?.sittingOut,timedOut:!!mine?.timedOut,leaving:!!mine?.leaveAfterHand,mustPost:!!mine?.mustPost,
    canShow:!!mine&&t.phase==='finished'&&!!result&&mine.cards.length===2&&!shown.has(mine.id),
-   id:t.id,name:t.name,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,turn:t.turn,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),minRaise:clean(t.minRaise),
+   id:t.id,name:t.name,color:t.color||null,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,turn:t.turn,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),minRaise:clean(t.minRaise),
    pots:LIVE.includes(t.phase)?livePots(t).map(p=>({amount:clean(p.amount),eligible:p.eligible})):[],
    seats:t.seats.map((s,i)=>s?{inactiveHands:s.inactiveHands||0,lastAction:s.lastAction||null,id:s.id,position:i,username:s.username,stack:clean(s.stack),bet:clean(s.roundBet),folded:s.folded,allIn:s.allIn,inHand:s.inHand,sittingOut:!!s.sittingOut,leaving:!!s.leaveAfterHand,waiting:!s.inHand&&!s.sittingOut,cardCount:s.cards.length,cards:s.userId===userId||shown.has(s.id)?s.cards:[],isMe:s.userId===userId}:null),
    events:t.events.slice(0,30),
