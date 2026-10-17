@@ -241,7 +241,7 @@ let wakeLock=null;const keepAwake=async()=>{if(!TABLE_MODE||document.hidden||wak
 keepAwake();document.addEventListener('visibilitychange',keepAwake);document.addEventListener('pointerdown',keepAwake,{once:true});
 
 // ---- Session end, idle sign-out and password change ----
-function sessionEnded(message){if(!token)return;stopRakeStream?.();stopInspect();stopTableStream();token='';profile=null;tableId=null;current=null;try{sessionStorage.removeItem('pokerToken');}catch{}document.documentElement.classList.remove('hasSession');if(typeof TABLE_MODE!=='undefined'&&TABLE_MODE)leaveTableTab();for(const id of ['#rebuyDialog','#chipDialog','#rulesDialog'])if($(id)?.open)$(id).close();$('#app').hidden=true;$('#login').hidden=false;$('#dashboard').hidden=true;$('#password').value='';const note=$('#loginNotice');if(note){note.textContent=message;note.hidden=false;}}
+function sessionEnded(message){if(!token)return;stopRakeStream?.();stopInspect();stopTableStream();token='';profile=null;tableId=null;current=null;try{sessionStorage.removeItem('pokerToken');}catch{}document.documentElement.classList.remove('hasSession');if(typeof TABLE_MODE!=='undefined'&&TABLE_MODE)leaveTableTab();for(const id of ['#rebuyDialog','#chipDialog','#rulesDialog'])if($(id)?.open)$(id).close();try{document.body.dataset.view='login';document.body.classList.remove('tableTab');$('.game').hidden=true;$('#lobby').hidden=true;if(new URLSearchParams(location.search).get('table'))history.replaceState({},'','/');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch{}$('#app').hidden=true;$('#login').hidden=false;$('#dashboard').hidden=true;$('#password').value='';const note=$('#loginNotice');if(note){note.textContent=message;note.hidden=false;}}
 // Signed in but untouched for 20 minutes outside a table: sign out.
 const IDLE_SIGNOUT_MS=20*60000;let lastInput=Date.now();for(const type of ['pointerdown','keydown','touchstart','wheel'])addEventListener(type,()=>{lastInput=Date.now();},{passive:true,capture:true});
 setInterval(async()=>{if(!token||!profile||Date.now()-lastInput<IDLE_SIGNOUT_MS)return;if(profile.seatedTableId)return;try{await api('logout',{});}catch{}sessionEnded('U nxore automatikisht pas 20 minutash pa aktivitet.');},30000);
@@ -298,3 +298,11 @@ function renderInspect(){const d=inspectData;if(!d)return;const activeOnly=$('#i
 $('#inspectActiveOnly').onchange=renderInspect;
 setInterval(()=>{if(panelPage==='inspect'&&inspectData&&!document.hidden)renderInspect();},1000);
 document.addEventListener('visibilitychange',()=>{if(panelPage!=='inspect'||profile?.user.role!=='CENTER')return;if(document.hidden)stopInspect();else startInspect();});
+
+// A tab left open can outlive its server session while background polling is
+// throttled. The instant it regains focus we re-check the session; a 401 routes
+// through api() -> sessionEnded(), so a dead session can never keep a live UI.
+let revalidating=false;
+async function revalidateSession(){if(!token||!profile||revalidating)return;revalidating=true;try{await refreshProfile();}catch{}finally{revalidating=false;}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)revalidateSession();});
+addEventListener('focus',revalidateSession);addEventListener('pageshow',revalidateSession);

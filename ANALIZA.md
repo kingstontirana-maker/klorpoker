@@ -287,3 +287,8 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Gjurmë:** çdo hapje e faqes regjistrohet në historik si "Inspektim tavolinash", me orën dhe adresën IP (një herë në 10 minuta).
 - **Paralajmërim kundër hileve:** kur dy ose më shumë lojtarë në të njëjtën tavolinë lidhen nga e njëjta adresë IP, del një njoftim i kuq dhe emrat e tyre shënohen me "IP". Kjo është shenja më e shpeshtë e bashkëpunimit ose e disa llogarive të një personi.
 - Shanset llogariten në sfond me pjesë të vogla dhe vetëm kur faqja është e hapur, që lojërat të mos ngadalësohen. Llogaritja është e saktë në turn dhe river, ndërsa në preflop dhe flop bëhet me mostra.
+
+## Rregullim: sesioni i skaduar nuk bllokonte ndërfaqen
+- **Problemi:** kur tavolina lihej hapur gjatë në browser, sesioni skadonte te serveri (30 min pa kërkesë), por faqja vazhdonte të tregonte lobby-n e lojtarit dhe lejonte veprime (zgjedhje tavoline, hyrje). Veprimet dështonin me 401, por ndërfaqja mbetej "e gjallë". Shkaku: kur tab-i rri në sfond, shfletuesi e ngadalëson polling-un, kështu që asgjë nuk e kapte skadimin derisa përdoruesi klikonte.
+- **Zgjidhja:** sapo tab-i rimerr fokusin (`visibilitychange`/`focus`/`pageshow` — ngjarje që nuk ngadalësohen), faqja ri-verifikon sesionin menjëherë me një kërkesë te serveri. Një 401 kalon te `sessionEnded()`, i cili tani **e rikthen plotësisht pamjen te login-i**: fsheh lojën dhe lobby-n, del nga modaliteti i tavolinës, pastron token-in dhe tregon "Sesioni përfundoi. Hyr përsëri."
+- E provuar: me sesion 6-sekondësh, pas skadimit dhe kthimit te tab-i, ekrani i hyrjes merr përsipër vetë, pa asnjë klik, dhe ndërfaqja e vjetër nuk klikohet më.
