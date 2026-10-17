@@ -57,9 +57,15 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
  function removeInactive(t){for(let i=0;i<t.seats.length;i++)if((t.seats[i]?.inactiveHands||0)>=2)cashOutSeat(t,i,'INACTIVE');}
  function commit(t,s,n){s.stack-=n;s.roundBet+=n;s.committed+=n;t.pot+=n;s.allIn=s.stack===0;}
 
+ // Back to an empty felt: no board, no cards, no result, no pot.
+ function clearTable(t){
+  t.phase='waiting';setTurn(t,-1);t.board=[];t.pot=0;t.currentBet=0;t.runout=null;t.lastResult=null;t.sbPos=t.bbPos=-1;
+  for(const s of t.seats)if(s)Object.assign(s,{cards:[],committed:0,roundBet:0,folded:false,allIn:false,acted:false,lastAction:null,inHand:false});
+ }
+
  function startHand(t){
   removeInactive(t);
-  if(t.seats.filter(s=>eligible(t,s)).length<2){t.phase='waiting';t.turn=-1;return false;}
+  if(t.seats.filter(s=>eligible(t,s)).length<2){clearTable(t);return false;}
   t.hand++;t.phase='preflop';t.board=[];t.pot=0;t.currentBet=0;t.minRaise=t.bb;t.deck=deck();t.lastResult=null;t.lastAggressor=-1;
   // The button never moves onto a player who still has to post to enter.
   const canButton=s=>eligible(t,s)&&!s.mustPost,anyButton=t.seats.some(canButton);
@@ -270,7 +276,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
    if(s.rebuyDeadline&&now>=s.rebuyDeadline&&idle){cashOutSeat(t,i,'REBUY_EXPIRED');changed=true;}
    else if(s.sittingOut&&now-s.sitOutSince>=SIT_OUT_MS&&idle){cashOutSeat(t,i,'SIT_OUT');changed=true;}}
   if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}if(t.turn>=0&&(now>=t.deadline||t.seats[t.turn].autoSitOut))act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}
-  if(now-t.lastActionAt>=BETWEEN_HANDS_MS){if(t.seats.some(s=>(s?.inactiveHands||0)>=2)){removeInactive(t);changed=true;}if(t.seats.filter(s=>eligible(t,s)).length>=2){startHand(t);changed=true;}}
+  if(now-t.lastActionAt>=BETWEEN_HANDS_MS){if(t.seats.some(s=>(s?.inactiveHands||0)>=2)){removeInactive(t);changed=true;}if(t.seats.filter(s=>eligible(t,s)).length>=2){startHand(t);changed=true;}else if(t.phase==='finished'||t.board.length||t.seats.some(s=>s?.cards.length)){clearTable(t);changed=true;}}
   if(changed)save();
  }
 

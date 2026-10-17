@@ -361,7 +361,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .timeBankButton{height:22px;font-size:10px;padding:0 8px}
 
  /* Three round buttons in a row in the bottom-right corner. */
- .dockActions{position:fixed;right:10px;bottom:8px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+ .dockActions{position:fixed;right:max(36px,6vw);bottom:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
  .actionButtons{display:flex;flex-direction:row;gap:10px;align-items:center}
  .actionButtons button{width:68px;height:68px;padding:0;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;font-size:13px;font-weight:800;line-height:1.1;box-shadow:0 6px 16px #000b,inset 0 1px 0 #ffffff26}
  .actionButtons button span{display:flex;flex-direction:column;align-items:center}
@@ -380,7 +380,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 
  /* Bet sizes appear beside the buttons only after a first tap on Raise. */
  .betPicker{display:none}
- .dock.sizing .betPicker{position:fixed;right:10px;bottom:86px;z-index:75;display:grid;grid-template-columns:1fr;gap:8px;width:min(270px,48vw);padding:10px;border-radius:16px;background:#0a1411f2;border:1px solid #5ef0a855;box-shadow:0 14px 40px #000d}
+ .dock.sizing .betPicker{position:fixed;right:max(36px,6vw);bottom:90px;z-index:75;display:grid;grid-template-columns:1fr;gap:8px;width:min(270px,48vw);padding:10px;border-radius:16px;background:#0a1411f2;border:1px solid #5ef0a855;box-shadow:0 14px 40px #000d}
  .sizingHead{display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
  .sizingHead button{width:26px;height:26px;padding:0;border-radius:50%;font-size:12px;background:#ffffff10;border:1px solid var(--line-2)}
  .betPresets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;min-height:0}
@@ -459,6 +459,9 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 @media(max-height:340px) and (orientation:landscape){
  .tableStage{--board-w:clamp(28px,calc(var(--felt-w,540px)*.064),48px)}
  .betAmount{font-size:9px;padding:2px 5px}.tableTitle .iconTool{width:24px;height:24px;font-size:11px}
+ .tableStage{--hole-w:27px;--hole-h:38px}
+ .game .seat:not(.me) .seatName{width:84px;padding:2px 4px 3px}.game .seat:not(.me) .seatName b{font-size:9px}.game .seat:not(.me) .seatName strong{font-size:11px;margin-top:0}
+ .game .seat:not(.me) .seatAction{top:calc(100% + 16px)}
  .game .pot,.game .winnerBanner{top:35%}.game .community{top:54%}
  .actionButtons button,.preActions label{width:58px;height:58px;font-size:11px}
  .actionButtons{gap:8px}.preActions{gap:8px}
@@ -469,3 +472,7 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 /* Your turn: the green button pulses so it is obvious who has to act. */
 @keyframes raisePulse{0%,100%{box-shadow:0 6px 16px #000b,0 0 0 0 #5ef0a8b3,0 0 14px #2bd99066}60%{box-shadow:0 6px 16px #000b,0 0 0 12px #5ef0a800,0 0 32px #2bd990d9}}
 .dock.myTurn .actionButtons .raise:not(:disabled){animation:raisePulse 1.3s ease-out infinite}
+
+/* The winner's amount appears once the chips have landed, not before. */
+@keyframes winBadgeIn{from{opacity:0;transform:translateX(-50%) scale(.5)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+.game .winBadge:not([hidden]){animation:winBadgeIn .35s cubic-bezier(.2,1.4,.4,1) 1.15s both}

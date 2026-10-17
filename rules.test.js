@@ -185,3 +185,13 @@ test('a reload (tab closed and reopened within seconds) changes nothing',()=>{
  e.away(t,user(turn));e.snapshot(t,'p'+turn);e.tickTable(t,Date.now()+1000);
  assert.equal(t.seats[turn].sittingOut,false);assert.equal(t.turn,turn,'still their decision');
 });
+
+test('a finished hand is cleared from the felt when no new hand can start',()=>{
+ const {e,t,checkDown,user}=setup([10000,10000]);e.startHand(t);checkDown();
+ assert.equal(t.phase,'finished');assert.equal(t.board.length,5);
+ e.leave(t,user(1));e.tickTable(t,t.lastActionAt+3000);
+ assert.equal(t.board.length,5,'the result stays visible during the reveal pause');
+ e.tickTable(t,t.lastActionAt+8000);
+ assert.equal(t.phase,'waiting');assert.deepEqual(t.board,[]);assert.equal(t.lastResult,null);assert.equal(t.pot,0);
+ assert.deepEqual(t.seats[0].cards,[]);assert.deepEqual(e.snapshot(t,'p0').seats[0].cards,[]);
+});

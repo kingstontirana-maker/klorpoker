@@ -205,3 +205,10 @@ Në telefon horizontal tavolina nuk e mban më formën fikse 2.1:1; mbush gjith�
 
 ### Butonat në rresht dhe glow i radhës
 Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold, Check/Call dhe Raise janë në një rresht poshtë djathtas, me diametër 68 px (58 px në telefonat shumë të vegjël). Kur është radha jote, butoni jeshil (Raise/Bet) ka një glow që pulson. Lojtarët anash janë ngritur pak që rreshti i butonave të mos i mbulojë. Kontrolli automatik me 6 lojtarë nuk gjen mbivendosje në 568×320, 667×375, 740×360, 844×390 dhe 915×412.
+
+## Rrjedha e tavolinës dhe hapja e saj
+- **Tavolina pastrohet kur nuk ka dorë të re.** Pas rezultatit (8 s), nëse nuk ka dy lojtarë me fonde, tavolina kthehet në pritje: pa board, pa letra, pa pot dhe pa rezultat. Më parë letrat e dorës së fundit mbeteshin në tavolinë pa afat. Kjo ka test.
+- **Hapja në të njëjtën skedë.** "Hap tavolinën" nuk hap më skedë apo dritare të re. Adresa bëhet `/?table=ID`, faqja kalon në ekran të plotë me të njëjtin klikim dhe në telefon Android rrotullohet horizontalisht. "←" kthen te lobby në të njëjtën skedë; butoni "mbrapa" i shfletuesit funksionon gjithashtu.
+- **Pa ndezjen e login-it.** Kur ka sesion, gjatë rifreskimit shfaqet vetëm logoja Klor Poker me një rreth që rrotullohet; formulari i hyrjes del vetëm kur nuk ka sesion të vlefshëm.
+- **Butonat në telefon** qëndrojnë 36–55 px larg skajit djathtas, sipas ekranit, jo në cep.
+- **Radha e animimeve:** bastet mblidhen në pot, çipat shkojnë te fituesi dhe vetëm pas mbërritjes së tyre shfaqet "+shuma".
