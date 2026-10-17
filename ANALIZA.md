@@ -292,3 +292,10 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Problemi:** kur tavolina lihej hapur gjatë në browser, sesioni skadonte te serveri (30 min pa kërkesë), por faqja vazhdonte të tregonte lobby-n e lojtarit dhe lejonte veprime (zgjedhje tavoline, hyrje). Veprimet dështonin me 401, por ndërfaqja mbetej "e gjallë". Shkaku: kur tab-i rri në sfond, shfletuesi e ngadalëson polling-un, kështu që asgjë nuk e kapte skadimin derisa përdoruesi klikonte.
 - **Zgjidhja:** sapo tab-i rimerr fokusin (`visibilitychange`/`focus`/`pageshow` — ngjarje që nuk ngadalësohen), faqja ri-verifikon sesionin menjëherë me një kërkesë te serveri. Një 401 kalon te `sessionEnded()`, i cili tani **e rikthen plotësisht pamjen te login-i**: fsheh lojën dhe lobby-n, del nga modaliteti i tavolinës, pastron token-in dhe tregon "Sesioni përfundoi. Hyr përsëri."
 - E provuar: me sesion 6-sekondësh, pas skadimit dhe kthimit te tab-i, ekrani i hyrjes merr përsipër vetë, pa asnjë klik, dhe ndërfaqja e vjetër nuk klikohet më.
+
+## Rregullime: zmadhimi i faqes dhe krediti në telefon
+- **Krediti i lojtarit poshtë-në-mes nuk dukej:** vendi yt ishte në buzën e poshtme të tavolinës dhe emri/krediti varej nën të, duke dalë jashtë ekranit në telefona me pak lartësi ose me shirit shfletuesi. Zgjidhja: vendi yt u ngrit pak lart dhe tavolina u shkurtua lehtë, që krediti të qëndrojë brenda kornizës me hapësirë (48–65 px nën të, provuar në 667×375, 844×390, 932×430). Krediti shfaqet edhe poshtë-majtas.
+- **Faqja zmadhohej kur logohesh:** fushat e hyrjes ishin 12 px, prandaj shfletuesi i telefonit zmadhonte automatikisht kur i prekje. Tani fushat janë 16 px në telefon dhe faqja nuk lejon zmadhim (`maximum-scale=1, user-scalable=no`).
+- **Faqja zmadhohej/zvogëlohej kur bëje veprime (PC dhe telefon):**
+  - Në PC: paneli i veprimeve ndryshonte lartësi kur vinte radha jote (150 px → 172 px), dhe kjo e ri-përmasonte tavolinën në çdo veprim. Tani paneli ka lartësi të qëndrueshme (176 px), kështu tavolina nuk lëviz më.
+  - Në telefon: prekja e shpejtë e butonave bënte "double-tap zoom". Tani zmadhimi është i çaktivizuar nga viewport-i.

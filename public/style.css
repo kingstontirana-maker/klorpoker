@@ -60,3 +60,10 @@
 .inspector .card .centerSuit{position:absolute;left:58%;top:60%;width:46%;height:46%;transform:translate(-50%,-50%)}
 .inspector .card .bottomCorner{display:none}
 @media(max-width:640px){.iSeat{grid-template-columns:minmax(0,1fr) auto}.iNums{text-align:left}.inspectStats{gap:14px}}
+
+/* Mobile: inputs at >=16px so focusing them never triggers browser auto-zoom
+   (the viewport also disables user scaling, this is a second safeguard). */
+@media(max-width:900px){
+ input,select,textarea{font-size:16px}
+ #username,#password,#newUser,#newPassword{font-size:16px}
+}

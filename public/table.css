@@ -169,7 +169,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .potBreakdown{display:flex;gap:10px;font-size:10px;letter-spacing:.06em;color:#cfe3d6;padding:3px 10px;border-radius:999px;background:#000a;border:0}.potBreakdown b{color:var(--gold-soft);margin-left:4px}
 
 /* ---------- Action dock ---------- */
-.dock{position:sticky;bottom:0;z-index:50;display:grid;grid-template-columns:minmax(220px,1fr) minmax(460px,620px);gap:18px;align-items:center;min-height:var(--dock-h,112px);margin:0 auto 10px;width:100%;max-width:1180px;padding:12px 16px;border-radius:18px;background:linear-gradient(180deg,#141e1bf2,#0a100ef7);border:1px solid var(--line-2);box-shadow:0 -10px 40px #0009,inset 0 1px 0 #ffffff0d;backdrop-filter:blur(10px);transition:border-color .3s,box-shadow .3s}
+.dock{position:sticky;bottom:0;z-index:50;display:grid;grid-template-columns:minmax(220px,1fr) minmax(460px,620px);gap:18px;align-items:center;min-height:var(--dock-h,176px);margin:0 auto 10px;width:100%;max-width:1180px;padding:12px 16px;border-radius:18px;background:linear-gradient(180deg,#141e1bf2,#0a100ef7);border:1px solid var(--line-2);box-shadow:0 -10px 40px #0009,inset 0 1px 0 #ffffff0d;backdrop-filter:blur(10px);transition:border-color .3s,box-shadow .3s}
 .dock.myTurn{border-color:#5ef0a880;box-shadow:0 -10px 40px #0009,0 0 0 1px #5ef0a833,0 0 34px #5ef0a826;animation:turnGlow 1.6s ease-in-out infinite alternate}
 .dockInfo{display:flex;flex-direction:column;gap:4px;min-width:0;align-self:center}
 .turnLine{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
