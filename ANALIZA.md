@@ -202,3 +202,6 @@ Njoftimi "Rrotullo telefonin" ka butonin "▶ Luaj horizontalisht". Në Android,
 
 ### Tavolina nga skaji në skaj
 Në telefon horizontal tavolina nuk e mban më formën fikse 2.1:1; mbush gjithë gjerësinë dhe lartësinë e ekranit. Për shembull: 716×262 në 740×360 (më parë 550×262), 820×292 në 844×390, 891×314 në 915×412. Lojtarët në të djathtë janë vendosur që të mos i mbulojnë butonat. Titulli i tavolinës fshihet në telefon (mbetet vetëm "←"). Kontrolli automatik me 6 lojtarë dhe butonat e dukshëm nuk gjen mbivendosje në 667×375, 740×360, 844×390 dhe 915×412; në 568×320 (iPhone SE i vjetër) butoni "←" mbulon vetëm 9×8 px të një letre të kthyer.
+
+### Butonat në rresht dhe glow i radhës
+Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold, Check/Call dhe Raise janë në një rresht poshtë djathtas, me diametër 68 px (58 px në telefonat shumë të vegjël). Kur është radha jote, butoni jeshil (Raise/Bet) ka një glow që pulson. Lojtarët anash janë ngritur pak që rreshti i butonave të mos i mbulojë. Kontrolli automatik me 6 lojtarë nuk gjen mbivendosje në 568×320, 667×375, 740×360, 844×390 dhe 915×412.

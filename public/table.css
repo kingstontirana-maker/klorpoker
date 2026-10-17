@@ -360,10 +360,10 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  #turnInfo{font-size:9px}#handStrength{font-size:13px}.actionSummary{display:none}#blindInfo{display:none}#inactivityNotice{font-size:9px}
  .timeBankButton{height:22px;font-size:10px;padding:0 8px}
 
- /* Three round buttons stacked in the bottom-right corner. */
- .dockActions{position:fixed;right:10px;bottom:10px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
- .actionButtons{display:flex;flex-direction:column;gap:9px;align-items:center}
- .actionButtons button{width:60px;height:60px;padding:0;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;font-size:13px;font-weight:800;line-height:1.1;box-shadow:0 6px 16px #000b,inset 0 1px 0 #ffffff26}
+ /* Three round buttons in a row in the bottom-right corner. */
+ .dockActions{position:fixed;right:10px;bottom:8px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+ .actionButtons{display:flex;flex-direction:row;gap:10px;align-items:center}
+ .actionButtons button{width:68px;height:68px;padding:0;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;font-size:13px;font-weight:800;line-height:1.1;box-shadow:0 6px 16px #000b,inset 0 1px 0 #ffffff26}
  .actionButtons button span{display:flex;flex-direction:column;align-items:center}
  .actionButtons button small{display:block;font-size:10px;font-weight:700;opacity:.95}
  .actionButtons kbd{display:none}
@@ -373,14 +373,14 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .dock.waitingTurn .actionButtons{display:none}
 
  /* Pre-actions take the same round shape when it is not your turn. */
- .preActions{display:flex;flex-direction:column;gap:9px;align-items:center}
+ .preActions{display:flex;flex-direction:row;gap:10px;align-items:center}
  .preActions>span{display:none}
- .preActions label{width:60px;height:60px;padding:4px;border-radius:50%;flex-direction:column;justify-content:center;gap:2px;font-size:10px;line-height:1.1;text-align:center;white-space:normal;background:#07100dcc;border:1.5px dashed #ffffff40}
+ .preActions label{width:68px;height:68px;padding:4px;border-radius:50%;flex-direction:column;justify-content:center;gap:2px;font-size:10px;line-height:1.1;text-align:center;white-space:normal;background:#07100dcc;border:1.5px dashed #ffffff40}
  .preActions input{width:14px;height:14px}
 
  /* Bet sizes appear beside the buttons only after a first tap on Raise. */
  .betPicker{display:none}
- .dock.sizing .betPicker{position:fixed;right:86px;bottom:10px;z-index:75;display:grid;grid-template-columns:1fr;gap:8px;width:min(270px,48vw);padding:10px;border-radius:16px;background:#0a1411f2;border:1px solid #5ef0a855;box-shadow:0 14px 40px #000d}
+ .dock.sizing .betPicker{position:fixed;right:10px;bottom:86px;z-index:75;display:grid;grid-template-columns:1fr;gap:8px;width:min(270px,48vw);padding:10px;border-radius:16px;background:#0a1411f2;border:1px solid #5ef0a855;box-shadow:0 14px 40px #000d}
  .sizingHead{display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
  .sizingHead button{width:26px;height:26px;padding:0;border-radius:50%;font-size:12px;background:#ffffff10;border:1px solid var(--line-2)}
  .betPresets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;min-height:0}
@@ -460,7 +460,12 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
  .tableStage{--board-w:clamp(28px,calc(var(--felt-w,540px)*.064),48px)}
  .betAmount{font-size:9px;padding:2px 5px}.tableTitle .iconTool{width:24px;height:24px;font-size:11px}
  .game .pot,.game .winnerBanner{top:35%}.game .community{top:54%}
- .actionButtons button,.preActions label{width:52px;height:52px;font-size:11px}
- .actionButtons{gap:7px}.preActions{gap:7px}
+ .actionButtons button,.preActions label{width:58px;height:58px;font-size:11px}
+ .actionButtons{gap:8px}.preActions{gap:8px}
+ .dock.sizing .betPicker{bottom:74px}
  .tableTools .tool,.tableTitle .iconTool{height:26px}.tableTitle .iconTool{width:26px}.tableToolbar{top:2px}
 }
+
+/* Your turn: the green button pulses so it is obvious who has to act. */
+@keyframes raisePulse{0%,100%{box-shadow:0 6px 16px #000b,0 0 0 0 #5ef0a8b3,0 0 14px #2bd99066}60%{box-shadow:0 6px 16px #000b,0 0 0 12px #5ef0a800,0 0 32px #2bd990d9}}
+.dock.myTurn .actionButtons .raise:not(:disabled){animation:raisePulse 1.3s ease-out infinite}
