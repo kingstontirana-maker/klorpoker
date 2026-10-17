@@ -41,7 +41,7 @@ fail('Not found',404);}
 export const tickTable=(t,now=Date.now())=>engine.tickTable(t,now);
 setInterval(()=>{for(const t of runtime.values())tickTable(t);},250).unref();
 
-const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
+const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.webp':'image/webp'};
 export const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');if(url.pathname==='/api/rake/events'){
  const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Login required',401);roleCheck(u,'CENTER','ADMIN','AGENT');
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});

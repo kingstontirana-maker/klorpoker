@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><radialGradient id="f" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#25b07f"/><stop offset=".6" stop-color="#0e6448"/><stop offset="1" stop-color="#062d20"/></radialGradient></defs><rect width="512" height="512" rx="112" fill="#08100d"/><circle cx="256" cy="256" r="200" fill="url(#f)" stroke="#7dffc4" stroke-width="6"/><path d="M256 120c-30 44-118 96-118 156 0 52 62 66 96 26l-22 90h88l-22-90c34 40 96 26 96-26 0-60-88-112-118-156z" fill="#f1dca4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs>
+ <linearGradient id="champagne" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="110">
+  <stop offset="0" stop-color="#f4e6c1"/><stop offset=".45" stop-color="#dcbd84"/><stop offset=".8" stop-color="#c29d62"/><stop offset="1" stop-color="#e2c690"/>
+ </linearGradient>
+ <linearGradient id="rule" gradientUnits="userSpaceOnUse" x1="0" x2="120" y1="0" y2="0">
+  <stop offset="0" stop-color="#d9bb83" stop-opacity="0"/><stop offset=".5" stop-color="#d9bb83"/><stop offset="1" stop-color="#d9bb83" stop-opacity="0"/>
+ </linearGradient>
+</defs><rect width="120" height="120" rx="26" fill="#08110d"/><path d="M24 60 A36 36 0 1 0 96 60 A36 36 0 1 0 24 60Z M26.6 60 A33.4 33.4 0 1 1 93.4 60 A33.4 33.4 0 1 1 26.6 60Z" fill="url(#champagne)" fill-rule="evenodd"/><path d="M60 45.0 C54.35294117647059 53.470588235294116 45.88235294117647 58.1764705882353 45.88235294117647 65.70588235294117 C45.88235294117647 71.3529411764706 53.411764705882355 73.23529411764706 57.64705882352941 68.52941176470588 L55.294117647058826 77.0 H64.70588235294117 L62.35294117647059 68.52941176470588 C66.58823529411765 73.23529411764706 74.11764705882354 71.3529411764706 74.11764705882354 65.70588235294117 C74.11764705882354 58.1764705882353 65.6470588235294 53.470588235294116 60 45.0Z" fill="url(#champagne)"/></svg>
