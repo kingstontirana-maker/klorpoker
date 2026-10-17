@@ -124,7 +124,7 @@ export function seatLayout(portrait=false,phone=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action
  // buttons own the bottom-right corner.
- if(phone&&!portrait)return {seats:[[50,1],[93,25],[93,72],[50,100],[7,72],[7,25]],bets:[[64,22],[74,40],[74,60],[37,83],[26,60],[26,40]],dealer:[[38,18],[86,44],[86,54],[62,85],[14,54],[14,44]]};
+ if(phone&&!portrait)return {seats:[[50,-3],[93,25],[93,72],[50,100],[7,72],[7,25]],bets:[[64,22],[74,40],[74,60],[37,83],[26,60],[26,40]],dealer:[[38,18],[82,44],[82,54],[62,85],[18,54],[18,44]]};
  return portrait?{seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[66,17],[70,36],[76,63],[50,63],[24,63],[30,36]],dealer:[[34,12],[84,9],[84,86],[74,86],[16,86],[16,9]]}
   :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[77,32],[77,68],[36,74],[23,68],[23,32]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
 }

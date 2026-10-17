@@ -268,3 +268,10 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Pa letra pa qenë i pranishëm:** në fillim të çdo dore, kush nuk është parë në 12 sekondat e fundit vihet në pushim *para* se të merren blinds. Kush mbyll faqen vihet në pushim brenda pak sekondash; pas 3 minutash pa u kthyer, çipat i kthehen në portofol.
 - **Nuk veprove në kohë = pushim:** kur i mbaron koha, loja bën vetë check/fold dhe lojtari kalon menjëherë në pushim (asnjë blind nuk i merret më). Rikthehet vetëm kur shtyp **↺ Kthehu**; mesazhi në tavolinë ia shpjegon këtë. Pas 5 minutash pushim ngrihet automatikisht dhe çipat kthehen në portofol.
 - **Hapja e letrave të tavolinës si te dealer-i:** çdo letër e flop/turn/river del me shpinë nga kuverta, rrëshqet në vendin e saj dhe kthehet me fytyrë; tre letrat e flop-it dalin njëra pas tjetrës me një vonesë të shkurtër. Letrat e reja fshihen deri në momentin e animimit, që të mos shfaqen para kohe.
+
+## Telefoni: letrat në mes, butonat larg letrave të tua (e matur)
+- **Letrat e tavolinës** janë saktësisht në qendër të tavolinës (0–1 px nga mesi në çdo madhësi telefoni). Poti (çipat + shuma) qëndron menjëherë sipër letrave, i llogaritur nga lartësia e letrës, jo me përqindje të hamendësuara.
+- **Lojtari sipër** ka emrin/shumën në të majtë të avatarit dhe letrat në të djathtë, që poti të ketë vend edhe në telefonat e vegjël.
+- **Butonat** janë sa më djathtas që lejon ekrani (maksimumi 40 px nga cepi, kurrë ngjitur me të): hapësira llogaritet nga gjysma e emrit tënd + 40 px largësi + gjerësia e tre butonave. Në asnjë madhësi nuk prekin letrat, emrin apo avatarin tënd.
+- **Butoni D** i lojtarëve anësorë është pak më brenda tavolinës, që të mos bjerë mbi avatarin e tyre.
+- E kontrolluar në 568×320, 667×375, 740×360, 844×390, 915×412 dhe 932×430: asnjë mbivendosje, asgjë jashtë ekranit.
