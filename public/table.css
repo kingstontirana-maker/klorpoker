@@ -476,3 +476,29 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 /* The winner's amount appears once the chips have landed, not before. */
 @keyframes winBadgeIn{from{opacity:0;transform:translateX(-50%) scale(.5)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 .game .winBadge:not([hidden]){animation:winBadgeIn .35s cubic-bezier(.2,1.4,.4,1) 1.15s both}
+
+/* ---------- Pot: chips in the middle, the amount underneath ---------- */
+.game .pot,.game .pot.settled{display:flex;flex-direction:column;align-items:center;gap:3px;padding:0;min-width:0;background:none;border:0;border-radius:0;box-shadow:none;top:31.5%}
+.game .community{top:49%}
+.game .pot>span,.game #potCaption,.game .sidePots{display:none}
+.game #potChips{display:flex;align-items:flex-end;justify-content:center;height:30px;min-height:30px;width:auto;overflow:visible;position:static;transition:opacity .25s}
+.game #potChips .chipStacks{transform:scale(.72);transform-origin:bottom center;height:34px}
+.game #potValue{display:block;padding:3px 12px;border-radius:999px;background:#000000a8;border:1px solid #d8b46a55;color:var(--gold-soft);font:750 16px/1.15 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;box-shadow:0 4px 12px #0008}
+.game .pot.empty{visibility:hidden}
+.game .pot.incoming #potChips{opacity:0}
+.game .pot.paying #potChips{opacity:0;transition:opacity .2s}
+.game .pot.settled{animation:potAway .4s ease 2.6s forwards}
+@keyframes potAway{to{opacity:0}}
+@media(max-width:900px) and (orientation:portrait),(max-width:520px){.game .pot,.game .pot.settled{top:28%}.game #potValue{font-size:14px}.game #potChips .chipStacks{transform:scale(.58)}.game #potChips{height:24px;min-height:24px}}
+@media(max-height:560px) and (orientation:landscape){
+ .game .pot,.game .pot.settled{top:34.5%;gap:2px}.game .community{top:55%}.game #potValue{font-size:13px;padding:2px 9px}
+ .game #potChips{height:20px;min-height:20px}.game #potChips .chipStacks{transform:scale(.5)}
+ /* Round buttons: further in from the corner and more space between them, never over your own seat. */
+ .dockActions{right:clamp(24px,calc(50vw - 312px),90px)}
+ .actionButtons,.preActions{gap:18px}
+ .dock.sizing .betPicker{right:clamp(24px,calc(50vw - 312px),90px)}
+}
+@media(max-height:340px) and (orientation:landscape){
+ .dockActions,.dock.sizing .betPicker{right:clamp(10px,calc(50vw - 274px),60px)}
+ .actionButtons,.preActions{gap:12px}
+}

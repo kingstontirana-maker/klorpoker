@@ -212,3 +212,9 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Pa ndezjen e login-it.** Kur ka sesion, gjatë rifreskimit shfaqet vetëm logoja Klor Poker me një rreth që rrotullohet; formulari i hyrjes del vetëm kur nuk ka sesion të vlefshëm.
 - **Butonat në telefon** qëndrojnë 36–55 px larg skajit djathtas, sipas ekranit, jo në cep.
 - **Radha e animimeve:** bastet mblidhen në pot, çipat shkojnë te fituesi dhe vetëm pas mbërritjes së tyre shfaqet "+shuma".
+
+## Poti në qendër dhe animimet
+- Shkrimet "POTI" dhe "POTI I DORËS" u hoqën. Në qendër të tavolinës janë çipat e potit dhe poshtë tyre shuma e gjithë potit. Çipat tregojnë vetëm atë që është mbledhur në mes; bastet e raundit aktual mbeten para lojtarëve derisa të mblidhen.
+- Radha e animimeve: bastet rrëshqasin te pot-i dhe grumbulli rritet vetëm kur çipat mbërrijnë. Në showdown letrat shihen 0.75 s para se pot-i të paguhet. Çipat shkojnë te fituesi pot pas poti, pastaj del "+shuma", pas rreth 2.6 s poti zhduket dhe dora tjetër nis pas 8 s.
+- Në telefon butonat janë më larg skajit djathtas: në ekranet e mesme deri në 90 px, në të ngushtat aq sa lejon emri yt që të mos mbulohet. Midis tyre ka 18 px hapësirë.
+- Kontrolli automatik me 6 lojtarë nuk gjen mbivendosje në 568×320, 667×375, 740×360, 844×390, 915×412 dhe 1366×768.

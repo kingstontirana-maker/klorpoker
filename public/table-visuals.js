@@ -34,24 +34,25 @@ export class TableVisuals {
   async play(e,t,generation){if(this.state?.hand!==e.hand)return;
     const seatNode=id=>this.root.querySelector(`[data-seat-user="${id||''}"]`);
     const seat=seatNode(e.userId)?.querySelector('.avatarWrap');
-    const pot=this.root.querySelector('.pot');
+    const pot=this.root.querySelector('#potChips')||this.root.querySelector('.pot'),potBox=this.root.querySelector('.pot');
     // A bet slides from the player to the chips in front of them.
     if(e.type==='bet'&&e.amount>0&&seat){this.beep(e.label==='ALL-IN'?'allin':'chip');const spot=this.betSpot(seatNode(e.userId));await this.fly(seat,spot||pot,e.amount,0,420);}
     // End of a betting round: every stack in front of a player is pulled into the pot.
-    else if(e.type==='collect'){this.beep('chip');await Promise.all(Object.entries(e.bets||{}).map(([id,amount],i)=>{const from=this.betSpot(seatNode(id));return from?this.fly(from,pot,amount,i*60,480):Promise.resolve();}));}
+    else if(e.type==='collect'){this.beep('chip');potBox?.classList.add('incoming');await Promise.all(Object.entries(e.bets||{}).map(([id,amount],i)=>{const from=this.betSpot(seatNode(id));return from?this.fly(from,pot,amount,i*60,480):Promise.resolve();}));potBox?.classList.remove('incoming');this.animate(pot,[{transform:'scale(.8)'},{transform:'scale(1.12)',offset:.6},{transform:'scale(1)'}],{duration:320});}
     else if(e.type==='reveal'){this.beep('card');await Promise.all((e.ids||[]).map((id,i)=>Promise.all([...(seatNode(id)?.querySelectorAll('.seatCards .card')||[])].map((card,k)=>this.animate(card,[{transform:'rotateY(90deg) scale(.9)',filter:'brightness(.6)'},{transform:'rotateY(0) scale(1)',filter:'brightness(1)'}],{duration:420,delay:i*160+k*90})))));}
     else if(e.type==='award'){
       // Refunds first, then the main pot and each side pot in turn.
       const pots=e.pots?.length?[...e.pots].sort((a,b)=>Number(b.refunded)-Number(a.refunded)):[{winners:Object.keys(e.payments),share:Object.values(e.payments)}];
       const start={};for(const [id,amount] of Object.entries(e.payments||{})){const plate=seatNode(id)?.querySelector('.seatName strong');if(plate){const now=Number(plate.textContent.replace(/[^\d.-]/g,''));if(Number.isFinite(now)){start[id]=now-amount;plate.textContent=fmtChips(start[id]);}}}
-      pot?.classList.add('paying');
+      if(this.state?.lastResult?.showdown)await wait(750);
+      potBox?.classList.add('paying');
       for(const [index,p] of pots.entries()){
         if(generation!==this.generation)return;
         if(!p.refunded)this.beep('win');
         await Promise.all(p.winners.map((id,i)=>{const node=seatNode(id),target=node?.querySelector('.avatarWrap');if(!target)return Promise.resolve();return this.fly(pot,target,p.share?.[i]??0,i*120,820,true).then(()=>{start[id]=(start[id]??0)+(p.share?.[i]??0);this.land(node,start[id],p.share?.[i]??0,!p.refunded);});}));
         if(index<pots.length-1)await wait(260);
       }
-      pot?.classList.remove('paying');
+      potBox?.classList.remove('paying');
     }else if(e.type==='deal'){
       const deck=this.root.querySelector('#dealOrigin');const cards=[...this.root.querySelectorAll('.seatCards .card')];this.beep('card');await Promise.all(cards.map((node,i)=>this.dealCard(deck,node,i*65)));
     }else if(e.type==='street'||e.type==='board'){
