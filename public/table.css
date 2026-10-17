@@ -340,7 +340,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .game{min-height:100dvh;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(var(--stage-min,280px),1fr);padding:0;touch-action:manipulation;-webkit-user-select:none;user-select:none}
  .tableToolbar{position:absolute;z-index:60;left:6px;right:6px;top:4px;min-height:0;padding:0;pointer-events:none;align-items:flex-start}
  .tableToolbar>*{pointer-events:auto}
- .tableTitle{gap:6px}.tableTitle h2{font-size:12px;max-width:150px}.tableSessionMeta{font-size:9px;margin-top:1px;gap:6px}
+ .tableTitle{gap:6px}.tableTitle>div{display:none}
  .tableTitle .iconTool{width:30px;height:30px;font-size:13px}
  .tableTools{gap:4px}.tableTools .tool{height:30px;padding:0 9px;font-size:12px;background:#0a1210cc}
  #connectionStatus{font-size:0;margin:0}#connectionStatus:before{margin:0}
@@ -354,7 +354,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .dock.idle .dockActions{display:none}
 
  /* Hand info: a small pill at the bottom-left. */
- .dockInfo{position:fixed;left:8px;bottom:8px;max-width:34vw;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 10px;border-radius:12px;background:#07100dd9;border:1px solid var(--line-2);text-align:left}
+ .dockInfo{position:fixed;left:8px;bottom:8px;max-width:min(150px,30vw);display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 10px;border-radius:12px;background:#07100dd9;border:1px solid var(--line-2);text-align:left}
  .dock.idle .dockInfo{align-items:flex-start;text-align:left}
  .dock.idle:not(.hasExtras) .dockInfo{display:none}
  #turnInfo{font-size:9px}#handStrength{font-size:13px}.actionSummary{display:none}#blindInfo{display:none}#inactivityNotice{font-size:9px}
@@ -363,7 +363,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  /* Three round buttons stacked in the bottom-right corner. */
  .dockActions{position:fixed;right:10px;bottom:10px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
  .actionButtons{display:flex;flex-direction:column;gap:9px;align-items:center}
- .actionButtons button{width:64px;height:64px;padding:0;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;font-size:13px;font-weight:800;line-height:1.1;box-shadow:0 6px 16px #000b,inset 0 1px 0 #ffffff26}
+ .actionButtons button{width:60px;height:60px;padding:0;border-radius:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;font-size:13px;font-weight:800;line-height:1.1;box-shadow:0 6px 16px #000b,inset 0 1px 0 #ffffff26}
  .actionButtons button span{display:flex;flex-direction:column;align-items:center}
  .actionButtons button small{display:block;font-size:10px;font-weight:700;opacity:.95}
  .actionButtons kbd{display:none}
@@ -375,7 +375,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  /* Pre-actions take the same round shape when it is not your turn. */
  .preActions{display:flex;flex-direction:column;gap:9px;align-items:center}
  .preActions>span{display:none}
- .preActions label{width:64px;height:64px;padding:4px;border-radius:50%;flex-direction:column;justify-content:center;gap:2px;font-size:10px;line-height:1.1;text-align:center;white-space:normal;background:#07100dcc;border:1.5px dashed #ffffff40}
+ .preActions label{width:60px;height:60px;padding:4px;border-radius:50%;flex-direction:column;justify-content:center;gap:2px;font-size:10px;line-height:1.1;text-align:center;white-space:normal;background:#07100dcc;border:1.5px dashed #ffffff40}
  .preActions input{width:14px;height:14px}
 
  /* Bet sizes appear beside the buttons only after a first tap on Raise. */
@@ -391,7 +391,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  #betInput{height:34px;font-size:14px}
  .dockExtras{display:flex;justify-content:flex-end}.dockExtras button{height:34px;border-radius:999px;font-size:12px}
 
- .tableStage{--board-w:clamp(32px,calc(var(--felt-h,260px)*.185),62px);--me-hole-h:clamp(44px,calc(var(--felt-h,260px)*.27),88px);--me-hole-w:calc(var(--me-hole-h)/1.4);--hole-w:34px;--hole-h:48px}
+ .tableStage{--board-w:clamp(30px,min(calc(var(--felt-h,260px)*.185),calc(var(--felt-w,600px)*.066)),62px);--me-hole-h:clamp(44px,calc(var(--felt-h,260px)*.27),88px);--me-hole-w:calc(var(--me-hole-h)/1.4);--hole-w:34px;--hole-h:48px}
  /* Small cards use a phone-style face: a large rank and suit in one corner and a
     clear suit in the other, so nothing overlaps and every card reads at a glance. */
  .game .card .cardCorner,.game .seat .seatCards .card .cardCorner,.game .community .card .cardCorner{width:44%;left:6%;top:5%}
@@ -399,9 +399,9 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .game .card.face .centerSuit{left:auto;top:auto;right:7%;bottom:6%;width:48%;height:48%;transform:none}
  .game .card.face{border-radius:6px}
  .game .seat.me .seatCards .card:first-child{transform:rotate(-3deg)}.game .seat.me .seatCards .card:nth-child(2){transform:rotate(3deg)}
- .game .pot{top:34%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
- .game .winnerBanner{top:34%}
- .game .community{top:53%;gap:4px}.feltBrand{display:none}
+ .game .pot{top:31%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
+ .game .winnerBanner{top:31%}
+ .game .community{top:52%;gap:4px}.feltBrand{display:none}
  .game .seat[data-visual-position="0"] .seatAction{display:none}
  .game .emptySeat span{font-size:16px;line-height:16px}.game .emptySeat b{font-size:8px}
  .tableBet .chipStacks{display:none}
@@ -455,11 +455,12 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 
 .rotateButton{margin-top:10px;padding:14px 26px;border-radius:999px;font-size:16px;font-weight:700;color:#04140d;background:linear-gradient(180deg,#7dffc4,#2fd38a);border:0;box-shadow:0 10px 30px #2bd99055}
 .rotateButton[hidden]{display:none}
-/* Narrow phones in landscape: shift the table left so the round buttons never
-   cover the right-hand players, and keep the top tools clear of their cards. */
-@media(max-height:560px) and (orientation:landscape) and (max-width:700px){
- .tableStage{margin-right:74px}
- .tableTools .tool,.tableTitle .iconTool{height:26px}.tableTitle .iconTool{width:26px}
- .tableToolbar{top:2px}
- .game .pot{top:35.5%;padding:2px 9px}.game .pot>strong{font-size:14px}.game .winnerBanner{top:35.5%}
+/* Small phones in landscape: slightly smaller round buttons and board. */
+@media(max-height:340px) and (orientation:landscape){
+ .tableStage{--board-w:clamp(28px,calc(var(--felt-w,540px)*.064),48px)}
+ .betAmount{font-size:9px;padding:2px 5px}.tableTitle .iconTool{width:24px;height:24px;font-size:11px}
+ .game .pot,.game .winnerBanner{top:35%}.game .community{top:54%}
+ .actionButtons button,.preActions label{width:52px;height:52px;font-size:11px}
+ .actionButtons{gap:7px}.preActions{gap:7px}
+ .tableTools .tool,.tableTitle .iconTool{height:26px}.tableTitle .iconTool{width:26px}.tableToolbar{top:2px}
 }

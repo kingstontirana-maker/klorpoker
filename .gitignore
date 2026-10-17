@@ -5,3 +5,7 @@ node_modules/
 dist/
 coverage/
 *.log
+
+# Live accounts and balances stay on the server, never in GitHub.
+data/
+*.zip

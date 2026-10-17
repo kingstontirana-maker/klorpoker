@@ -108,12 +108,14 @@ export function seatLayout(portrait=false,phone=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action
  // buttons own the bottom-right corner.
- if(phone&&!portrait)return {seats:[[50,4],[92,17],[92,78],[50,100],[8,78],[8,17]],bets:[[64,27],[77,33],[77,64],[36,73],[23,64],[23,33]],dealer:[[40,21],[82,24],[83,72],[63,82],[17,72],[18,24]]};
+ if(phone&&!portrait)return {seats:[[50,4],[88,20],[76,80],[50,100],[26,80],[16,20]],bets:[[66,25],[75,38],[64,70],[38,82],[36,70],[28,38]],dealer:[[42,21],[79,29],[69,72],[62,84],[31,72],[25,29]]};
  return portrait?{seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[66,17],[70,36],[76,63],[50,63],[24,63],[30,36]],dealer:[[34,12],[84,9],[84,86],[74,86],[16,86],[16,9]]}
   :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[77,32],[77,68],[36,74],[23,68],[23,32]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
 }
 // Felt size from the free stage area; text and cards never scale with it.
-export function feltBox(width,height,portrait=false){
+export function feltBox(width,height,portrait=false,phone=false){
+ // Phones in landscape: the felt fills the whole screen, edge to edge.
+ if(phone&&!portrait){const top=50,bottom=48,side=12,w0=width-2*side,h0=height-top-bottom,w=Math.min(w0,h0*3),h=Math.min(h0,w/1.7);return {width:w,height:h,top:top+Math.max(0,(h0-h)/2),minStage:top+bottom+180,ratio:w/h};}
  // Short screens (phones in landscape, small phones) use tighter margins.
  const short=portrait?height<620:height<=560;
  const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?50:78),bottom=portrait?(short?80:92):(short?48:92),side=portrait?50:(short?14:36);
