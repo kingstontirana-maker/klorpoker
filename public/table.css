@@ -583,3 +583,12 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
  .game .pot,.game .pot.settled{top:calc(50% - var(--board-w) * .7 - 18px)}
  .dockActions,.dock.sizing .betPicker{right:calc(clamp(8px,calc(50vw - 311px),40px) + env(safe-area-inset-right))}
 }
+
+/* Phones: the page is exactly the screen. The felt's glow (stage ::before/::after)
+   is wider than the table and on large phones (e.g. 932×430) reached past the
+   screen edges, making the page 990×436 so the browser zoomed out / scrolled.
+   Clip it to the stage and never let the page scroll. */
+@media(max-height:560px) and (orientation:landscape),(max-width:900px) and (orientation:portrait){
+ html:has(body[data-view="table"]),body[data-view="table"]{overflow:hidden;overscroll-behavior:none}
+ body[data-view="table"] .tableStage{overflow:clip}
+}

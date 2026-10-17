@@ -1,7 +1,7 @@
 // Texas Hold'em table engine. Amounts are integer cents; the server owns the
 // accounts and persistence, the engine owns seats, betting and settlement.
 import crypto from 'node:crypto';
-import {deck,distribute,evaluate,compare,rankNames,bestFive} from './poker.js';
+import {deck,distribute,evaluate,compare,rankNames,bestFive,ranks,suits} from './poker.js';
 
 export const LIVE=['preflop','flop','turn','river'];
 export const ACTION_MS=30000,BETWEEN_HANDS_MS=8000,RESULT_REVEAL_MS=8000,REBUY_WINDOW_MS=30000,SIT_OUT_MS=5*60000;
@@ -48,7 +48,7 @@ export function livePots(t){
  return pots;
 }
 
-export function createEngine({db,save=()=>{},onSettle=()=>{}}){
+export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  const findUser=id=>db.users.find(u=>u.id===id);
  const event=(t,text)=>{t.events.unshift({text,at:Date.now(),hand:t.hand});t.events=t.events.slice(0,60);};
  function visual(t,type,detail={}){const e={seq:++t.visualSeq,hand:t.hand,type,at:Date.now(),...detail};t.visualEvents.push(e);t.visualEvents=t.visualEvents.slice(-100);return e;}
@@ -290,5 +290,33 @@ export function createEngine({db,save=()=>{},onSettle=()=>{}}){
   if(changed)save();
  }
 
- return {makeTable,startHand,act,sit,leave,rebuy,sitOut,away,show,useTimeBank,chat,snapshot,tickTable,cashOutSeat,buyinLimits};
+ // ---- Center inspection: the whole table, every hole card, live win chances ----
+ // Win chances are recomputed only when the board or the players in the hand
+ // change: exact on the turn/river, sampled earlier. The work runs in small
+ // chunks between other events so no table ever waits for it.
+ const equityJobs=new WeakMap();
+ function equity(t){
+  const live=t.seats.filter(s=>inHand(s)&&s.cards.length===2);if(live.length<2)return {};
+  const key=t.hand+'|'+t.board.join('')+'|'+live.map(s=>s.id).join();let job=equityJobs.get(t);
+  if(job?.key!==key){
+   const known=new Set([...t.board,...t.seats.flatMap(s=>s?.cards||[])]),rest=[];for(const su of suits)for(const r of ranks)if(!known.has(r+su))rest.push(r+su);
+   const need=5-t.board.length,boards=need===0?[[]]:need===1?rest.map(c=>[c]):Array.from({length:need===2?250:150},()=>{const pick=new Set();while(pick.size<need)pick.add(rest[Math.floor(Math.random()*rest.length)]);return [...pick];});
+   job={key,value:job?.value&&job.hand===t.hand?job.value:{},hand:t.hand,ready:false};equityJobs.set(t,job);
+   const players=live.map(s=>({id:s.id,cards:s.cards})),board=[...t.board],share=Object.fromEntries(players.map(p=>[p.id,0]));let i=0;
+   const step=()=>{if(equityJobs.get(t)!==job)return;for(const end=Math.min(boards.length,i+Math.max(2,Math.floor(40/players.length)));i<end;i++){const full=[...board,...boards[i]];let best=null,winners=[];for(const p of players){const v=evaluate([...p.cards,...full]),c=best?compare(v,best):1;if(c>0){best=v;winners=[p.id];}else if(c===0)winners.push(p.id);}for(const id of winners)share[id]+=1/winners.length;}
+    if(i<boards.length)return setImmediate(step);job.value=Object.fromEntries(Object.entries(share).map(([id,n])=>[id,Math.round(n/boards.length*1000)/10]));job.ready=true;onEquity();};
+   setImmediate(step);
+  }
+  return job.ready?job.value:Object.fromEntries(Object.keys(job.value).filter(id=>live.some(s=>s.id===id)).map(id=>[id,null]));
+ }
+ function inspect(t){
+  const eq=LIVE.includes(t.phase)||t.runout?equity(t):{};
+  return {id:t.id,name:t.name,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),turn:t.turn,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,deadline:t.turn>=0?t.deadline:null,runout:!!t.runout,
+   seats:t.seats.map((s,i)=>s?{position:i,userId:s.userId,username:s.username,stack:clean(s.stack),bet:clean(s.roundBet),committed:clean(s.committed),cards:s.cards,inHand:!!s.inHand,folded:!!s.folded,allIn:!!s.allIn,sittingOut:!!s.sittingOut,lastAction:s.lastAction||null,
+    made:s.cards.length===2&&t.board.length>=3?rankNamesSq[bestFive([...t.board,...s.cards]).rank]:null,equity:eq[s.id]??null}:null),
+   result:t.phase==='finished'&&t.lastResult?{winnerIds:t.lastResult.winnerIds,payments:Object.fromEntries(Object.entries(t.lastResult.payments).map(([k,v])=>[k,clean(v)])),rake:clean(t.lastResult.totalRake||0)}:null,
+   events:t.events.slice(0,8)};
+ }
+
+ return {makeTable,startHand,act,sit,leave,rebuy,sitOut,away,show,useTimeBank,chat,snapshot,tickTable,cashOutSeat,buyinLimits,inspect};
 }

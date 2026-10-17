@@ -26,3 +26,37 @@
 .statusOnline{color:#5ef0a8;font-weight:600}.statusBlocked{color:#ff8b95;font-weight:600}
 .ghostButton{background:transparent;border-color:#34433e;font-size:12px}
 .dangerButton{color:#ffb3b9;border-color:#ef5d6b55}
+
+/* Center: live table inspection */
+.inspectBar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.inspectBar .eyebrow{color:#e0c27d}.inspectBar p{margin:4px 0 0}
+.liveDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5ef0a8;box-shadow:0 0 8px #5ef0a8;margin-right:6px;animation:livePulse 1.6s ease-in-out infinite}
+@keyframes livePulse{50%{opacity:.35}}
+.inspectStats{display:flex;gap:22px}.inspectStats div{display:grid}.inspectStats small{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.inspectStats strong{font-size:18px}
+.inspectFilter{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.inspectAlerts{margin:14px 0 0;padding:10px 14px;border-radius:12px;background:#3a1418;border:1px solid #ef5d6b66;color:#ffd0d4;font-size:13px}.inspectAlerts p{margin:3px 0}.inspectAlerts[hidden]{display:none}
+.inspector{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,540px),1fr));gap:16px;margin-top:16px}
+.iTable{background:linear-gradient(180deg,#0f1c19,#0a1311);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.iTable header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;height:auto;min-height:0;padding:0;background:none;border:0;flex-wrap:nowrap}.iTable h3{margin:0;font-size:16px}.iTable header small{color:var(--muted);font-size:12px}
+.iPhase{font-size:11px;font-weight:700;letter-spacing:.06em;padding:4px 10px;border-radius:999px;background:#1b2a26;color:#a9c4ba;white-space:nowrap}
+.iPhase.preflop,.iPhase.flop,.iPhase.turn,.iPhase.river{background:#123a2a;color:#7ff0b9}.iPhase.finished{background:#3a3014;color:#f1d58e}
+.iBoard{display:flex;align-items:center;gap:6px;padding:10px;border-radius:12px;background:radial-gradient(ellipse at center,#14533a,#0b2d21);margin-bottom:10px}
+.iSlot{display:block;width:34px;height:48px;border-radius:5px;border:1px dashed #ffffff22;flex:none}
+.iPot{margin-left:auto;display:grid;text-align:right}.iPot small{font-size:10px;color:#cfe7dc99}.iPot strong{color:#f1dca4}
+.iSeats{display:grid;gap:6px}
+.iSeat{display:grid;grid-template-columns:minmax(0,1.2fr) auto minmax(72px,.6fr) minmax(0,1.3fr);align-items:center;gap:10px;padding:7px 10px;border-radius:10px;background:#ffffff06;border:1px solid transparent}
+.iSeat.turn{border-color:#5ef0a8;background:#5ef0a812}.iSeat.won{border-color:#d8b46a;background:#d8b46a14}.iSeat.folded{opacity:.45}.iSeat.out{opacity:.35}
+.iWho{display:grid;min-width:0}.iWho b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.iWho small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iTag{display:inline-block;margin-left:4px;padding:0 4px;border-radius:4px;background:#24332f;color:#cfe;font-size:9px;font-style:normal;vertical-align:middle}.iTag.warn{background:#7a1f2a;color:#fff}
+.iCards{display:flex;gap:3px}
+.iNums{display:grid;text-align:right}.iNums strong{font-size:13px}.iNums small{font-size:10px;color:var(--muted)}
+.iInfo{display:grid;gap:3px;min-width:0}.iInfo small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iEq{position:relative;height:14px;border-radius:7px;background:#ffffff10;overflow:hidden}.iEq span{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#1f9d68,#5ef0a8);transition:width .4s}.iEq em{position:relative;display:block;text-align:center;font-size:10px;font-style:normal;font-weight:700;line-height:14px;color:#fff;text-shadow:0 1px 2px #000}
+.iLog{margin-top:8px;font-size:12px;color:var(--muted)}.iLog summary{cursor:pointer}.iLog p{margin:3px 0}.iLog time{color:#6f8a81;margin-right:4px}
+.inspector .card{position:relative;display:block;overflow:hidden;flex:none;width:34px;height:48px;border-radius:5px;background:linear-gradient(150deg,#fff,#eef2f4);border:1px solid #d5dde2;color:#14283a;box-shadow:1px 2px 4px #0006}
+.inspector .card.red{color:#d02a49}
+.inspector .card .cardCorner{position:absolute;left:2px;top:2px;width:12px;aspect-ratio:20 / 34;display:block}
+.inspector .card .cornerArtwork{display:block;width:100%;height:100%;overflow:visible;fill:currentColor}
+.inspector .card .centerSuit{position:absolute;left:58%;top:60%;width:46%;height:46%;transform:translate(-50%,-50%)}
+.inspector .card .bottomCorner{display:none}
+@media(max-width:640px){.iSeat{grid-template-columns:minmax(0,1fr) auto}.iNums{text-align:left}.inspectStats{gap:14px}}

@@ -7,8 +7,8 @@ let db;try{db=JSON.parse(fs.readFileSync(SAVE,'utf8'));}catch{const salt=secret(
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];
-export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map();let pushQueued=false;const save=()=>{db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));fs.mkdirSync(path.dirname(SAVE),{recursive:true});const tmp=SAVE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(db,null,2));fs.renameSync(tmp,SAVE);queuePush();};
-const engine=createEngine({db,save,onSettle:()=>publishRake()});
+export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));fs.mkdirSync(path.dirname(SAVE),{recursive:true});const tmp=SAVE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(db,null,2));fs.renameSync(tmp,SAVE);queuePush();};
+const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush()});
 const makeTable=(id,name,sb,bb)=>{const t=engine.makeTable(id,name,sb,bb);runtime.set(t.id,t);return t;};
 if(!db.tables.length)db.tables=[{id:'1',name:'Emerald One',sb:100,bb:200}];for(const t of db.tables)makeTable(t.id,t.name,t.sb,t.bb);save();
 // Sessions end after SESSION_IDLE_MS without any request (closed tab) and after
@@ -62,20 +62,36 @@ export const tickTable=(t,now=Date.now())=>engine.tickTable(t,now);
 // table changes (and every 2 s as a heartbeat). Presence comes only from the
 // player's own requests (a half-open socket proves nothing); when the
 // stream closes the away protection starts at once.
-function pushTables(){pushQueued=false;for(const [res,sub] of tableSubs){const u=me(sub.token),t=runtime.get(sub.tableId);if(!u||!t||u.role!=='USER'){res.end();tableSubs.delete(res);continue;}try{res.write('data: '+JSON.stringify(engine.snapshot(t,u.id,false))+'\n\n');}catch{tableSubs.delete(res);}}}
-function queuePush(){if(!pushQueued&&tableSubs.size){pushQueued=true;setImmediate(pushTables);}}
-setInterval(()=>{if(tableSubs.size)pushTables();},2000).unref();
+function pushTables(){pushQueued=false;pushInspect();for(const [res,sub] of tableSubs){const u=me(sub.token),t=runtime.get(sub.tableId);if(!u||!t||u.role!=='USER'){res.end();tableSubs.delete(res);continue;}try{res.write('data: '+JSON.stringify(engine.snapshot(t,u.id,false))+'\n\n');}catch{tableSubs.delete(res);}}}
+function queuePush(){if(!pushQueued&&(tableSubs.size||inspectSubs.size)){pushQueued=true;setImmediate(pushTables);}}
+setInterval(()=>{if(tableSubs.size||inspectSubs.size)pushTables();},1000).unref();
 function openTableStream(req,res,tableId){const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Hyr në llogari për të vazhduar.',401);if(u.role!=='USER')fail('Forbidden',403);const t=runtime.get(tableId);if(!t)fail('Table not found',404);if(!t.seats.some(s=>s?.userId===u.id)&&u.balance<=0)fail('Krediti është zero. Kontaktoni agjentin për të shtuar kredit.',403);
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
  tableSubs.set(res,{token,userId:u.id,tableId});res.write('data: '+JSON.stringify(engine.snapshot(t,u.id))+'\n\n');
  const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();
  res.on('close',()=>{clearInterval(beat);tableSubs.delete(res);if(![...tableSubs.values()].some(s=>s.userId===u.id&&s.tableId===tableId))engine.away(t,u);});}
 setInterval(()=>{for(const t of runtime.values())tickTable(t);},250).unref();
+// Center inspection: every table with every hole card, live. Only the center
+// account can open it, it can never sit at a table, and each session is logged.
+// Players at one table who connect from the same address are flagged.
+function inspectView(){
+ const ipOf=userId=>{for(const s of tokens.values())if(s.userId===userId)return s.ip;return db.users.find(u=>u.id===userId)?.lastLoginIp||null;};
+ const tables=[...runtime.values()].map(t=>{const view=engine.inspect(t),byIp={};
+  for(const s of view.seats)if(s){s.ip=ipOf(s.userId);s.online=[...tokens.values()].some(x=>x.userId===s.userId);if(s.ip)(byIp[s.ip]??=[]).push(s.username);}
+  view.alerts=Object.entries(byIp).filter(([,names])=>names.length>1).map(([ip,names])=>({type:'SAME_IP',ip,names}));return view;});
+ return {serverNow:Date.now(),rakePercent:db.rakePercent,tables};
+}
+function pushInspect(){if(!inspectSubs.size)return;let data;for(const [res,token] of inspectSubs){const u=me(token);if(!u||u.role!=='CENTER'){res.end();inspectSubs.delete(res);continue;}data??='data: '+JSON.stringify(inspectView())+'\n\n';try{res.write(data);}catch{inspectSubs.delete(res);}}}
+function openInspectStream(req,res){const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Hyr në llogari për të vazhduar.',401);if(u.role!=='CENTER')fail('Vetëm qendra ka akses në inspektim.',403);
+ const last=db.ledger.findLast?.(x=>x.type==='INSPECT'&&x.from===u.id);if(!last||Date.now()-last.time>10*60000){db.ledger.push({id:uid(),type:'INSPECT',from:u.id,amount:0,ip:clientIp(req),time:Date.now()});save();}
+ res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
+ inspectSubs.set(res,token);res.write('data: '+JSON.stringify(inspectView())+'\n\n');
+ const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();res.on('close',()=>{clearInterval(beat);inspectSubs.delete(res);});}
 
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.webp':'image/webp'};
 const SECURITY_HEADERS={'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()','cross-origin-opener-policy':'same-origin',
  'content-security-policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
-export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost');const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/rake/events'){
+export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost');const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
  const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Login required',401);roleCheck(u,'CENTER','ADMIN','AGENT');
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
  rakeClients.set(res,token);res.write('data: '+JSON.stringify(staffRakeReport(u))+'\n\n');

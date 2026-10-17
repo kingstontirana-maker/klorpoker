@@ -275,3 +275,15 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Butonat** janë sa më djathtas që lejon ekrani (maksimumi 40 px nga cepi, kurrë ngjitur me të): hapësira llogaritet nga gjysma e emrit tënd + 40 px largësi + gjerësia e tre butonave. Në asnjë madhësi nuk prekin letrat, emrin apo avatarin tënd.
 - **Butoni D** i lojtarëve anësorë është pak më brenda tavolinës, që të mos bjerë mbi avatarin e tyre.
 - E kontrolluar në 568×320, 667×375, 740×360, 844×390, 915×412 dhe 932×430: asnjë mbivendosje, asgjë jashtë ekranit.
+
+## Telefoni: faqja është fiks sa ekrani
+- **Problemi:** drita dekorative rreth tavolinës (`.tableStage::after`) ishte më e gjerë se tavolina. Në telefonat e mëdhenj (p.sh. 932×430) dilte jashtë ekranit, faqja bëhej 990×436 dhe shfletuesi e zvogëlonte/lejonte lëvizje, prandaj gjithçka dukej më e madhe se ekrani.
+- **Zgjidhja:** në telefon tavolina pritet saktësisht në kufijtë e ekranit dhe faqja nuk lëviz më. Drita jashtë ekranit nuk shihej gjithsesi.
+- E kontrolluar: 932×430, 915×412, 915×340, 844×390, 844×330, 740×300, 667×375, 568×320, 568×270, portret 390×844 dhe desktop 1280×800: faqja është fiks sa ekrani dhe asgjë nuk pritet.
+
+## Inspektimi live (vetëm qendra)
+- Faqe e re te paneli i qendrës: **Inspektimi live**. Shfaq çdo tavolinë në kohë reale: letrat e tavolinës, potin, radhën me sekondat që mbeten dhe, për çdo lojtar, **të dyja letrat**, stack-un, sa ka futur në pot, veprimin e fundit, kombinimin aktual dhe **shansin e fitores (%)**, i cili përditësohet në çdo rrugë.
+- **Kush e sheh:** vetëm llogaria CENTER. Admin, agjent dhe lojtar marrin 403. Qendra nuk mund të ulet në tavolinë, prandaj nuk mund ta përdorë për të luajtur.
+- **Gjurmë:** çdo hapje e faqes regjistrohet në historik si "Inspektim tavolinash", me orën dhe adresën IP (një herë në 10 minuta).
+- **Paralajmërim kundër hileve:** kur dy ose më shumë lojtarë në të njëjtën tavolinë lidhen nga e njëjta adresë IP, del një njoftim i kuq dhe emrat e tyre shënohen me "IP". Kjo është shenja më e shpeshtë e bashkëpunimit ose e disa llogarive të një personi.
+- Shanset llogariten në sfond me pjesë të vogla dhe vetëm kur faqja është e hapur, që lojërat të mos ngadalësohen. Llogaritja është e saktë në turn dhe river, ndërsa në preflop dhe flop bëhet me mostra.

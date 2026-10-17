@@ -153,6 +153,13 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.match(r.headers.get('content-type'),/text\/event-stream/);const reader=r.body.getReader();let buf='';while(!buf.includes(String.fromCharCode(10,10))){const {value}=await reader.read();buf+=new TextDecoder().decode(value);}
      const first=JSON.parse(buf.slice(buf.indexOf('data: ')+6,buf.indexOf(String.fromCharCode(10,10))));assert.equal(first.id,'1');assert.ok(Array.isArray(first.seats));ctl.abort();
      assert.equal((await fetch(base+'/api/table/1/stream')).status,401);}
+    // Center inspection: only the center, every hole card exactly as dealt, and the access is logged.
+    {const open=tok=>fetch(base+'/api/inspect/stream',{headers:{Authorization:'Bearer '+tok},signal:AbortSignal.timeout(5000)});
+     assert.equal((await open(fresh)).status,403);assert.equal((await open(tokens[2])).status,403);assert.equal((await fetch(base+'/api/inspect/stream')).status,401);
+     const r=await open(tokens[0]);assert.ok(r.headers.get('content-type').includes('text/event-stream'));const reader=r.body.getReader();let buf='';while(!buf.includes(String.fromCharCode(10,10))){const {value}=await reader.read();buf+=new TextDecoder().decode(value);}
+     const view=JSON.parse(buf.slice(buf.indexOf('data: ')+6,buf.indexOf(String.fromCharCode(10,10))));reader.cancel();
+     for(const t of runtime.values()){const seen=view.tables.find(x=>x.id===t.id);assert.ok(seen);t.seats.forEach((s,i)=>assert.deepEqual(seen.seats[i]?.cards??null,s?s.cards:null));}
+     assert.ok((await call('ledger',tokens[0])).data.some(x=>x.type==='INSPECT'),'inspection is logged');}
     const page=await fetch(base+'/');assert.equal(page.headers.get('x-frame-options'),'DENY');assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));fs.rmSync(dir,{recursive:true,force:true});}
 });
