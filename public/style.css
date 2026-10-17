@@ -67,3 +67,29 @@
  input,select,textarea{font-size:16px}
  #username,#password,#newUser,#newPassword{font-size:16px}
 }
+
+/* Phones never enlarge text on their own (iOS landscape boost, Android font
+   scaling), so the layout is the one that was designed and measured. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* Touch screens: inputs at 16px at any width, so tapping a field never zooms. */
+@media(pointer:coarse){input,select,textarea{font-size:16px}}
+/* The sign-in box scrolls instead of being cut off on short landscape screens. */
+.login{overflow-y:auto;place-items:safe center;padding:12px 0}
+@media(max-height:560px) and (orientation:landscape){
+ .loginBox{padding:16px 24px 18px;max-width:400px}
+ .loginLogo{max-width:170px;margin:-4px auto 2px}
+ .loginBox input{padding:10px 12px;margin-top:4px}
+ .loginBox label{margin-top:6px}
+}
+/* Very short landscape screens (small phones with the browser bar): logo on the
+   left, form on the right, so the whole sign-in fits without scrolling. */
+@media(max-height:340px) and (orientation:landscape){
+ .loginBox{max-width:600px;display:grid;grid-template-columns:190px 1fr;column-gap:22px;align-items:center;padding:12px 20px}
+ .loginBox>.loginLogo{grid-column:1;grid-row:1 / span 4;margin:0;max-width:190px}
+ .loginBox>p:not(.loginNotice),.loginBox>small{display:none}
+ .loginBox>.loginNotice{grid-column:1 / -1;margin-bottom:6px}
+ .loginBox>label,.loginBox>button{grid-column:2}
+ .loginBox>label{margin-top:4px;font-size:12px}
+ .loginBox input{padding:8px 12px}
+ .loginBox>button{margin-top:10px;padding:10px}
+}

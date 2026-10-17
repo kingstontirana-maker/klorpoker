@@ -299,3 +299,17 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Faqja zmadhohej/zvogëlohej kur bëje veprime (PC dhe telefon):**
   - Në PC: paneli i veprimeve ndryshonte lartësi kur vinte radha jote (150 px → 172 px), dhe kjo e ri-përmasonte tavolinën në çdo veprim. Tani paneli ka lartësi të qëndrueshme (176 px), kështu tavolina nuk lëviz më.
   - Në telefon: prekja e shpejtë e butonave bënte "double-tap zoom". Tani zmadhimi është i çaktivizuar nga viewport-i.
+
+## Telefoni: tavolina shkallëzohet sipas ekranit (fit-to-screen)
+- **Problemi:** në telefona me pak lartësi (sidomos me shiritin e shfletuesit të dukshëm) tavolina zvogëlohej, por ulëset, emrat, letrat dhe butonat mbeteshin me madhësi fikse në piksel, prandaj dukeshin shumë të mëdha dhe mbulonin tavolinën. Rregullat e veçanta për çdo madhësi nuk e zgjidhnin dot.
+- **Zgjidhja:** në telefon horizontal, tavolina vizatohet mbi një kanavacë të paktën 800×390 dhe shkallëzohet proporcionalisht që të mbushë saktësisht ekranin. Çdo element ruan përmasat e veta në çdo pajisje dhe asgjë nuk del jashtë kornizës. Hapësirat për notch-in dhe shiritin e poshtëm korrigjohen sipas shkallës. U hoqën 7 blloqe rregullash për madhësi të veçanta që nuk duhen më.
+- **Teksti nuk zmadhohet vetë:** `text-size-adjust:100%` ndalon iPhone-in të zmadhojë tekstin në horizontal dhe Android-in ta shkallëzojë sipas cilësimit të madhësisë së shkronjave.
+- **Hyrja:** fushat janë 16 px në çdo ekran me prekje (pa marrë parasysh gjerësinë, rregulli i mëparshëm vlente vetëm nën 900 px dhe telefoni horizontal është më i gjerë), kështu që prekja e tyre nuk zmadhon faqen. Kutia e hyrjes futet e plotë në ekran edhe horizontalisht; në ekranet shumë të ulëta logo është majtas dhe forma djathtas.
+- E provuar në 568×280, 568×320, 640×300, 640×360, 667×375, 720×320, 740×360, 844×390, 915×412, 932×430: faqja është fiks sa ekrani, pa mbivendosje, asgjë jashtë kornizës, krediti yt me 35–66 px hapësirë poshtë; butonat e veprimit nuk prekin asnjë lojtar. Desktopi nuk ndryshon.
+
+## Telefoni: tavolina dhe letrat më të mëdha
+- Kanavaca bazë u zvogëlua nga 800×390 në 730×365, kështu që shkalla në telefon rritet (p.sh. 640×360: 0.80 → 0.89; 844×390: 1.00 → 1.07; 932×430: 1.10 → 1.18) dhe çdo gjë del më e madhe.
+- Më pak hapësirë bosh lart dhe poshtë tavolinës, që tavolina të zërë më shumë nga ekrani.
+- Letrat më të mëdha në telefon: letrat e tavolinës, letrat e tua dhe letrat e kundërshtarëve; emrat dhe krediti me shkronja më të mëdha.
+- Vendi yt u ul pak (97%) që letrat e tua të mos prekin letrat e tavolinës.
+- Matur (lojtari në dorë, me letrat e tavolinës të hapura): nga 568×280 deri te 932×430 asgjë nuk mbivendoset, asgjë nuk del jashtë ekranit, faqja është fiks sa ekrani. Letrat e tavolinës: 39×54 px në telefonin më të vogël deri në 59×83 px në më të madhin (më parë 38×53 në 640×360).
