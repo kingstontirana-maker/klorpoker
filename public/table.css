@@ -615,3 +615,12 @@ body.fitDesk .dock{margin-bottom:12px}
 .tableStage:after,body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at center,var(--t-pool,#2bd99018) 0%,transparent 65%)}
 /* The room around the table is a dark tint of the table's colour. */
 body[data-view="table"] .game:before{background:radial-gradient(ellipse 60% 50% at 50% 45%,var(--t-amb,#12382acc) 0%,transparent 70%),radial-gradient(ellipse 120% 90% at 50% 40%,var(--t-room1,#0d2119) 0%,var(--t-room2,#0a1612) 45%,var(--t-room3,#070e0b) 75%,#040806 100%);transition:background .6s ease}
+
+/* Phones: the canvas sits inside the safe area (positioned by app.js), so the
+   insets are no longer padded inside it, and the controls use plain offsets. */
+body.fitPhone .game{left:var(--fit-x,0px)!important;top:var(--fit-y,0px)!important;padding:0!important}
+body.fitPhone .tableToolbar{left:6px;right:6px;top:4px}
+body.fitPhone .dockInfo{left:8px;bottom:8px}
+body.fitPhone .dockActions{right:40px;bottom:12px}
+body.fitPhone .dock.sizing .betPicker{right:40px;bottom:98px}
+body.fitPhone{background:#040806}

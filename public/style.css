@@ -169,3 +169,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .revKpis{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:1100px){.revKpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.revKpis{grid-template-columns:1fr}}
+/* iPhone: "Add to Home Screen" hint */
+.a2hs{display:flex;align-items:flex-start;gap:12px;margin:0 0 18px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,#1a2a22,#0f1a16);border:1px solid #d8b46a55;color:#e8f3ee}
+.a2hs div{display:grid;gap:4px;flex:1}.a2hs b{color:#f1d58e}.a2hs span{font-size:13px;line-height:1.5;color:#cfe}.a2hs i{font-style:normal;font-weight:700;color:#fff}.a2hs em{font-style:normal;padding:0 4px;border:1px solid #ffffff33;border-radius:4px}
+.a2hs button{background:none;border:0;color:#9ab;font-size:18px;cursor:pointer;padding:0 4px}

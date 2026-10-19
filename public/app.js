@@ -21,7 +21,7 @@ const canRotate=!!(document.documentElement.requestFullscreen&&screen.orientatio
 $('#rotateNow').hidden=!canRotate;if(TABLE_MODE)lockLandscape();
 $('#rotateNow').onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen({navigationUI:'hide'});await screen.orientation.lock('landscape');}catch{toast('Ktheje telefonin anash për të vazhduar.');}};
 const roleNames={CENTER:'Qendra',ADMIN:'Administratori',AGENT:'Agjenti',USER:'Lojtari'};
-function setView(){const player=profile.user.role==='USER';if(player&&TABLE_MODE&&!tableId){TABLE_MODE=null;document.body.classList.remove('tableTab');if(new URLSearchParams(location.search).get('table'))history.pushState({},'','/');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}if(!TABLE_MODE)tableId=null;$('#lobby').hidden=!player||!!tableId;$('.game').hidden=!player||!tableId;$('#sidebar').hidden=!player||!tableId;$('#backLobby').hidden=!player||!tableId;$('.selectWrap').hidden=true;$('#dashboard').hidden=player;$('#closeDashboard').hidden=!player;$('#adminToggle').hidden=true;$('#workspaceLabel').textContent=player?'Hapësira e lojtarit':'Paneli · '+roleNames[profile.user.role];document.body.dataset.role=profile.user.role;document.body.dataset.view=player?(tableId?'table':'lobby'):'management';requestAnimationFrame(tableId?layoutTable:fitPhone);}
+function setView(){const player=profile.user.role==='USER';if(player&&TABLE_MODE&&!tableId){TABLE_MODE=null;document.body.classList.remove('tableTab');if(new URLSearchParams(location.search).get('table'))history.pushState({},'','/');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}if(!TABLE_MODE)tableId=null;$('#lobby').hidden=!player||!!tableId;$('.game').hidden=!player||!tableId;$('#sidebar').hidden=!player||!tableId;$('#backLobby').hidden=!player||!tableId;$('.selectWrap').hidden=true;$('#dashboard').hidden=player;$('#closeDashboard').hidden=!player;$('#adminToggle').hidden=true;$('#workspaceLabel').textContent=player?'Hapësira e lojtarit':'Paneli · '+roleNames[profile.user.role];document.body.dataset.role=profile.user.role;document.body.dataset.view=player?(tableId?'table':'lobby'):'management';requestAnimationFrame(tableId?layoutTable:fitPhone);if(!$('#lobby').hidden)iosHint();}
 function showApp(){profile&&($('#login').hidden=true,$('#app').hidden=false);$('#userTag').textContent=profile.user.username+' · '+roleNames[profile.user.role];$('#balanceTag').textContent=fmt(profile.user.balance);$('#adminToggle').hidden=profile.user.role==='USER';}
 async function refreshProfile(){const oldSeat=profile?.seatedTableId;profile=await api('state');if(oldSeat&&!profile.seatedTableId&&tableId===oldSeat){tableId=null;current=null;visuals.reset();for(const id of ['#rebuyDialog','#chipDialog'])if($(id).open)$(id).close();toast(profile.lastTableExit?.reason==='IDLE_TABLE'?'U ngrite nga tavolina pas 10 minutash pa lojë. Çipat u kthyen në portofol.':profile.lastTableExit?.reason==='INACTIVE'?'U largove nga tavolina pas dy duarve pa veprim. Çipat u kthyen në portofol.':'U largove nga tavolina. Çipat e mbetur u kthyen në portofol.');}showApp();const prev=$('#tables').value;$('#tables').innerHTML=profile.tables.map(t=>`<option value="${t.id}">${safe(t.name)} • ${fmt(t.sb)}/${fmt(t.bb)} • ${t.players}/6</option>`).join('');$('#tables').value=profile.tables.some(t=>t.id===tableId)?tableId:profile.tables[0]?.id;setView();renderLobby();if(profile.user.role!=='USER'&&!$('#rakeForm').contains(document.activeElement)){$('#rakePct').value=profile.rakePercent;}if(profile.user.role!=='USER')renderManagedTables();if($('#chipDialog').open)syncDeposit('chip');}
 const portraitQuery=window.matchMedia('(max-width:900px) and (orientation:portrait), (max-width:520px)');const isPortrait=()=>portraitQuery.matches;
@@ -161,12 +161,19 @@ let lastPortrait=null;// Phones in landscape: lay the table out on a canvas of a
 // (or wider) and scaled to the window, so it fills the window the moment it opens
 // and only scales evenly (never re-flows) when the window or full screen changes.
 const FIT_W=730,FIT_H=365,DESK_W=1000,DESK_H=760;
+// Safe-area insets (notch, rounded corners, home indicator) in CSS px.
+let insetProbe=null;
+function safeInsets(){if(!insetProbe){insetProbe=document.createElement('div');insetProbe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';document.body.append(insetProbe);}
+ const cs=getComputedStyle(insetProbe);return {t:parseFloat(cs.paddingTop)||0,r:parseFloat(cs.paddingRight)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0};}
 function fitPhone(){const g=$('.game');if(!g)return;const table=document.body.dataset.view==='table',W=innerWidth,H=Math.min(innerHeight,window.visualViewport?.height||innerHeight);
- const phone=table&&isPhone(),desk=table&&!phone&&!isPortrait()&&W>DESK_W;
+ const phone=table&&isPhone(),desk=table&&!phone&&!isPortrait()&&W>DESK_W,ins=safeInsets();
  document.body.classList.toggle('fitPhone',phone);document.body.classList.toggle('fitDesk',desk);
- if(!phone&&!desk){for(const k of ['--fit-s','--fit-w','--fit-h'])g.style.removeProperty(k);return;}
- const s=phone?Math.min(H/FIT_H,W/FIT_W):Math.min(H/DESK_H,W/DESK_W);
- g.style.setProperty('--fit-s',String(s));g.style.setProperty('--fit-w',W/s+'px');g.style.setProperty('--fit-h',H/s+'px');}
+ if(!phone&&!desk){for(const k of ['--fit-s','--fit-w','--fit-h','--fit-x','--fit-y'])g.style.removeProperty(k);return;}
+ // Phones: the canvas is scaled into the safe area (inside the notch and the
+ // home indicator), so those never eat into the felt; the strips outside are background.
+ const sw=phone?W-ins.l-ins.r:W,sh=phone?H-ins.t-ins.b:H,s=phone?Math.min(sh/FIT_H,sw/FIT_W):Math.min(H/DESK_H,W/DESK_W);
+ g.style.setProperty('--fit-x',(phone?ins.l:0)+'px');g.style.setProperty('--fit-y',(phone?ins.t:0)+'px');
+ g.style.setProperty('--fit-s',String(s));g.style.setProperty('--fit-w',(phone?sw:W)/s+'px');g.style.setProperty('--fit-h',(phone?sh:H)/s+'px');}
 function layoutTable(){fitPhone();const stage=$('.tableStage');if(!stage||!stage.clientWidth)return;const portrait=isPortrait(),box=feltBox(stage.clientWidth,stage.clientHeight,portrait,isPhone());$('.game').style.setProperty('--stage-min',Math.ceil(box.minStage)+'px');stage.style.setProperty('--felt-w',box.width+'px');stage.style.setProperty('--felt-h',box.height+'px');stage.style.setProperty('--felt-top',box.top+'px');const mode=portrait+':'+isPhone();if(lastPortrait!==null&&lastPortrait!==mode&&current)render(current);lastPortrait=mode;}
 new ResizeObserver(layoutTable).observe($('.tableStage'));
 // Backup for tabs that were opened in the background: measure again when shown.
@@ -393,3 +400,11 @@ $('#revExport').onclick=async()=>{try{$('#revStatus').textContent='Duke përgati
  const lines=[['Data','Ora','Tavolina','Dora','Lojtari','Agjenti','Admini','Rake (€)'].join(';'),...r.rows.map(x=>{const dt=new Date(x.time);return [revDay(dt).split('-').reverse().join('.'),dt.toLocaleTimeString('sq-AL',{timeZone:revTz,hour12:false}),x.table,x.hand??'',x.player,x.agent||'',x.admin||'',String(x.amount.toFixed(2)).replace('.',',')].map(esc).join(';');}),'',['Totali','','','','','','',String(r.rows.reduce((n,x)=>n+x.amount,0).toFixed(2)).replace('.',',')].join(';')];
  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='klor-te-ardhurat-'+r.root.username+'-'+r.from+'_'+r.to+'.csv';document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
  $('#revStatus').textContent=r.rows.length+' rreshta u eksportuan';}catch(err){$('#revStatus').textContent=err.message;}};
+
+// iPhone/iPad: Safari cannot go full screen, but a Home Screen web app opens without
+// Safari's bars, so the table gets the whole screen. Shown once, in the lobby.
+function iosHint(){try{if(localStorage.getItem('klorA2HS'))return;}catch{}
+ const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),standalone=navigator.standalone||matchMedia('(display-mode: standalone),(display-mode: fullscreen)').matches;
+ if(!ios||standalone||$('#a2hs'))return;const b=document.createElement('div');b.id='a2hs';b.className='a2hs';b.setAttribute('role','note');
+ b.innerHTML='<div><b>Ekran i plotë në iPhone</b><span>Safari nuk lejon ekran të plotë. Shtyp <i>Shpërnda</i> <em>□↑</em> → <i>Shto në ekranin bazë</i> (Add to Home Screen) dhe hape Klor Poker nga ikona: tavolina del e madhe, pa shiritin e Safari-t.</span></div><button type="button" aria-label="Mbyll">✕</button>';
+ b.querySelector('button').onclick=()=>{b.remove();try{localStorage.setItem('klorA2HS','1');}catch{}};$('#lobby').prepend(b);}
