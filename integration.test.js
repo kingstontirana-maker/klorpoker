@@ -22,6 +22,19 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     for(let i=0;i<5;i++)tokens.push((await call('login','',{username:'test'+i,password})).data.token);
     assert.equal((await call('rake/events',tokens[3])).status,403);
     assert.equal((await call('rake/events','')).status,401);
+    // Registration through an agent's invite link lands the player under that agent.
+    const invite=(await call('state',tokens[2])).data.user.invite;assert.match(invite,/^[0-9A-F]{10}$/);
+    assert.equal((await call('state',tokens[3])).data.user.invite,undefined);
+    assert.equal((await call('register','',{username:'newbie',password:'Newbie12345',code:'0000000000',adult:true})).status,400);
+    assert.equal((await call('register','',{username:'newbie',password:'Newbie12345',code:invite,adult:false})).status,400);
+    assert.equal((await call('register','',{username:'newbie',password:'short',code:invite,adult:true})).status,400);
+    const reg=await call('register','',{username:'newbie',password:'Newbie12345',code:invite.toLowerCase(),adult:true});
+    assert.equal(reg.status,200);assert.equal(reg.data.user.role,'USER');assert.equal(reg.data.user.parentId,'2');assert.equal(reg.data.user.balance,0);assert.equal((await call('state',reg.data.token)).status,200);
+    assert.equal((await call('register','',{username:'NEWBIE',password:'Newbie12345',code:invite,adult:true})).status,400);
+    assert.ok((await call('users',tokens[2])).data.some(x=>x.username==='newbie'));
+    const newInvite=(await call('invite/reset',tokens[2],{})).data.invite;assert.notEqual(newInvite,invite);assert.equal((await call('invite/reset',tokens[3],{})).status,403);
+    assert.equal((await call('register','',{username:'newbie2',password:'Newbie12345',code:invite,adult:true})).status,400);
+    const stats=(await call('public/stats','')).data;assert.equal(typeof stats.tables,'number');assert.ok(!/test\d|passHash|salt/.test(JSON.stringify(stats)));
     for(const index of [0,1,2]){
       const controller=new AbortController();
       const response=await fetch(base+'/api/rake/events',{headers:{Authorization:'Bearer '+tokens[index]},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});
@@ -131,7 +144,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
 
     // Security: one session per account, sign-in lockout, password rules, blocking, headers.
     const fresh=(await call('login','',{username:'test3',password})).data.token;
-    const old=await call('state',tokens[3]);assert.equal(old.status,401);assert.match(old.data.error,/pajisje tjetër/);
+    const old=await call('state',tokens[3]);assert.equal(old.status,401);assert.match(old.data.error,/another device/);
     assert.equal((await call('state',fresh)).status,200);
     assert.equal((await call('users/create',tokens[2],{username:'weakpass',password:'short'})).status,400);
     assert.equal((await call('users/create',tokens[2],{username:'goodpass',password:'Fjalekalim9'})).status,200);

@@ -173,3 +173,57 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .a2hs{display:flex;align-items:flex-start;gap:12px;margin:0 0 18px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,#1a2a22,#0f1a16);border:1px solid #d8b46a55;color:#e8f3ee}
 .a2hs div{display:grid;gap:4px;flex:1}.a2hs b{color:#f1d58e}.a2hs span{font-size:13px;line-height:1.5;color:#cfe}.a2hs i{font-style:normal;font-weight:700;color:#fff}.a2hs em{font-style:normal;padding:0 4px;border:1px solid #ffffff33;border-radius:4px}
 .a2hs button{background:none;border:0;color:#9ab;font-size:18px;cursor:pointer;padding:0 4px}
+
+/* ---------- Lobby list ---------- */
+.lobbyTools{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:0 0 12px}
+#lobbySearch{flex:1 1 240px;max-width:440px;padding:10px 14px;border-radius:10px;border:1px solid #2a3c37;background:#091011;color:#fff}
+.lobbyCheck{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+#lobbyTables{display:block;grid-template-columns:none}
+.lobbyList{border:1px solid #263735;border-radius:14px;overflow:hidden;background:#0c1514}
+.llHead,.llRow{display:grid;grid-template-columns:62px minmax(170px,2.2fr) minmax(112px,1fr) minmax(150px,1.3fr) minmax(130px,1.1fr) minmax(104px,.9fr) 136px;align-items:center;column-gap:14px;padding:0 18px}
+.llHead{background:#101c19;border-bottom:1px solid #263735;min-height:44px}
+.llSort{all:unset;cursor:pointer;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:13px 0;white-space:nowrap}
+.llSort:hover,.llSort.on{color:#e8f3ee}.llSort:focus-visible{outline:2px solid var(--mint);outline-offset:2px;border-radius:4px}
+.llRow{min-height:64px;border-bottom:1px solid #1b2a27;cursor:pointer;transition:background .15s}
+.llRow:last-child{border-bottom:0}.llRow:hover{background:#ffffff07}
+.llRow.locked{cursor:default;opacity:.7}
+.llRow.seated{background:linear-gradient(90deg,var(--t-ring,#5ef0a833),transparent 55%)}
+.llRow small{display:none}
+.llId{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:600;font-size:13px}
+.llName{display:flex;align-items:center;gap:10px;min-width:0}.llName b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.llName em{font-style:normal;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#1d4d3c;color:#bff5d9;white-space:nowrap}
+.llDot{flex:none;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--t-1,#25b07f),var(--t-4,#09432f));box-shadow:0 0 0 1px var(--t-rim,#7dffc4cc),0 0 10px var(--t-halo1,#5ef0a84d)}
+.llBlinds,.llBuyin,.llPlayers{font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+.llPlayers{display:flex;align-items:center;gap:9px}
+.llSeats{display:inline-flex;gap:3px}.llSeats i{width:8px;height:8px;border-radius:50%;background:#ffffff1c}.llSeats i.on{background:#5ef0a8;box-shadow:0 0 6px #5ef0a888}
+.llStatus{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);white-space:nowrap}.llStatus.live{color:#7ff0b9}
+.llAct button{width:100%;padding:9px 12px;font-size:13px;white-space:nowrap;background:linear-gradient(180deg,var(--t-2,#1e6b4a),var(--t-3,#14513a));border-color:var(--t-rim,#5ef0a866);color:#fff}
+.llEmpty{padding:26px;text-align:center;color:var(--muted);margin:0}
+@media(max-width:1100px){.llHead,.llRow{grid-template-columns:54px minmax(150px,2fr) minmax(104px,1fr) minmax(130px,1.2fr) minmax(118px,1fr) 118px}.llStatus{display:none}.llHead .llSort[data-sort="status"]{display:none}}
+/* Phones and narrow windows: each table is a compact two-line row. */
+@media(max-width:760px){
+ .llHead{display:none}
+ .llRow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:12px 14px;min-height:0}
+ .llName{order:1;flex:1 1 55%}.llName b{font-size:15px}
+ .llAct{order:2;flex:0 0 auto}.llAct button{width:auto;padding:8px 14px}
+ .llId{order:3;font-size:12px}
+ .llBlinds,.llBuyin,.llPlayers,.llStatus{order:4;font-size:12px;display:flex}
+ .llRow small{display:inline;color:var(--muted);margin-right:5px}
+ .llSeats i{width:6px;height:6px}
+ .lobbyTools{gap:8px 14px}#lobbySearch{max-width:none}
+}
+/* Lobby list: keep the live status visible down to 900 px; ID first on phones. */
+@media(max-width:1100px){.llHead,.llRow{grid-template-columns:48px minmax(140px,1.8fr) minmax(96px,.9fr) minmax(128px,1.1fr) minmax(112px,1fr) minmax(92px,.8fr) 104px;column-gap:12px;padding:0 14px}.llStatus{display:flex}.llHead .llSort[data-sort="status"]{display:block}}
+@media(max-width:900px){.llHead,.llRow{grid-template-columns:44px minmax(130px,1.8fr) minmax(92px,.9fr) minmax(124px,1.1fr) minmax(108px,1fr) 100px}.llStatus{display:none}.llHead .llSort[data-sort="status"]{display:none}}
+@media(max-width:760px){.llId{order:0;flex:none;font-size:12px}.llStatus{display:flex}}
+
+/* Mobile lobby: the Open button sits in the vertical middle of its row. */
+@media(max-width:760px){
+ .llRow{position:relative;padding-right:118px}
+ .llAct{position:absolute;right:14px;top:50%;transform:translateY(-50%)}
+ .llName{flex-basis:100%}
+}
+/* Agent invite link */
+.inviteCard{margin-bottom:18px;background:radial-gradient(120% 140% at 100% 0%,#d9bb8322,transparent 55%),var(--surface)}
+.inviteRow{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 10px}
+.inviteRow input{flex:1 1 280px;min-width:0;padding:12px 14px;border-radius:10px;border:1px solid #2a3c37;background:#091011;color:#e8f3ee;font-family:ui-monospace,Consolas,monospace;font-size:14px}

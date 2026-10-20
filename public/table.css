@@ -85,9 +85,9 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .seatAction[data-action=RAISE],.seatAction[data-action=BET]{color:#ffd58a;border-color:#d8b46a66;background:#2b200ecc}
 .seatAction[data-action=ALL-IN]{color:#fff;border-color:#ef5d6b;background:linear-gradient(90deg,#8d1d2c,#c33447);box-shadow:0 0 14px #ef5d6b66}
 .seatAction[data-action=CALL],.seatAction[data-action=CHECK],.seatAction[data-action=AUTO-CHECK]{color:#c5f5da;border-color:#5ef0a840}
-.seatAction[data-action=FITUES]{color:#231808;background:linear-gradient(90deg,#f1dca4,#d8b46a);border-color:#fff3}
+.seatAction[data-action=WINNER]{color:#231808;background:linear-gradient(90deg,#f1dca4,#d8b46a);border-color:#fff3}
 .seatAction[data-action=FOLD],.seatAction[data-action=AUTO-FOLD]{color:#93a29a}
-.seatAction[data-action=PUSHIM],.seatAction[data-action=PRET],.seatAction[data-action=LARGOHET]{color:#9aa79e}
+.seatAction[data-action="SIT OUT"],.seatAction[data-action=WAITING],.seatAction[data-action=LEAVING]{color:#9aa79e}
 .game .foldedSeat .avatar,.game .foldedSeat .seatName{opacity:.55}
 .game .seat.sittingOutSeat .avatar,.game .seat.sittingOutSeat .seatName{opacity:.45;filter:grayscale(.7)}
 .game .blindBadge{position:absolute;left:-10px;top:-2px;z-index:6;min-width:24px;padding:1px 5px;border-radius:9px;font:800 9px/15px Inter,system-ui,sans-serif;text-align:center;color:#0b1712;background:#bfe9d0;border:1px solid #fff8;box-shadow:0 2px 6px #000a}

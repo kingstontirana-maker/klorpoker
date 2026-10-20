@@ -365,3 +365,30 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Zgjidhja:** tavolina shkallëzohet brenda zonës së sigurt (jashtë notch-it dhe home indicator-it) në vend që ato të zbriten nga brenda; tapeti përdor gjerësinë shtesë të ekraneve të gjata (deri 3.4:1); ulëset anash poshtë u ngritën pak (72% → 67%) që tapeti të marrë më shumë lartësi, kështu edhe letrat dalin më të mëdha.
 - **Rezultati:** në çdo telefon tapeti zë 90% të gjerësisë së zonës së dukshme dhe letrat rriten me ekranin (letrat e tavolinës nga 40×56 px te 568×280 deri në 61×85 px te 915×412). iPhone 13 Pro Max: në Safari tapeti 748×235 me letra 53×74; nga Home Screen 749×268 me letra 58×82. Asnjë mbivendosje, asgjë në zonën e notch-it; butonat e veprimit nuk prekin asnjë lojtar.
 - **Ekran i plotë në iPhone:** Safari nuk e lejon, por faqja e shtuar në ekranin bazë (Shpërnda → Shto në ekranin bazë) hapet pa shiritat e Safari-t. Lobby i tregon këtë këshillë një herë përdoruesve të iPhone/iPad që hapin faqen nga Safari. U shtua ikona PNG (180×180) që kërkon iPhone për ekranin bazë.
+
+## Lobby si listë
+- Kartat e veçanta u zëvendësuan me një listë të vetme dhe responsive.
+- **Në kompjuter:** tabelë me kolonat ID, Tavolina (me ngjyrën e saj), Blinds, Buy-in, Lojtarë (6 pikat e vendeve + x/6), Statusi (live me jeshile) dhe butoni "Hap" në ngjyrën e tavolinës. Klikimi i titullit të kolonës e rendit listën (rritëse/zbritëse); klikimi i rreshtit e hap tavolinën.
+- **Kërkim dhe filtra:** kërko sipas emrit ose ID-së (#6), "Vetëm me vende të lira", "Vetëm ku po luhet". Kërkimi nuk e humb fokusin kur lista rifreskohet vetë.
+- **Në telefon:** çdo tavolinë është një rresht kompakt me dy vija (#ID · emri · Hap / blinds · buy-in · lojtarë · statusi).
+- Tavolina ku je ulur shënohet "ulur këtu"; pa kredit, butoni çaktivizohet.
+
+## Home page, regjistrim me ftesë dhe faqja në anglisht
+
+- **E gjithë platforma në anglisht:** index.html (`lang="en"`), app.js, table-visuals.js, mesazhet e lojës (game.js), gabimet e serverit (server.js), rake.js dhe manifest. Datat shfaqen me `en-GB`. Etiketat e vendeve tani janë `SIT OUT / WAITING / LEAVING / WINNER` (selektorët në table.css u përditësuan). Testet u përshtatën me tekstet e reja.
+- **Home page e re** (`public/home.css`, `public/home.js`): faqja nuk hapet më direkt te login. Ka hero me tavolinë 3D të animuar (letrat shpërndahen, çipat lëvizin, tilt me mausin), shirit promocionesh, 6 karta veçorish, 2 banera promocionale, numra live (tavolina, lojtarë, duar në lojë) nga `/api/public/stats`, tavolinat kryesore, hapat "si funksionon", CTA finale dhe footer 18+ / lojë e përgjegjshme. Animacionet fiken me `prefers-reduced-motion`.
+- **Sign in / Register** hapen në një dritare (`#authDialog`) me dy tab-e. Kur sesioni mbaron, faqja kthehet te home page me dritaren e hyrjes të hapur dhe mesazhin përkatës.
+- **Regjistrimi me kod ftese:** çdo agjent ka një kod (10 shenja hex) dhe link `https://klorpoker.com/?ref=KODI`, që shfaqen te paneli i agjentit (Overview → "Your invite link", me Copy dhe "New link" që çaktivizon të vjetrin). Lojtari që regjistrohet bie direkt nën atë agjent me portofol 0; regjistrimi shënohet në historikun e agjentit ("Player registered"). Pa kod të vlefshëm nuk krijohet llogari. Kufizime: 10 tentativa/orë për IP, konfirmim 18+, i njëjti rregull fjalëkalimi si kudo.
+- **Lobby në celular:** butoni "Open" është në mes vertikal të rreshtit.
+- Testet: 52/52 kalojnë (shtuar kontrolle për regjistrimin, kodin e gabuar, 18+, emrin e zënë, rinovimin e kodit dhe statistikat publike pa të dhëna private).
+
+## Home page e ridizajnuar (premium)
+- Hero kinematik me imazhin real të tavolinës luksoze (`home-table.webp` 120 KB, `home-table-m.webp` 49 KB për celular, nga `design-reference.png` 2.1 MB), me zoom të ngadaltë, dritë që kalon, pluhur ari (canvas) dhe grain.
+- Në plan të parë: A♠ K♠ me të njëjtat letra si në lojë (shpërndahen me animacion dhe ndjekin mausin) dhe çipa 3D.
+- Tipografi luksoze: tituj të mëdhenj + serif italik ari; butona ari me shkëlqim; ikona SVG në vend të emoji-ve.
+- Seksione: shirita të kryqëzuar me tekst lëvizës, "showcase" i tavolinës në kornizë që drejtohet me scroll dhe pika që tregojnë veçoritë, bento grid me kufij ari që rrotullohen, shirit me 10 kombinimet e pokerit me letra reale, 3 hapat e ftesës me vijë të animuar, CTA finale me çipa që bien, footer 18+.
+- Në tablet dhe celular letrat dalin mbi titull (nuk e mbulojnë), çdo gjë brenda ekranit, pa scroll horizontal.
+- **Rifinim:** në hero një royal flush (10-J-Q-K-A ♠) shpërndahet me shpinë të zezë/ari, kthehet një nga një dhe hapet si fan me shpërthim drite smerald/ari, xixa dhe shkëlqim mbi letra. Çipat janë vizatuar në SVG si cilindra realë (anët me inserte, faqja me unazë, inlay dhe ♠). Butonat janë smerald si në lojë. Join / Sign in duken menjëherë pa scroll (edhe në celular, krah për krah). Shiriti jeshil është mbi atë të artë.
+- **Letrat dhe çipat statike:** royal flush-i në hero është tani 3D statik (perspektivë, trashësi letre, hije reale), pa asnjë animacion apo efekt. Dizajn modern e i pastër: numri dhe simboli në qoshe, një ♠ i madh në mes, pa korniza apo panele brenda letrës. Çipat qëndrojnë në tavolinë pa lëvizje; edhe çipat në fund të faqes janë statikë.
+- **Imazhi i çipave:** në vend të letrave, hero tani tregon imazhin e çipave smerald/zi/ari (`home-chips.webp` 127 KB, `home-chips-m.webp` 54 KB për celular), statik, me sfond transparent.
+- **Titulli i hero-s:** "Place your bets. / Go all-in. / *Win big.*"

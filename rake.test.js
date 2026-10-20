@@ -55,7 +55,7 @@ test('revenue report: who generated it, how, isolated per branch, with date rang
  // Centre: everything, split by admin, plus unattributed legacy rake.
  const c=revenueReport(db,users[0],range,now);
  assert.equal(c.totals.rake,155);assert.equal(c.totals.hands,3);assert.equal(c.totals.players,3);
- assert.deepEqual(c.byChild.map(x=>[x.username,x.rake]),[['adminA',120],['adminB',30],['Pa atribuim (para regjistrimit të detajuar)',5]]);
+ assert.deepEqual(c.byChild.map(x=>[x.username,x.rake]),[['adminA',120],['adminB',30],['Unattributed (before detailed records)',5]]);
  assert.equal(c.byTable.find(t=>t.name==='Ruby').rake,90);
  assert.equal(c.series.length,7);assert.equal(c.series.find(s=>s.key==='2026-10-12').rake,90);
  assert.equal(c.hours[21].rake,90,'hour of day in Tirana');
@@ -71,7 +71,7 @@ test('revenue report: who generated it, how, isolated per branch, with date rang
  // Drill-down only inside one's own network.
  assert.equal(revenueReport(db,users[0],{...range,scope:'g'},now).totals.rake,120);
  assert.deepEqual(revenueReport(db,users[0],{...range,scope:'g'},now).path.map(p=>p.username),['center','adminA','agentG']);
- assert.throws(()=>revenueReport(db,users[2],{...range,scope:'g'},now),/rrjetin/);
+ assert.throws(()=>revenueReport(db,users[2],{...range,scope:'g'},now),/not in your network/);
  // Detail rows for export add up to the total.
  const d=revenueReport(db,users[0],{...range,detail:true},now);
  assert.equal(d.rows.reduce((n,r)=>n+r.amount,0),150,'attributed rows (legacy has no player)');

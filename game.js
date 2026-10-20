@@ -26,8 +26,8 @@ export const fail=(m,code=400)=>{const e=Error(m);e.status=code;throw e;};
 const suitSymbols={c:'♣',d:'♦',h:'♥',s:'♠'};
 export const cardText=c=>(c[0]==='T'?'10':c[0])+suitSymbols[c[1]];
 const phaseNames={flop:'FLOP',turn:'TURN',river:'RIVER'};
-const rankNamesSq={'High Card':'Letra e lartë','One Pair':'Çift','Two Pair':'Dy çifte','Three of a Kind':'Tris','Straight':'Shkallë','Flush':'Ngjyrë','Full House':'Full House','Four of a Kind':'Poker','Straight Flush':'Shkallë me ngjyrë'};
-const exitNames={INACTIVE:'pasivitet',REBUY_EXPIRED:'pa fonde',SIT_OUT:'pushim i gjatë',IDLE_TABLE:'tavolinë pa lojë',LEFT:'dalje',DISCONNECTED:'u shkëput nga loja'};
+const rankNamesSq={'High Card':'High Card','One Pair':'One Pair','Two Pair':'Two Pair','Three of a Kind':'Three of a Kind','Straight':'Straight','Flush':'Flush','Full House':'Full House','Four of a Kind':'Four of a Kind','Straight Flush':'Straight Flush'};
+const exitNames={INACTIVE:'inactivity',REBUY_EXPIRED:'out of chips',SIT_OUT:'long sit-out',IDLE_TABLE:'idle table',LEFT:'left',DISCONNECTED:'disconnected'};
 
 export const inHand=s=>!!s&&s.inHand&&!s.folded;
 export const actionable=s=>inHand(s)&&!s.allIn;
@@ -60,7 +60,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  // Bets in front of the players slide into the middle at the end of a round.
  function collect(t){const bets=Object.fromEntries(t.seats.filter(s=>s?.roundBet>0).map(s=>[s.userId,clean(s.roundBet)]));if(Object.keys(bets).length)visual(t,'collect',{bets});}
 
- function cashOutSeat(t,index,reason){const s=t.seats[index];if(!s)return;const u=findUser(s.userId);if(u){u.balance+=s.stack;u.tableExit={tableId:t.id,reason,at:Date.now()};}db.ledger.push({id:uid(),type:'CASH_OUT',to:s.userId,tableId:t.id,amount:s.stack,reason,time:Date.now()});t.seats[index]=null;event(t,`${s.username} u largua · ${exitNames[reason]||reason}`);visual(t,'leave',{userId:s.userId,position:index,reason});}
+ function cashOutSeat(t,index,reason){const s=t.seats[index];if(!s)return;const u=findUser(s.userId);if(u){u.balance+=s.stack;u.tableExit={tableId:t.id,reason,at:Date.now()};}db.ledger.push({id:uid(),type:'CASH_OUT',to:s.userId,tableId:t.id,amount:s.stack,reason,time:Date.now()});t.seats[index]=null;event(t,`${s.username} left · ${exitNames[reason]||reason}`);visual(t,'leave',{userId:s.userId,position:index,reason});}
  function removeInactive(t){for(let i=0;i<t.seats.length;i++)if((t.seats[i]?.inactiveHands||0)>=2)cashOutSeat(t,i,'INACTIVE');}
  function commit(t,s,n){s.stack-=n;s.roundBet+=n;s.committed+=n;t.pot+=n;s.allIn=s.stack===0;}
 
@@ -89,10 +89,10 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   post(t.sbPos,t.sb,'SB');post(t.bbPos,t.bb,'BB');
   // A player who joined or returned from sitting out posts one live big blind,
   // unless they are already in a blind position.
-  for(const pos of order){const s=t.seats[pos];if(s.mustPost&&!headsUp&&pos!==t.sbPos&&pos!==t.bbPos){post(pos,t.bb,'POST');event(t,`${s.username} paguan big blind për të hyrë në lojë`);}s.mustPost=false;}
+  for(const pos of order){const s=t.seats[pos];if(s.mustPost&&!headsUp&&pos!==t.sbPos&&pos!==t.bbPos){post(pos,t.bb,'POST');event(t,`${s.username} posts a big blind to join the game`);}s.mustPost=false;}
   t.currentBet=Math.max(...order.map(p=>t.seats[p].roundBet));
   setTurn(t,nextToAct(t,t.bbPos));
-  event(t,`Dora #${t.hand} nisi · blinds ${eur(t.sb)}/${eur(t.bb)} · dealer ${t.seats[t.button].username}`);
+  event(t,`Hand #${t.hand} started · blinds ${eur(t.sb)}/${eur(t.bb)} · dealer ${t.seats[t.button].username}`);
   if(t.turn<0)progress(t);
   return true;
  }
@@ -111,7 +111,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   const allIn=t.seats.filter(actionable).length<=1;
   if(t.phase==='river'&&!allIn)return finish(t,true);
   // Nobody can bet any more: table the hands, then deal the board street by street.
-  if(allIn){collect(t);for(const s of t.seats)if(s)s.roundBet=0;t.currentBet=0;setTurn(t,-1);t.runout={at:Date.now()+RUNOUT_STEP_MS};visual(t,'reveal',{ids:t.seats.filter(inHand).map(s=>s.id)});event(t,'All-in · letrat hapen në tavolinë');return;}
+  if(allIn){collect(t);for(const s of t.seats)if(s)s.roundBet=0;t.currentBet=0;setTurn(t,-1);t.runout={at:Date.now()+RUNOUT_STEP_MS};visual(t,'reveal',{ids:t.seats.filter(inHand).map(s=>s.id)});event(t,'All-in · the cards are dealt out');return;}
   dealStreet(t);setTurn(t,nextToAct(t,t.button));
  }
 
@@ -139,8 +139,8 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   const winnerIds=[...new Set(result.pots.filter(p=>!p.refunded).flatMap(p=>p.winners))];
   const shown=showdown?showdownOrder(t):[];
   const winningHands=showdown?Object.fromEntries(winnerIds.map(id=>[id,bestFive([...t.board,...byId(id).cards])])):{};
-  if(showdown){for(const id of shown){const s=byId(id),b=bestFive([...t.board,...s.cards]);event(t,`${s.username} tregon ${s.cards.map(cardText).join(' ')} · ${rankNamesSq[b.rank]}`);}for(const s of t.seats)if(inHand(s)&&!shown.includes(s.id))event(t,`${s.username} nuk i tregon letrat (muck)`);}
-  let contested=0;for(const p of result.pots){const names=p.winners.map(id=>byId(id)?.username).join(' & ');if(p.refunded)event(t,`Basti i pakonkurruar ${eur(p.amount)} iu kthye ${names}`);else{event(t,`${names} ${p.winners.length>1?'ndajnë':'fiton'} ${eur(p.amount)} · ${contested?'side pot '+contested:'poti kryesor'}`);contested++;}}
+  if(showdown){for(const id of shown){const s=byId(id),b=bestFive([...t.board,...s.cards]);event(t,`${s.username} shows ${s.cards.map(cardText).join(' ')} · ${rankNamesSq[b.rank]}`);}for(const s of t.seats)if(inHand(s)&&!shown.includes(s.id))event(t,`${s.username} mucks their cards`);}
+  let contested=0;for(const p of result.pots){const names=p.winners.map(id=>byId(id)?.username).join(' & ');if(p.refunded)event(t,`Uncalled bet of ${eur(p.amount)} returned to ${names}`);else{event(t,`${names} ${p.winners.length>1?'split':'wins'} ${eur(p.amount)} · ${contested?'side pot '+contested:'main pot'}`);contested++;}}
   visual(t,'award',{payments:Object.fromEntries(Object.entries(result.payments).map(([id,n])=>[id,clean(n)])),winnerIds,pots:result.pots.map(p=>({amount:clean(p.amount),winners:p.winners,refunded:p.refunded,share:p.winners.map((id,i)=>clean(Math.floor(p.amount/p.winners.length)+(i<p.amount%p.winners.length?1:0)))}))});
   t.lastResult={...result,winnerIds,winningHands,showdown,shown,at:Date.now(),hands:shown.map(id=>{const s=byId(id),b=bestFive([...t.board,...s.cards]);return {id,username:s.username,cards:s.cards,rank:b.rank,score:b.score};})};
   for(const s of t.seats)if(s)s.roundBet=0;
@@ -154,101 +154,101 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  }
 
  function act(t,userId,type,amount,automatic=false){
-  if(!LIVE.includes(t.phase))fail('Dora nuk është aktive');
-  const p=seatOf(t,userId);if(p<0||p!==t.turn)fail('Nuk është radha jote');
+  if(!LIVE.includes(t.phase))fail('The hand is not active');
+  const p=seatOf(t,userId);if(p<0||p!==t.turn)fail('It is not your turn');
   const s=t.seats[p],owe=toCall(t,s),at=Date.now();
   // A timed-out player checks when checking is free, and folds otherwise.
   if(automatic&&type==='fold'&&owe===0)type='check';
   if(type==='call'&&owe===0)type='check';
-  if(type==='fold'){s.folded=true;s.acted=true;s.lastAction={type:automatic?'AUTO-FOLD':'FOLD',at};visual(t,'fold',{position:p,userId});event(t,`${s.username} ${automatic?'bën fold automatik (pa veprim)':'bën fold'}`);}
-  else if(type==='check'){if(owe)fail('Nuk mund të bësh check: ka bast për të ndjekur');s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:automatic?'AUTO-CHECK':'CHECK',at};visual(t,'check',{position:p,userId});event(t,`${s.username} ${automatic?'bën check automatik (pa veprim)':'bën check'}`);}
-  else if(type==='call'){const n=Math.min(owe,s.stack);commit(t,s,n);s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:s.allIn?'ALL-IN':'CALL',amount:clean(n),at};visual(t,'bet',{position:p,userId,amount:clean(n),label:s.lastAction.type});event(t,`${s.username} bën call ${eur(n)}${s.allIn?' · all-in':''}`);}
+  if(type==='fold'){s.folded=true;s.acted=true;s.lastAction={type:automatic?'AUTO-FOLD':'FOLD',at};visual(t,'fold',{position:p,userId});event(t,`${s.username} ${automatic?'folds automatically (no action)':'folds'}`);}
+  else if(type==='check'){if(owe)fail('You cannot check: there is a bet to call');s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:automatic?'AUTO-CHECK':'CHECK',at};visual(t,'check',{position:p,userId});event(t,`${s.username} ${automatic?'checks automatically (no action)':'checks'}`);}
+  else if(type==='call'){const n=Math.min(owe,s.stack);commit(t,s,n);s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:s.allIn?'ALL-IN':'CALL',amount:clean(n),at};visual(t,'bet',{position:p,userId,amount:clean(n),label:s.lastAction.type});event(t,`${s.username} calls ${eur(n)}${s.allIn?' · all-in':''}`);}
   else if(type==='raise'){
-   if(!canRaise(t,s))fail(s.acted?'Basti nuk është rihapur pas një all-in të paplotë':'Nuk ke fonde të mjaftueshme për të ngritur');
+   if(!canRaise(t,s))fail(s.acted?'Betting was not reopened after an incomplete all-in':'You do not have enough chips to raise');
    const target=money(amount),max=s.roundBet+s.stack,opening=t.currentBet===0;
-   if(!Number.isSafeInteger(target)||target<=t.currentBet||target>max)fail('Shuma e bastit është e pavlefshme');
+   if(!Number.isSafeInteger(target)||target<=t.currentBet||target>max)fail('The bet amount is invalid');
    const increment=target-t.currentBet;
-   if(increment<t.minRaise&&target!==max)fail(`${opening?'Basti minimal':'Ngritja minimale'} është ${eur(t.currentBet+t.minRaise)}`);
+   if(increment<t.minRaise&&target!==max)fail(`${opening?'The minimum bet':'The minimum raise'} is ${eur(t.currentBet+t.minRaise)}`);
    const n=target-s.roundBet;commit(t,s,n);
    // Only a full raise reopens the betting and sets the next minimum raise.
    if(increment>=t.minRaise){t.minRaise=increment;for(const o of t.seats)if(actionable(o))o.acted=false;}
    t.currentBet=target;s.acted=true;s.actedAt=target;t.lastAggressor=p;
    s.lastAction={type:s.allIn?'ALL-IN':opening?'BET':'RAISE',amount:clean(target),at};visual(t,'bet',{position:p,userId,amount:clean(n),label:s.lastAction.type});
-   event(t,`${s.username} ${opening?'bën bet':'ngre në'} ${eur(target)}${s.allIn?' · all-in':''}`);
+   event(t,`${s.username} ${opening?'bets':'raises to'} ${eur(target)}${s.allIn?' · all-in':''}`);
   }
-  else fail('Veprim i pavlefshëm');
-  if(automatic){if(s.lastTimeoutHand!==t.hand){s.inactiveHands=(s.inactiveHands||0)+1;s.lastTimeoutHand=t.hand;}if(!s.sittingOut){s.sittingOut=true;s.sitOutSince=Date.now();s.timedOut=true;event(t,`${s.username} nuk veproi në kohë · në pushim derisa të kthehet`);}}else{s.inactiveHands=0;s.lastTimeoutHand=null;s.lastSeen=Date.now();}
+  else fail('Invalid action');
+  if(automatic){if(s.lastTimeoutHand!==t.hand){s.inactiveHands=(s.inactiveHands||0)+1;s.lastTimeoutHand=t.hand;}if(!s.sittingOut){s.sittingOut=true;s.sitOutSince=Date.now();s.timedOut=true;event(t,`${s.username} did not act in time · sitting out until they return`);}}else{s.inactiveHands=0;s.lastTimeoutHand=null;s.lastSeen=Date.now();}
   progress(t);save();
  }
 
  function sit(t,u,position,buyin,allTables){
-  if(u.role!=='USER')fail('Vetëm lojtarët mund të luajnë',403);
-  if(allTables.some(room=>room.seats.some(s=>s?.userId===u.id)))fail('Je ulur tashmë në një tavolinë');
+  if(u.role!=='USER')fail('Only players can play',403);
+  if(allTables.some(room=>room.seats.some(s=>s?.userId===u.id)))fail('You are already seated at a table');
   const pos=Number(position),amount=money(buyin),limits=buyinLimits(t);
-  if(!Number.isInteger(pos)||pos<0||pos>=6||t.seats[pos])fail('Vendi nuk është i lirë');
-  if(!Number.isSafeInteger(amount)||amount<limits.min||amount>limits.max||u.balance<amount)fail(`Buy-in i pavlefshëm (${eur(limits.min)}–${eur(limits.max)})`);
+  if(!Number.isInteger(pos)||pos<0||pos>=6||t.seats[pos])fail('That seat is taken');
+  if(!Number.isSafeInteger(amount)||amount<limits.min||amount>limits.max||u.balance<amount)fail(`Invalid buy-in (${eur(limits.min)}–${eur(limits.max)})`);
   u.balance-=amount;u.tableExit=null;
   // Joining a running game requires a live big blind before the first hand.
   const running=t.hand>0&&t.seats.filter(s=>eligible(t,s)).length>=2;
   t.seats[pos]={id:u.id,userId:u.id,username:u.username,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
-  db.ledger.push({id:uid(),type:'BUY_IN',from:u.id,tableId:t.id,amount,time:Date.now()});event(t,`${u.username} u ul në vendin ${pos+1}${LIVE.includes(t.phase)?' · luan nga dora e ardhshme':''}`);save();
+  db.ledger.push({id:uid(),type:'BUY_IN',from:u.id,tableId:t.id,amount,time:Date.now()});event(t,`${u.username} sat down in seat ${pos+1}${LIVE.includes(t.phase)?' · plays from the next hand':''}`);save();
  }
 
  // Leaving during a hand folds the cards now and cashes out at settlement.
  function leave(t,u){
-  const i=seatOf(t,u.id);if(i<0)fail('Nuk je ulur në tavolinë');const s=t.seats[i];
+  const i=seatOf(t,u.id);if(i<0)fail('You are not seated at this table');const s=t.seats[i];
   if(!LIVE.includes(t.phase)||!s.inHand){cashOutSeat(t,i,'LEFT');save();return {ok:true,pending:false};}
   s.leaveAfterHand=true;
-  if(!s.folded&&!s.allIn){if(t.turn===i)act(t,u.id,'fold');else{s.folded=true;s.acted=true;s.lastAction={type:'FOLD',at:Date.now()};visual(t,'fold',{position:i,userId:u.id});event(t,`${s.username} bën fold dhe largohet`);if(t.seats.filter(inHand).length===1)finish(t,false);}}
+  if(!s.folded&&!s.allIn){if(t.turn===i)act(t,u.id,'fold');else{s.folded=true;s.acted=true;s.lastAction={type:'FOLD',at:Date.now()};visual(t,'fold',{position:i,userId:u.id});event(t,`${s.username} folds and leaves`);if(t.seats.filter(inHand).length===1)finish(t,false);}}
   save();return {ok:true,pending:!!t.seats[i]};
  }
 
  function rebuy(t,u,value){
-  const s=t.seats[seatOf(t,u.id)];if(!s)fail('Nuk je ulur në tavolinë');
-  if(LIVE.includes(t.phase)&&s.inHand)fail('Çipat shtohen ndërmjet duarve');
-  if(s.rebuyDeadline&&Date.now()>=s.rebuyDeadline)fail('Afati i riblerjes përfundoi');
+  const s=t.seats[seatOf(t,u.id)];if(!s)fail('You are not seated at this table');
+  if(LIVE.includes(t.phase)&&s.inHand)fail('Chips can only be added between hands');
+  if(s.rebuyDeadline&&Date.now()>=s.rebuyDeadline)fail('The rebuy time has expired');
   const amount=money(value),max=buyinLimits(t).max;
-  if(!Number.isSafeInteger(amount)||amount<=0||amount>u.balance||s.stack+amount>max||s.stack+amount<t.bb)fail('Shuma e pavlefshme ose kredit i pamjaftueshëm');
+  if(!Number.isSafeInteger(amount)||amount<=0||amount>u.balance||s.stack+amount>max||s.stack+amount<t.bb)fail('Invalid amount or not enough credit');
   u.balance-=amount;s.stack+=amount;delete s.rebuyDeadline;delete s.rebuyAvailableAt;db.ledger.push({id:uid(),type:'REBUY',from:u.id,tableId:t.id,amount,time:Date.now()});save();
  }
 
  function markAway(t,s,reason){
   if(!s||s.sittingOut)return;s.sittingOut=true;s.autoSitOut=true;s.sitOutSince=Date.now();s.awayHand=t.hand;
-  event(t,`${s.username} ${reason||'u shkëput'} · nuk merr letra derisa të kthehet`);save();
+  event(t,`${s.username} ${reason||'disconnected'} · no cards until they return`);save();
  }
  // A returning player only posts to re-enter if hands were dealt without them.
  function comeBack(t,s){
   if(s.timedOut){s.autoSitOut=false;return;}   // a timed-out player returns only by choice
   s.sittingOut=false;s.autoSitOut=false;delete s.sitOutSince;s.inactiveHands=0;s.lastTimeoutHand=null;
   s.mustPost=t.hand>(s.awayHand??t.hand)&&t.seats.filter(o=>o!==s&&eligible(t,o)).length>=2;
-  event(t,`${s.username} u rikthye në lojë`);save();
+  event(t,`${s.username} is back in the game`);save();
  }
  // The tab was closed: if the player is not back within 5 seconds (a reload is),
  // the normal away protection takes over.
  function away(t,u){const s=t.seats[seatOf(t,u.id)];if(s&&!s.sittingOut)s.lastSeen=Math.min(s.lastSeen??Date.now(),Date.now()-AWAY_MS+5000);}
 
  function sitOut(t,u,value){
-  const s=t.seats[seatOf(t,u.id)];if(!s)fail('Nuk je ulur në tavolinë');
-  if(value){if(!s.sittingOut){s.sittingOut=true;s.sitOutSince=Date.now();event(t,`${s.username} bën pushim`);}}
-  else if(s.sittingOut){s.sittingOut=false;s.autoSitOut=false;s.timedOut=false;delete s.sitOutSince;s.inactiveHands=0;s.lastTimeoutHand=null;s.mustPost=t.seats.filter(o=>o!==s&&eligible(t,o)).length>=2;event(t,`${s.username} u kthye në lojë`);}
+  const s=t.seats[seatOf(t,u.id)];if(!s)fail('You are not seated at this table');
+  if(value){if(!s.sittingOut){s.sittingOut=true;s.sitOutSince=Date.now();event(t,`${s.username} sits out`);}}
+  else if(s.sittingOut){s.sittingOut=false;s.autoSitOut=false;s.timedOut=false;delete s.sitOutSince;s.inactiveHands=0;s.lastTimeoutHand=null;s.mustPost=t.seats.filter(o=>o!==s&&eligible(t,o)).length>=2;event(t,`${s.username} returned to the game`);}
   save();
  }
 
  // After the hand a player may voluntarily show cards that were not tabled.
  function show(t,u){
-  const s=t.seats[seatOf(t,u.id)];if(!s||t.phase!=='finished'||!t.lastResult||s.cards.length!==2)fail('Nuk ka letra për të treguar');
-  if(!t.lastResult.shown.includes(s.id)){t.lastResult.shown.push(s.id);event(t,`${s.username} tregon ${s.cards.map(cardText).join(' ')}`);}
+  const s=t.seats[seatOf(t,u.id)];if(!s||t.phase!=='finished'||!t.lastResult||s.cards.length!==2)fail('There are no cards to show');
+  if(!t.lastResult.shown.includes(s.id)){t.lastResult.shown.push(s.id);event(t,`${s.username} shows ${s.cards.map(cardText).join(' ')}`);}
  }
 
  function useTimeBank(t,u){
-  const i=seatOf(t,u.id),s=t.seats[i];if(!s||i!==t.turn||!LIVE.includes(t.phase))fail('Nuk është radha jote');
-  const add=Math.min(TIME_BANK_CHUNK,s.timeBank||0);if(add<=0)fail('Koha shtesë ka mbaruar');
-  s.timeBank-=add;t.deadline+=add;event(t,`${s.username} përdor ${Math.round(add/1000)} sekonda kohë shtesë`);save();
+  const i=seatOf(t,u.id),s=t.seats[i];if(!s||i!==t.turn||!LIVE.includes(t.phase))fail('It is not your turn');
+  const add=Math.min(TIME_BANK_CHUNK,s.timeBank||0);if(add<=0)fail('Your time bank is used up');
+  s.timeBank-=add;t.deadline+=add;event(t,`${s.username} uses ${Math.round(add/1000)} seconds of time bank`);save();
  }
 
  function chat(t,u,text){
-  const message=String(text||'').replace(/\s+/g,' ').trim().slice(0,200);if(!message)fail('Mesazhi është bosh');
-  t.chatTimes??={};if(Date.now()-(t.chatTimes[u.id]||0)<1200)fail('Prit pak para mesazhit tjetër');t.chatTimes[u.id]=Date.now();
+  const message=String(text||'').replace(/\s+/g,' ').trim().slice(0,200);if(!message)fail('The message is empty');
+  t.chatTimes??={};if(Date.now()-(t.chatTimes[u.id]||0)<1200)fail('Wait a moment before your next message');t.chatTimes[u.id]=Date.now();
   t.chat.push({id:++t.chatSeq,user:u.username,text:message,at:Date.now()});t.chat=t.chat.slice(-CHAT_LIMIT);
  }
 

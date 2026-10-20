@@ -68,8 +68,8 @@ test('all 52 cards use matching SVG suits and two rank indices',()=>{
 
 test('hand descriptions, starting hands and pre-actions',async()=>{
  const {describeHand,startingHand,preActionFor}=await import('./public/table-visuals.js');
- assert.equal(describeHand([8,14]),'Royal Flush');assert.equal(describeHand([6,13,7]),'Full House K mbi 7');assert.equal(describeHand([2,12,4,9]),'Dy çifte Q dhe 4');assert.equal(describeHand(null),'');
- assert.equal(startingHand(['Ah','Ad']),'Çift A në dorë');assert.equal(startingHand(['Ts','Ks']),'K-10 me ngjyrë');assert.equal(startingHand(['BACK','BACK']),'');
+ assert.equal(describeHand([8,14]),'Royal Flush');assert.equal(describeHand([6,13,7]),'Full house, K over 7');assert.equal(describeHand([2,12,4,9]),'Two pair, Q and 4');assert.equal(describeHand(null),'');
+ assert.equal(startingHand(['Ah','Ad']),'Pocket As');assert.equal(startingHand(['Ts','Ks']),'K-10 suited');assert.equal(startingHand(['BACK','BACK']),'');
  assert.equal(preActionFor('checkFold',0),'check');assert.equal(preActionFor('checkFold',2),'fold');assert.equal(preActionFor('call',2),'call');assert.equal(preActionFor('check',2),null);
 });
 

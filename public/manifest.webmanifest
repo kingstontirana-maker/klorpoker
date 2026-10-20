@@ -1,7 +1,7 @@
 {
   "name": "Klor Poker",
   "short_name": "Klor Poker",
-  "description": "Texas Hold'em me kredit virtual",
+  "description": "Texas Hold'em with virtual credit",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",

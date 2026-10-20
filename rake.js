@@ -27,7 +27,7 @@ export function isUnder(db,id,ancestorId){const byId=new Map(db.users.map(u=>[u.
 export function revenueReport(db,viewer,{from,to,scope,detail=false}={},now=Date.now()){
  const byId=new Map(db.users.map(u=>[u.id,u]));
  const root=scope&&scope!==viewer.id?byId.get(scope):viewer;
- if(!root||!isUnder(db,root.id,viewer.id))throw Object.assign(Error('Ky raport nuk është në rrjetin tënd'),{status:403});
+ if(!root||!isUnder(db,root.id,viewer.id))throw Object.assign(Error('This report is not in your network'),{status:403});
  const rakes=db.ledger.filter(x=>x.type==='RAKE');
  const today=dayFmt.format(now),first=rakes.length?dayFmt.format(Math.min(...rakes.map(x=>x.time))):today;
  to=validDay(to)?to:today;from=from==='all'?first:validDay(from)?from:addDays(to,-29);if(from>to)[from,to]=[to,from];
@@ -55,9 +55,9 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false}={},now=Date
   total+=sum;hands++;
   const b=series.get(bucketOf(d));if(b){b.rake+=sum;b.hands++;}
   const h=hours[Number(hourFmt.format(x.time))%24];h.rake+=sum;h.hands++;
-  const t=tables.get(x.tableId)||tables.set(x.tableId,{id:x.tableId,name:tableOf(x.tableId).name||('Tavolina '+x.tableId),color:tableOf(x.tableId).color||null,sb:tableOf(x.tableId).sb||0,bb:tableOf(x.tableId).bb||0,rake:0,hands:0}).get(x.tableId);t.rake+=sum;t.hands++;
+  const t=tables.get(x.tableId)||tables.set(x.tableId,{id:x.tableId,name:tableOf(x.tableId).name||('Table '+x.tableId),color:tableOf(x.tableId).color||null,sb:tableOf(x.tableId).sb||0,bb:tableOf(x.tableId).bb||0,rake:0,hands:0}).get(x.tableId);t.rake+=sum;t.hands++;
   for(const a of parts){
-   if(!a.pid){const k='_legacy';const c=children.get(k)||children.set(k,{id:null,username:'Pa atribuim (para regjistrimit të detajuar)',role:'LEGACY',rake:0,hands:new Set(),players:new Set()}).get(k);c.rake+=a.amount;c.hands.add(x.id);continue;}
+   if(!a.pid){const k='_legacy';const c=children.get(k)||children.set(k,{id:null,username:'Unattributed (before detailed records)',role:'LEGACY',rake:0,hands:new Set(),players:new Set()}).get(k);c.rake+=a.amount;c.hands.add(x.id);continue;}
    activePlayers.add(a.pid);
    const c=children.get(a.v.id)||children.set(a.v.id,{id:a.v.id,username:a.v.username,role:a.v.role,rake:0,hands:new Set(),players:new Set()}).get(a.v.id);c.rake+=a.amount;c.hands.add(x.id);c.players.add(a.pid);
    const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:byId.get(a.pid)?.username||a.pid,...upline(a.pid),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
