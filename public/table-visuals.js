@@ -23,7 +23,9 @@ export function chipStack(amount,{compact=false}={}){const parts=splitChips(amou
 export function timerState(deadline,now,duration=30000){const remaining=Math.max(0,(deadline||0)-now);return {remaining,seconds:Math.ceil(remaining/1000),fraction:Math.max(0,Math.min(1,remaining/duration)),urgent:remaining<=5000,warning:remaining<=10000};}
 export function winningState(t,focusId){const result=t.phase==='finished'?t.lastResult:null;const ids=result?.winnerIds||[];const selected=ids.includes(focusId)?focusId:ids[0];const hand=result?.showdown?result.winningHands?.[selected]:null;return {ids,selected,hand,board:new Set(hand?.cards.filter(c=>t.board.includes(c))||[]),cards:new Set(hand?.cards||[])};}
 export function freshEvents(events,lastSeq,hand){return events.filter(e=>e.seq>lastSeq&&e.hand===hand);}
-export function betLimits(t,mine){const max=Math.round(((mine?.stack||0)+(mine?.bet||0))*100)/100;return {min:Math.min(t.currentBet+t.minRaise,max),max,canRaise:!!mine&&max>t.currentBet&&(t.legalActions?.canRaise??true)};}
+export const GAME_INFO={holdem:{short:'NLH',name:"No Limit Hold'em",hole:2},omaha:{short:'PLO',name:'Pot Limit Omaha',hole:4}};
+export const gameInfo=g=>GAME_INFO[g]||GAME_INFO.holdem;
+export function betLimits(t,mine){const stack=Math.round(((mine?.stack||0)+(mine?.bet||0))*100)/100,cap=t.legalActions?.maxRaiseTo,max=mine&&Number.isFinite(cap)&&cap>0?Math.min(stack,cap):stack;return {min:Math.min(t.currentBet+t.minRaise,max),max,canRaise:!!mine&&max>t.currentBet&&(t.legalActions?.canRaise??true)};}
 
 // Effect nodes live outside the seat/board DOM, so polling cannot destroy a flight.
 export class TableVisuals {
@@ -110,7 +112,10 @@ export function describeHand(score){
  if(!Array.isArray(score))return '';const v=n=>valueNames[n]||'';
  return ['High card '+v(score[1]),'Pair of '+v(score[1]),`Two pair, ${v(score[1])} and ${v(score[2])}`,'Three of a kind, '+v(score[1]),`Straight to ${v(score[1])}`,`Flush, ${v(score[1])} high`,`Full house, ${v(score[1])} over ${v(score[2])}`,'Four of a kind, '+v(score[1]),score[1]===14?'Royal Flush':`Straight flush to ${v(score[1])}`][score[0]]||'';
 }
+// Omaha starting hands: the ranks high to low plus how the suits combine.
+function omahaStart(cards){const order='23456789TJQKA',sorted=[...cards].sort((x,y)=>order.indexOf(y[0])-order.indexOf(x[0])),r=c=>c[0]==='T'?'10':c[0];const counts=Object.values(cards.reduce((m,c)=>(m[c[1]]=(m[c[1]]||0)+1,m),{})).sort((a,b)=>b-a);const suited=counts[0]===2&&counts[1]===2?'double-suited':counts[0]===2?'single-suited':counts[0]>=3?(counts[0]===4?'one suit':'three of a suit'):'rainbow';const pairs=[...new Set(cards.map(c=>c[0]))].length<4;return sorted.map(r).join('')+' · '+suited+(pairs?' · paired':'');}
 export function startingHand(cards){
+ if(cards?.length===4&&cards.every(c=>/^[2-9TJQKA][cdhs]$/.test(c)))return omahaStart(cards);
  if(cards?.length!==2||cards.some(c=>!/^[2-9TJQKA][cdhs]$/.test(c)))return '';
  const order='23456789TJQKA',[a,b]=[...cards].sort((x,y)=>order.indexOf(y[0])-order.indexOf(x[0])),r=c=>c[0]==='T'?'10':c[0];
  return a[0]===b[0]?`Pocket ${r(a)}s`:`${r(a)}-${r(b)} ${a[1]===b[1]?'suited':'offsuit'}`;

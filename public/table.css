@@ -624,3 +624,16 @@ body.fitPhone .dockInfo{left:8px;bottom:8px}
 body.fitPhone .dockActions{right:40px;bottom:12px}
 body.fitPhone .dock.sizing .betPicker{right:40px;bottom:98px}
 body.fitPhone{background:#040806}
+
+/* ---------- Omaha: four hole cards, fanned and overlapped ---------- */
+.game.omaha .seatCards{gap:0}
+.game.omaha .seatCards .card{width:calc(var(--hole-w) * .82);height:calc(var(--hole-h) * .82)}
+.game.omaha .seatCards .card+.card{margin-left:calc(var(--hole-w) * -.38)}
+.game.omaha .seat.me .seatCards{gap:0}
+.game.omaha .seat.me .seatCards .card{width:calc(var(--me-hole-w) * .88);height:calc(var(--me-hole-h) * .88)}
+.game.omaha .seat.me .seatCards .card+.card{margin-left:calc(var(--me-hole-w) * -.34)}
+.game.omaha .seat.me .seatCards .card:nth-child(1){transform:rotate(-9deg) translateY(5px)}
+.game.omaha .seat.me .seatCards .card:nth-child(2){transform:rotate(-3deg) translateY(1px)}
+.game.omaha .seat.me .seatCards .card:nth-child(3){transform:rotate(3deg) translateY(1px)}
+.game.omaha .seat.me .seatCards .card:nth-child(4){transform:rotate(9deg) translateY(5px)}
+.game.omaha .seat .seatCards .card .bottomCorner{display:none}

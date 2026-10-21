@@ -392,3 +392,53 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Letrat dhe çipat statike:** royal flush-i në hero është tani 3D statik (perspektivë, trashësi letre, hije reale), pa asnjë animacion apo efekt. Dizajn modern e i pastër: numri dhe simboli në qoshe, një ♠ i madh në mes, pa korniza apo panele brenda letrës. Çipat qëndrojnë në tavolinë pa lëvizje; edhe çipat në fund të faqes janë statikë.
 - **Imazhi i çipave:** në vend të letrave, hero tani tregon imazhin e çipave smerald/zi/ari (`home-chips.webp` 127 KB, `home-chips-m.webp` 54 KB për celular), statik, me sfond transparent.
 - **Titulli i hero-s:** "Place your bets. / Go all-in. / *Win big.*"
+- **Hero me foton e çipave:** fotoja e çipave (`home-chips.webp`, `home-chips-m.webp` për celular) u rikthye në hero.
+- **Hero mbush ekranin e parë:** elementet kanë më shumë hapësirë mes tyre, blloku qendrohet vertikalisht dhe numrat live dalin në fund të ekranit të parë (kompjuter, tablet, celular).
+
+## Pot Limit Omaha (PLO)
+- **Si luhet:** çdo lojtar merr **4 letra**; blinds, pozicionet, raundet (preflop, flop, turn, river), side pots, rake dhe radha e showdown-it janë si në Hold'em.
+- **Rregulli 2 + 3:** dora duhet të përdorë **saktësisht 2** letra nga dora dhe **saktësisht 3** nga tavolina (`evaluateHand`/`bestHand` në poker.js provojnë 6 × 10 = 60 kombinime). P.sh. 4 zemra në dorë me vetëm 2 në tavolinë nuk janë flush; poker (4 njësoj) në tavolinë nuk mund të luhet.
+- **Pot limit:** basti maksimal = pot-i; raise-i maksimal = basti aktual + pot-i pas call-it (`maxRaiseTo` në game.js). Shembull blinds €1/€2: raise-i i parë maksimumi €7. Minimumi si në No Limit. Serveri refuzon çdo shumë mbi limit ("Pot limit: the maximum raise is …"); butoni "All-in" bëhet "Pot" kur limiti është më i vogël se stack-u.
+- **Ku shfaqet:** qendra zgjedh lojën kur krijon tavolinën (Hold'em ose Omaha); lobby ka etiketën NLH / PLO dhe filtrin "All games / Texas Hold'em / Omaha"; në tavolinë 4 letrat dalin si fan, rreshti lart tregon "PLO · Hand #"; forca e dorës preflop tregohet si "AAKK · double-suited"; inspektimi live llogarit shanset me rregullin 2 + 3; rregullat e Omaha-s janë në dritaren e rregullave.
+- Testet: `omaha.test.js` (rregulli 2 + 3, 4 letra të fshehura, madhësitë pot-limit preflop/flop, all-in i shkurtër, showdown dhe ruajtja e parave) + kontrolle në integration.test.js për krijimin e tavolinës Omaha. Gjithsej 60/60.
+
+## Auditim i plotë i logjikës (Hold'em + Omaha)
+- **Vlerësuesi i duarve:** u vlerësuan të gjitha 2,598,960 duart me 5 letra; numri për çdo kategori përputhet saktësisht me matematikën (p.sh. 40 straight flush, 624 poker, 3,744 full house).
+- **Përzierja:** Fisher–Yates me `crypto.randomInt`; 260,000 deck-e: χ² = 51.2 për 51 shkallë lirie (e drejtë, pa anim).
+- **Fuzz i lojës së plotë:** ~45,000 duar të rastësishme (2–6 lojtarë, Hold'em dhe Omaha, rake 0–10%, raise legalë dhe ilegalë, fold, largime, pushime, rebuy): 0 humbje parash, 0 veprime ilegale të pranuara, 0 veprime legale të refuzuara, 0 duar të pambaruara, deck gjithmonë 52 letra unike, rake i saktë (pa flop pa rake), pagesat përputhen me një llogaritje të pavarur të side pot-eve. Një version i shkurtër u shtua si test i përhershëm (`fuzz.test.js`).
+- **Rregullat e verifikuara:** blinds dhe heads-up, opsioni i big blind, min bet/raise, all-in i paplotë që nuk rihap bastin (TDA), side pots, bastet pa call kthehen, odd chip te fituesi i parë majtas dealer-it, radha e showdown-it dhe muck, runout rrugë pas rruge, time bank, timeout check/fold, Omaha 2 + 3 dhe pot-limit.
+- **Mangësi të mbetura (jo gabime rregullash):** (1) nuk ruhet historia e plotë e duarve për ankesa/auditim; (2) inspektimi live i qendrës sheh letrat gjatë dorës — rrezik nga brenda; (3) rinisja e serverit gjatë dorës e anulon dorën (paratë kthehen); (4) rake pa tavan; (5) fjalëkalimet e vjetra në historinë e git; (6) `bots.js` (i palidhur ende) — botët kundër lojtarëve realë duhen deklaruar.
+
+## Lobby me tab-e
+- Në fillim të filtrave ka 3 tab-e: **Texas Hold'em**, **Omaha** dhe **Tournaments**, secili me numrin e tavolinave. Lista tregon vetëm tavolinat e lojës së zgjedhur; tab-i mbahet mend gjatë sesionit.
+- **Tournaments:** motori i turneve nuk ekziston ende, prandaj tab-i tregon "No tournaments are scheduled right now" me butonin për tavolinat cash.
+
+## Historia e çdo dore (te qendra)
+- **Çfarë ruhet:** çdo dorë e mbaruar (Hold'em dhe Omaha): tavolina, loja, blinds, rake %, dealer, çdo lojtar me vendin, stack-un e fillimit, **letrat e dorës** dhe stack-un në fund (+/−), çdo veprim me rrugën, shumën dhe kohën (blinds, fold, check, call, bet, raise "to", all-in, timeout, largim), letrat e tavolinës, pot-et/side pot-et, fituesit, kombinimet, pagesat dhe rake-u.
+- **Ku ruhet:** skedar më vete `hands.jsonl` pranë `state.json` (një rresht JSON për dorë, vetëm shtohet, nuk rishkruhet kurrë), kështu mbijeton rinisjet dhe nuk e rëndon databazën. Leximi bëhet nga fundi në blloqe, pra duart e fundit gjenden menjëherë edhe kur historia është shumë e madhe. Dosja `data/` nuk shkon në git.
+- **Ku shihet:** Paneli i qendrës → **Hand history**: lista nga më e reja, filtra sipas tavolinës, lojtarit dhe datave, "Load older hands". Klikimi hap dorën e plotë: tavolina me letrat, çdo lojtar me letrat dhe fitimin/humbjen, historia tekst rrugë pas rruge (PRE-FLOP, FLOP, TURN, RIVER, SHOWDOWN, SUMMARY) dhe **Download .txt**.
+- **Akses:** vetëm qendra (`/api/hands`, `/api/hands/get`); adminët, agjentët dhe lojtarët marrin 403.
+- U mbrojt kodi i papërfunduar "Bots" në app.js (lidhet vetëm kur HTML-ja e tij ekziston), sepse pa këtë faqja ndalonte së ngarkuari pjesën pas tij.
+
+## Botët që mbushin tavolinat (të ndershëm)
+- **Qëllimi:** të mbushin vendet bosh që tavolinat të duken plot, pa mashtruar. Boti është lojtar i zakonshëm i ulur në tavolinë, me para nga qendra (buxheti del nga portofoli i qendrës dhe kthehet te qendra kur boti fshihet).
+- **I ndershëm:** vendos vetëm nga `botView` = letrat e veta + ajo që shohin të gjithë (board, pot, bastet). Nuk sheh letrat e të tjerëve, deck-un apo rezultatin dhe nuk humb me qëllim. Testi `bots.test.js` provon që asnjë letër e huaj nuk hyn në vendim. Forca e dorës llogaritet nga letrat e veta (preflop Hold'em/Omaha, pas flop-it me vlerësuesin e lojës); respekton min-raise dhe pot-limit-in e Omaha-s; "mendon" 1.5–4 sekonda.
+- **Menaxhimi i rrezikut (nga qendra):** buxheti, buy-in, **win limit** (kur fiton aq në një sesion ngrihet nga tavolina — nuk u merr kurrë shumë lojtarëve), **loss limit** (kur humb aq ndalon) dhe stili Low / Medium / High.
+- **Vetëm mbush:** ulet vetëm ku ka të paktën një lojtar real, nuk zë kurrë vendin e fundit të lirë, maksimumi 3 botë për tavolinë, largohet kur ikin lojtarët realë ose kur tavolina mbushet.
+- **Kush i sheh:** lojtarët i shohin botët si lojtarë të zakonshëm (emër normal, pa etiketë; snapshot-i i lojtarit nuk ka asnjë shenjë bot-i). Vetëm qendra i dallon: paneli Bots, inspektimi live (etiketa BOT) dhe historia e duarve. Rregullat e lojës thonë në mënyrë të përgjithshme që platforma mund të ulë "house players" që ndjekin të njëjtat rregulla dhe shohin vetëm letrat e tyre (pa treguar cili është bot).
+- **Paneli:** Qendra → **Bots**: krijim, start/stop, ndryshim i konfigurimit, gjendja live (wallet + tavolinë, fitimi i sesionit dhe total), fshirje me rimbursim. Botët nuk mund të hyjnë me fjalëkalim dhe nuk dalin te llogaritë/transfertat.
+- **Nuk u ndërtua (me qëllim):** sjellja "fiton pak, pastaj ia kthen lojtarit" — kjo kërkon që boti të humbasë me qëllim, d.m.th. manipulim i rezultateve (chip dumping).
+
+## Pagesa me crypto (USDT TRC20 direkt në wallet-in e qendrës)
+- **Pa ndërmjetës dhe pa çelës privat:** qendra vendos vetëm adresën publike të wallet-it (Paneli → **Crypto payments**). Serveri lexon blockchain-in publik (TronGrid) vetëm për transfertat e konfirmuara të USDT (kontrata `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`) drejt asaj adrese. Adresat kontrollohen me checksum (base58check).
+- **Depozita (lojtari):** te portofoli në lobby → **Deposit** → zgjedh USDT; serveri jep një **shumë unike** (p.sh. 50.37 USDT), që e lidh pagesën me atë kërkesë — askush nuk mund të marrë pagesën e tjetrit. Kontroll automatik çdo 30 s (dhe "I have paid · check now"); krediti në € = USDT × kursi i qendrës, nga portofoli i qendrës te lojtari (ledger `CRYPTO_DEPOSIT` me hash-in). Kërkesa vlen 3 orë; maksimumi 3 të hapura; një transfertë kreditohet vetëm një herë.
+- **Transferta pa depozitë** (shumë e gabuar, vonë): dalin te qendra për t'ia kredituar lojtarit të duhur ose për t'i injoruar.
+- **Tërheqja (lojtari):** shuma në € + adresa TRC20; krediti bllokohet menjëherë; qendra paguan nga wallet-i dhe shënon **Paid** me hash-in (krediti kalon te qendra) ose **Reject** (krediti i kthehet lojtarit). Një tërheqje e hapur për lojtar; chips-at në tavolinë nuk përfshihen.
+- **Konfigurimi i qendrës:** adresa, kursi i depozitës dhe i tërheqjes (€ për 1 USDT), minimumet, aktiv/joaktiv. Opsionale: `TRONGRID_API_KEY` në Coolify për limit më të lartë kërkesash.
+- Testet: `payments.test.js` (checksum adresash, vetëm shuma unike kreditohet, pa dyfishim, token/rrjet i gabuar injorohet, skadimi dhe caktimi manual, tërheqje paid/reject me ruajtjen e parave, të drejtat). 70/70.
+
+## Menuja e llogarisë (avatar smerald)
+- Në vend të "Sign out" në header ka një **avatar smerald**; klikimi hap menunë me emrin, rolin dhe portofolin, pastaj opsionet të renditura: **Deposit** (me etiketën USDT ose "soon"), **Withdraw**, **Transactions**, **Hand rankings & rules**, **Change password**, **Sign out**. Stafi sheh **Management panel** në vend të opsioneve të lojtarit; qendra edhe **Crypto payments**.
+- Deposit/Withdraw duken gjithmonë (edhe te kartela e portofolit në lobby); nëse qendra nuk i ka aktivizuar pagesat crypto, lojtari sheh "Coming soon · contact your agent".
+- **Transactions:** historia e portofolit të lojtarit (krediti nga agjenti, buy-in/dalje nga tavolina, depozita/tërheqje crypto). **Change password** tani edhe për lojtarët.
+- Menuja mbyllet me klik jashtë ose Esc; në celular hapet në gjithë gjerësinë.

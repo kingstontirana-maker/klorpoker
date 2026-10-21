@@ -125,6 +125,14 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     let mine=(await call('table/1/state',tokens[3])).data;
     assert.equal(mine.seats.find(s=>s?.id==='3').lastAction.type,'AUTO-FOLD');
     assert.equal(mine.sittingOut,true);assert.equal(mine.timedOut,true);
+    // Every hand is kept for the center: newest first, with all cards and actions.
+    {const list=await call('hands',tokens[0],{});assert.equal(list.status,200);assert.ok(list.data.hands.length>=2);const last=list.data.hands[0];assert.equal(last.hand,room.hand);assert.ok(list.data.hands.every((h,i,a)=>!i||a[i-1].id>h.id),'newest first');
+     const full=(await call('hands/get',tokens[0],{id:last.id})).data;assert.equal(full.tableId,'1');assert.ok(full.players.every(p=>p.cards.length===2));
+     assert.ok(full.actions.some(a=>a.type==='SB')&&full.actions.some(a=>a.type==='BB')&&full.actions.some(a=>a.type==='AUTO-FOLD'));
+     assert.equal(Math.round(Object.values(full.payments).reduce((a,b)=>a+b,0)*100+full.rake*100),Math.round(full.pot*100),'payments + rake = pot');
+     assert.equal((await call('hands',tokens[1],{})).status,403,'admins cannot read hand history');assert.equal((await call('hands',tokens[3],{})).status,403);
+     assert.equal((await call('hands',tokens[0],{player:'test4',limit:1})).data.hands.length,1);assert.equal((await call('hands',tokens[0],{player:'nobody'})).data.hands.length,0);
+     assert.equal((await call('hands/get',tokens[0],{id:999999})).status,404);}
     const stackOut=room.seats.find(s=>s?.userId==='3').stack;
     assert.equal((await call('table/1/start',tokens[3],{})).status,400,'no hand without a second active player');
     assert.equal(room.seats.find(s=>s?.userId==='3').stack,stackOut,'no blind is taken while sitting out');
@@ -170,6 +178,12 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     {const made=await call('tables/create',tokens[0],{name:'Ruby',sb:1,bb:2,color:'#8C1D36'});assert.equal(made.status,200);assert.equal(made.data.color,'#8c1d36');
      assert.equal((await call('tables/create',tokens[0],{name:'Bad',sb:1,bb:2,color:'red;}'})).status,400,'only #rrggbb colours');
      assert.equal((await call('tables/create',tokens[0],{name:'Plain',sb:1,bb:2})).data.color,'#1f9d6b','default emerald');
+     // Omaha tables: chosen at creation, listed with their game, four cards each.
+     const plo=await call('tables/create',tokens[0],{name:'Omaha One',sb:1,bb:2,game:'omaha'});assert.equal(plo.status,200);assert.equal(plo.data.game,'omaha');
+     assert.equal((await call('tables/create',tokens[0],{name:'Bad game',sb:1,bb:2,game:'stud'})).status,400);
+     assert.equal((await call('tables/create',tokens[1],{name:'Not center',sb:1,bb:2,game:'omaha'})).status,403);
+     const games=(await call('state',tokens[0])).data.tables;assert.equal(games.find(x=>x.id===plo.data.id).game,'omaha');assert.equal(games.find(x=>x.name==='Plain').game,'holdem');
+     assert.equal(runtime.get(plo.data.id).game,'omaha');
      const listed=(await call('state',tokens[0])).data.tables.find(t=>t.id===made.data.id);assert.equal(listed.color,'#8c1d36');
      assert.equal((await call('tables/color',tokens[2],{id:made.data.id,color:'#1d4fb3'})).status,403,'only the centre recolours');
      assert.equal((await call('tables/color',tokens[0],{id:made.data.id,color:'#1d4fb3'})).status,200);

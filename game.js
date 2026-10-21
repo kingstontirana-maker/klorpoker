@@ -1,7 +1,7 @@
-// Texas Hold'em table engine. Amounts are integer cents; the server owns the
+// Texas Hold'em (No Limit) and Omaha (Pot Limit) table engine. Amounts are integer cents; the server owns the
 // accounts and persistence, the engine owns seats, betting and settlement.
 import crypto from 'node:crypto';
-import {deck,distribute,evaluate,compare,rankNames,bestFive,ranks,suits} from './poker.js';
+import {deck,distribute,compare,rankNames,ranks,suits,GAMES,gameOf,evaluateHand,bestHand} from './poker.js';
 import {rakeShares} from './rake.js';
 
 export const LIVE=['preflop','flop','turn','river'];
@@ -33,6 +33,10 @@ export const inHand=s=>!!s&&s.inHand&&!s.folded;
 export const actionable=s=>inHand(s)&&!s.allIn;
 export const eligible=(t,s)=>!!s&&s.stack>=t.bb&&!s.rebuyDeadline&&!s.sittingOut&&!s.leaveAfterHand;
 export const toCall=(t,s)=>Math.max(0,t.currentBet-s.roundBet);
+// Pot limit (Omaha): the largest raise is to the current bet plus the pot after
+// calling, i.e. currentBet + pot (all chips in, this street included) + the call.
+// No limit (Hold'em): the whole stack.
+export const maxRaiseTo=(t,s)=>{const all=s.roundBet+s.stack;return gameOf(t)==='omaha'?Math.min(all,t.currentBet+t.pot+toCall(t,s)):all;};
 // TDA: betting reopens for a player who already acted only when the raises
 // made since their action add up to at least one full raise.
 export const canRaise=(t,s)=>actionable(s)&&s.stack>toCall(t,s)&&(!s.acted||t.currentBet-(s.actedAt||0)>=t.minRaise);
@@ -49,13 +53,17 @@ export function livePots(t){
  return pots;
 }
 
-export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
+export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onHand=()=>{}}){
  const findUser=id=>db.users.find(u=>u.id===id);
  const event=(t,text)=>{t.events.unshift({text,at:Date.now(),hand:t.hand});t.events=t.events.slice(0,60);};
+ // Hand history: every hand is recorded from the deal to the payout (all hole cards,
+ // every action with its amount, the board, pots, winners and rake) and handed to
+ // onHand when it ends, so the server can store it for the center.
+ const rec=(t,pos,type,amount,extra={})=>{if(!t.record)return;const s=t.seats[pos];t.record.actions.push({street:t.phase,seat:pos+1,username:s?.username,type,...(amount!=null?{amount:clean(amount)}:{}),...extra,at:Date.now()});};
  function visual(t,type,detail={}){const e={seq:++t.visualSeq,hand:t.hand,type,at:Date.now(),...detail};t.visualEvents.push(e);t.visualEvents=t.visualEvents.slice(-100);return e;}
  const seatOf=(t,userId)=>t.seats.findIndex(s=>s?.userId===userId);
 
- function makeTable(id,name,sb,bb){return {id:String(id),name,sb,bb,hand:0,phase:'waiting',button:-1,sbPos:-1,bbPos:-1,turn:-1,lastAggressor:-1,board:[],pot:0,currentBet:0,minRaise:bb,deck:[],seats:Array(6).fill(null),events:[],lastResult:null,lastActionAt:0,turnStartedAt:0,deadline:0,runout:null,visualEvents:[],visualSeq:0,chat:[],chatSeq:0};}
+ function makeTable(id,name,sb,bb,game='holdem'){return {id:String(id),name,sb,bb,game:GAMES[game]?game:'holdem',hand:0,phase:'waiting',button:-1,sbPos:-1,bbPos:-1,turn:-1,lastAggressor:-1,board:[],pot:0,currentBet:0,minRaise:bb,deck:[],seats:Array(6).fill(null),events:[],lastResult:null,lastActionAt:0,turnStartedAt:0,deadline:0,runout:null,visualEvents:[],visualSeq:0,chat:[],chatSeq:0};}
  function setTurn(t,i){t.turn=i;t.lastActionAt=t.turnStartedAt=Date.now();t.deadline=i>=0?t.turnStartedAt+ACTION_MS:0;}
  // Bets in front of the players slide into the middle at the end of a round.
  function collect(t){const bets=Object.fromEntries(t.seats.filter(s=>s?.roundBet>0).map(s=>[s.userId,clean(s.roundBet)]));if(Object.keys(bets).length)visual(t,'collect',{bets});}
@@ -81,11 +89,13 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   t.runout=null;
   for(const s of t.seats)if(s){Object.assign(s,{cards:[],committed:0,roundBet:0,folded:false,allIn:false,acted:false,actedAt:0,lastAction:null,inHand:eligible(t,s)});if(s.inHand)s.timeBank=Math.min(TIME_BANK_MAX,(s.timeBank??TIME_BANK_START)+TIME_BANK_REFILL);}
   const order=[];for(let i=1;i<=6;i++){const p=(t.button+i)%6;if(t.seats[p]?.inHand)order.push(p);}
-  for(let c=0;c<2;c++)for(const pos of order)t.seats[pos].cards.push(t.deck.pop());
+  t.record={tableId:t.id,table:t.name,game:gameOf(t),hand:t.hand,sb:clean(t.sb),bb:clean(t.bb),rakePercent:db.rakePercent,startedAt:Date.now(),button:t.button+1,players:order.map(p=>({seat:p+1,userId:t.seats[p].userId,username:t.seats[p].username,...(t.seats[p].isBot?{bot:true}:{}),stack:clean(t.seats[p].stack)})),actions:[],board:[]};
+  for(let c=0;c<GAMES[gameOf(t)].hole;c++)for(const pos of order)t.seats[pos].cards.push(t.deck.pop());
+  for(const p of t.record.players)p.cards=[...t.seats[p.seat-1].cards];
   visual(t,'deal',{button:t.button});
   // Heads-up: the button posts the small blind and acts first preflop.
   const headsUp=order.length===2;t.sbPos=headsUp?t.button:order[0];t.bbPos=headsUp?order[0]:order[1];
-  const post=(pos,n,type)=>{const s=t.seats[pos],v=Math.min(s.stack,n);commit(t,s,v);s.lastAction={type,amount:clean(v),at:Date.now()};visual(t,'bet',{position:pos,userId:s.userId,amount:clean(v),label:type});};
+  const post=(pos,n,type)=>{const s=t.seats[pos],v=Math.min(s.stack,n);commit(t,s,v);rec(t,pos,type,v);s.lastAction={type,amount:clean(v),at:Date.now()};visual(t,'bet',{position:pos,userId:s.userId,amount:clean(v),label:type});};
   post(t.sbPos,t.sb,'SB');post(t.bbPos,t.bb,'BB');
   // A player who joined or returned from sitting out posts one live big blind,
   // unless they are already in a blind position.
@@ -102,6 +112,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   t.deck.pop();const count=t.board.length===0?3:1;for(let i=0;i<count;i++)t.board.push(t.deck.pop());
   t.phase=t.board.length===3?'flop':t.board.length===4?'turn':'river';
   t.currentBet=0;t.minRaise=t.bb;t.lastAggressor=-1;for(const s of t.seats)if(s){s.roundBet=0;s.acted=false;s.actedAt=0;}
+  t.record?.actions.push({street:t.phase,type:'BOARD',board:[...t.board],at:Date.now()});
   visual(t,'street',{phase:t.phase,count:t.board.length});event(t,`${phaseNames[t.phase]} · ${t.board.map(cardText).join(' ')}`);
  }
 
@@ -124,7 +135,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  // first player left of the button. A losing hand is mucked unless anyone is all-in.
  function showdownOrder(t){
   const allIn=t.seats.some(s=>inHand(s)&&s.allIn),start=t.lastAggressor>=0&&inHand(t.seats[t.lastAggressor])?t.lastAggressor:(t.button+1)%6,shown=[];let best=null;
-  for(let k=0;k<6;k++){const s=t.seats[(start+k)%6];if(!inHand(s))continue;const score=evaluate([...s.cards,...t.board]);if(allIn||!best||compare(score,best)>=0){shown.push(s.id);if(!best||compare(score,best)>0)best=score;}}
+  for(let k=0;k<6;k++){const s=t.seats[(start+k)%6];if(!inHand(s))continue;const score=evaluateHand(gameOf(t),s.cards,t.board);if(allIn||!best||compare(score,best)>=0){shown.push(s.id);if(!best||compare(score,best)>0)best=score;}}
   return shown;
  }
 
@@ -133,16 +144,20 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   collect(t);t.runout=null;
   const players=t.seats.flatMap((s,i)=>s?.inHand?[{...s,position:(i-t.button+5)%6}]:[]);
   // Rake is a flat percentage of the contested pot; there is no per-hand cap.
-  const result=distribute(players,t.board,db.rakePercent,Infinity,t.board.length>=3);
+  const game=gameOf(t),result=distribute(players,t.board,db.rakePercent,Infinity,t.board.length>=3,game);
   for(const s of t.seats)if(s&&result.payments[s.id])s.stack+=result.payments[s.id];
   const byId=id=>t.seats.find(s=>s?.id===id);
   const winnerIds=[...new Set(result.pots.filter(p=>!p.refunded).flatMap(p=>p.winners))];
   const shown=showdown?showdownOrder(t):[];
-  const winningHands=showdown?Object.fromEntries(winnerIds.map(id=>[id,bestFive([...t.board,...byId(id).cards])])):{};
-  if(showdown){for(const id of shown){const s=byId(id),b=bestFive([...t.board,...s.cards]);event(t,`${s.username} shows ${s.cards.map(cardText).join(' ')} · ${rankNamesSq[b.rank]}`);}for(const s of t.seats)if(inHand(s)&&!shown.includes(s.id))event(t,`${s.username} mucks their cards`);}
+  const winningHands=showdown?Object.fromEntries(winnerIds.map(id=>[id,bestHand(game,byId(id).cards,t.board)])):{};
+  if(showdown){for(const id of shown){const s=byId(id),b=bestHand(game,s.cards,t.board);event(t,`${s.username} shows ${s.cards.map(cardText).join(' ')} · ${rankNamesSq[b.rank]}`);}for(const s of t.seats)if(inHand(s)&&!shown.includes(s.id))event(t,`${s.username} mucks their cards`);}
   let contested=0;for(const p of result.pots){const names=p.winners.map(id=>byId(id)?.username).join(' & ');if(p.refunded)event(t,`Uncalled bet of ${eur(p.amount)} returned to ${names}`);else{event(t,`${names} ${p.winners.length>1?'split':'wins'} ${eur(p.amount)} · ${contested?'side pot '+contested:'main pot'}`);contested++;}}
   visual(t,'award',{payments:Object.fromEntries(Object.entries(result.payments).map(([id,n])=>[id,clean(n)])),winnerIds,pots:result.pots.map(p=>({amount:clean(p.amount),winners:p.winners,refunded:p.refunded,share:p.winners.map((id,i)=>clean(Math.floor(p.amount/p.winners.length)+(i<p.amount%p.winners.length?1:0)))}))});
-  t.lastResult={...result,winnerIds,winningHands,showdown,shown,at:Date.now(),hands:shown.map(id=>{const s=byId(id),b=bestFive([...t.board,...s.cards]);return {id,username:s.username,cards:s.cards,rank:b.rank,score:b.score};})};
+  t.lastResult={...result,winnerIds,winningHands,showdown,shown,at:Date.now(),hands:shown.map(id=>{const s=byId(id),b=bestHand(game,s.cards,t.board);return {id,username:s.username,cards:s.cards,rank:b.rank,score:b.score};})};
+  if(t.record){const r=t.record,name=id=>byId(id)?.username||id;Object.assign(r,{endedAt:Date.now(),board:[...t.board],showdown,pot:clean(t.pot),rake:clean(result.totalRake),
+   pots:result.pots.map(p=>({amount:clean(p.amount),winners:p.winners.map(name),refunded:!!p.refunded})),payments:Object.fromEntries(Object.entries(result.payments).map(([id,n])=>[name(id),clean(n)])),
+   winners:winnerIds.map(name),shown:t.lastResult.hands.map(h=>({username:h.username,cards:h.cards,rank:h.rank})),winningHands:Object.fromEntries(Object.entries(winningHands).map(([id,w])=>[name(id),{rank:w.rank,cards:w.cards}]))});
+   for(const p of r.players){const s=byId(p.userId);p.end=clean(s?s.stack:0);p.result=Math.round((p.end-p.stack)*100)/100;p.folded=!!s?.folded;}t.record=null;try{onHand(r);}catch{}}
   for(const s of t.seats)if(s)s.roundBet=0;
   t.phase='finished';setTurn(t,-1);
   for(let i=0;i<t.seats.length;i++)if(t.seats[i]?.leaveAfterHand)cashOutSeat(t,i,'LEFT');
@@ -160,16 +175,17 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   // A timed-out player checks when checking is free, and folds otherwise.
   if(automatic&&type==='fold'&&owe===0)type='check';
   if(type==='call'&&owe===0)type='check';
-  if(type==='fold'){s.folded=true;s.acted=true;s.lastAction={type:automatic?'AUTO-FOLD':'FOLD',at};visual(t,'fold',{position:p,userId});event(t,`${s.username} ${automatic?'folds automatically (no action)':'folds'}`);}
-  else if(type==='check'){if(owe)fail('You cannot check: there is a bet to call');s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:automatic?'AUTO-CHECK':'CHECK',at};visual(t,'check',{position:p,userId});event(t,`${s.username} ${automatic?'checks automatically (no action)':'checks'}`);}
-  else if(type==='call'){const n=Math.min(owe,s.stack);commit(t,s,n);s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:s.allIn?'ALL-IN':'CALL',amount:clean(n),at};visual(t,'bet',{position:p,userId,amount:clean(n),label:s.lastAction.type});event(t,`${s.username} calls ${eur(n)}${s.allIn?' · all-in':''}`);}
+  if(type==='fold'){rec(t,p,automatic?'AUTO-FOLD':'FOLD');s.folded=true;s.acted=true;s.lastAction={type:automatic?'AUTO-FOLD':'FOLD',at};visual(t,'fold',{position:p,userId});event(t,`${s.username} ${automatic?'folds automatically (no action)':'folds'}`);}
+  else if(type==='check'){if(owe)fail('You cannot check: there is a bet to call');rec(t,p,automatic?'AUTO-CHECK':'CHECK');s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:automatic?'AUTO-CHECK':'CHECK',at};visual(t,'check',{position:p,userId});event(t,`${s.username} ${automatic?'checks automatically (no action)':'checks'}`);}
+  else if(type==='call'){const n=Math.min(owe,s.stack);commit(t,s,n);rec(t,p,'CALL',n,s.allIn?{allIn:true}:{});s.acted=true;s.actedAt=t.currentBet;s.lastAction={type:s.allIn?'ALL-IN':'CALL',amount:clean(n),at};visual(t,'bet',{position:p,userId,amount:clean(n),label:s.lastAction.type});event(t,`${s.username} calls ${eur(n)}${s.allIn?' · all-in':''}`);}
   else if(type==='raise'){
    if(!canRaise(t,s))fail(s.acted?'Betting was not reopened after an incomplete all-in':'You do not have enough chips to raise');
-   const target=money(amount),max=s.roundBet+s.stack,opening=t.currentBet===0;
+   const target=money(amount),max=maxRaiseTo(t,s),opening=t.currentBet===0;
+   if(Number.isSafeInteger(target)&&target>max&&target<=s.roundBet+s.stack)fail(`Pot limit: the maximum ${opening?'bet':'raise'} is ${eur(max)}`);
    if(!Number.isSafeInteger(target)||target<=t.currentBet||target>max)fail('The bet amount is invalid');
    const increment=target-t.currentBet;
-   if(increment<t.minRaise&&target!==max)fail(`${opening?'The minimum bet':'The minimum raise'} is ${eur(t.currentBet+t.minRaise)}`);
-   const n=target-s.roundBet;commit(t,s,n);
+   if(increment<t.minRaise&&target!==s.roundBet+s.stack)fail(`${opening?'The minimum bet':'The minimum raise'} is ${eur(t.currentBet+t.minRaise)}`);
+   const n=target-s.roundBet;commit(t,s,n);rec(t,p,opening?'BET':'RAISE',n,{to:clean(target),...(s.allIn?{allIn:true}:{})});
    // Only a full raise reopens the betting and sets the next minimum raise.
    if(increment>=t.minRaise){t.minRaise=increment;for(const o of t.seats)if(actionable(o))o.acted=false;}
    t.currentBet=target;s.acted=true;s.actedAt=target;t.lastAggressor=p;
@@ -190,7 +206,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   u.balance-=amount;u.tableExit=null;
   // Joining a running game requires a live big blind before the first hand.
   const running=t.hand>0&&t.seats.filter(s=>eligible(t,s)).length>=2;
-  t.seats[pos]={id:u.id,userId:u.id,username:u.username,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
+  t.seats[pos]={id:u.id,userId:u.id,username:u.username,isBot:!!u.isBot,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
   db.ledger.push({id:uid(),type:'BUY_IN',from:u.id,tableId:t.id,amount,time:Date.now()});event(t,`${u.username} sat down in seat ${pos+1}${LIVE.includes(t.phase)?' · plays from the next hand':''}`);save();
  }
 
@@ -199,7 +215,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
   const i=seatOf(t,u.id);if(i<0)fail('You are not seated at this table');const s=t.seats[i];
   if(!LIVE.includes(t.phase)||!s.inHand){cashOutSeat(t,i,'LEFT');save();return {ok:true,pending:false};}
   s.leaveAfterHand=true;
-  if(!s.folded&&!s.allIn){if(t.turn===i)act(t,u.id,'fold');else{s.folded=true;s.acted=true;s.lastAction={type:'FOLD',at:Date.now()};visual(t,'fold',{position:i,userId:u.id});event(t,`${s.username} folds and leaves`);if(t.seats.filter(inHand).length===1)finish(t,false);}}
+  if(!s.folded&&!s.allIn){if(t.turn===i)act(t,u.id,'fold');else{rec(t,i,'FOLD',null,{left:true});s.folded=true;s.acted=true;s.lastAction={type:'FOLD',at:Date.now()};visual(t,'fold',{position:i,userId:u.id});event(t,`${s.username} folds and leaves`);if(t.seats.filter(inHand).length===1)finish(t,false);}}
   save();return {ok:true,pending:!!t.seats[i]};
  }
 
@@ -236,7 +252,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
 
  // After the hand a player may voluntarily show cards that were not tabled.
  function show(t,u){
-  const s=t.seats[seatOf(t,u.id)];if(!s||t.phase!=='finished'||!t.lastResult||s.cards.length!==2)fail('There are no cards to show');
+  const s=t.seats[seatOf(t,u.id)];if(!s||t.phase!=='finished'||!t.lastResult||!s.cards.length)fail('There are no cards to show');
   if(!t.lastResult.shown.includes(s.id)){t.lastResult.shown.push(s.id);event(t,`${s.username} shows ${s.cards.map(cardText).join(' ')}`);}
  }
 
@@ -257,19 +273,19 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  function snapshot(t,userId,seen=true){
   const present=seen&&t.seats.find(s=>s?.userId===userId);if(present){present.lastSeen=Date.now();if(present.autoSitOut)comeBack(t,present);}
   const mine=t.seats.find(s=>s?.userId===userId),shown=new Set(t.phase==='finished'?t.lastResult?.shown||[]:t.runout?t.seats.filter(inHand).map(s=>s.id):[]);
-  const myScore=mine?.inHand&&mine.cards.length===2&&t.board.length>=3?evaluate([...mine.cards,...t.board]):null;
+  const game=gameOf(t),myScore=mine?.inHand&&mine.cards.length>=2&&t.board.length>=3?evaluateHand(game,mine.cards,t.board):null;
   const ready=t.seats.filter(s=>eligible(t,s)).length;
   const result=t.lastResult;
   return {
    myHandRank:myScore?rankNames[myScore[0]]:null,myHandScore:myScore,myCards:mine?.cards||[],
    visualEvents:t.visualEvents,
    nextHandAt:['waiting','finished'].includes(t.phase)&&ready>=2?Math.max(t.lastActionAt+BETWEEN_HANDS_MS,Date.now()):null,
-   legalActions:{canRaise:!!mine&&canRaise(t,mine),isBet:t.currentBet===0,toCall:clean(mine?toCall(t,mine):0),minRaiseTo:clean(t.currentBet+t.minRaise),maxRaiseTo:clean(mine?mine.stack+mine.roundBet:0)},
+   legalActions:{canRaise:!!mine&&canRaise(t,mine),isBet:t.currentBet===0,toCall:clean(mine?toCall(t,mine):0),minRaiseTo:clean(t.currentBet+t.minRaise),maxRaiseTo:clean(mine?maxRaiseTo(t,mine):0),potLimit:game==='omaha'},
    serverNow:Date.now(),actionDeadline:t.turn>=0?t.deadline:null,actionDuration:t.turn>=0?t.deadline-t.turnStartedAt:ACTION_MS,runout:!!t.runout,timeBank:Math.floor((mine?.timeBank||0)/1000),chat:t.chat,
    rebuyAvailableAt:mine?.rebuyAvailableAt||null,rebuyDeadline:mine?.rebuyDeadline||null,
    sittingOut:!!mine?.sittingOut,timedOut:!!mine?.timedOut,leaving:!!mine?.leaveAfterHand,mustPost:!!mine?.mustPost,
-   canShow:!!mine&&t.phase==='finished'&&!!result&&mine.cards.length===2&&!shown.has(mine.id),
-   id:t.id,name:t.name,color:t.color||null,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,turn:t.turn,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),minRaise:clean(t.minRaise),
+   canShow:!!mine&&t.phase==='finished'&&!!result&&mine.cards.length>0&&!shown.has(mine.id),
+   id:t.id,name:t.name,game,color:t.color||null,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,turn:t.turn,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),minRaise:clean(t.minRaise),
    pots:LIVE.includes(t.phase)?livePots(t).map(p=>({amount:clean(p.amount),eligible:p.eligible})):[],
    seats:t.seats.map((s,i)=>s?{inactiveHands:s.inactiveHands||0,lastAction:s.lastAction||null,id:s.id,position:i,username:s.username,stack:clean(s.stack),bet:clean(s.roundBet),folded:s.folded,allIn:s.allIn,inHand:s.inHand,sittingOut:!!s.sittingOut,leaving:!!s.leaveAfterHand,waiting:!s.inHand&&!s.sittingOut,cardCount:s.cards.length,cards:s.userId===userId||shown.has(s.id)?s.cards:[],isMe:s.userId===userId}:null),
    events:t.events.slice(0,30),
@@ -299,14 +315,14 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  // chunks between other events so no table ever waits for it.
  const equityJobs=new WeakMap();
  function equity(t){
-  const live=t.seats.filter(s=>inHand(s)&&s.cards.length===2);if(live.length<2)return {};
+  const game=gameOf(t),live=t.seats.filter(s=>inHand(s)&&s.cards.length>=2);if(live.length<2)return {};
   const key=t.hand+'|'+t.board.join('')+'|'+live.map(s=>s.id).join();let job=equityJobs.get(t);
   if(job?.key!==key){
    const known=new Set([...t.board,...t.seats.flatMap(s=>s?.cards||[])]),rest=[];for(const su of suits)for(const r of ranks)if(!known.has(r+su))rest.push(r+su);
-   const need=5-t.board.length,boards=need===0?[[]]:need===1?rest.map(c=>[c]):Array.from({length:need===2?250:150},()=>{const pick=new Set();while(pick.size<need)pick.add(rest[Math.floor(Math.random()*rest.length)]);return [...pick];});
+   const need=5-t.board.length,boards=need===0?[[]]:need===1?rest.map(c=>[c]):Array.from({length:game==='omaha'?(need===2?120:60):need===2?250:150},()=>{const pick=new Set();while(pick.size<need)pick.add(rest[Math.floor(Math.random()*rest.length)]);return [...pick];});
    job={key,value:job?.value&&job.hand===t.hand?job.value:{},hand:t.hand,ready:false};equityJobs.set(t,job);
    const players=live.map(s=>({id:s.id,cards:s.cards})),board=[...t.board],share=Object.fromEntries(players.map(p=>[p.id,0]));let i=0;
-   const step=()=>{if(equityJobs.get(t)!==job)return;for(const end=Math.min(boards.length,i+Math.max(2,Math.floor(40/players.length)));i<end;i++){const full=[...board,...boards[i]];let best=null,winners=[];for(const p of players){const v=evaluate([...p.cards,...full]),c=best?compare(v,best):1;if(c>0){best=v;winners=[p.id];}else if(c===0)winners.push(p.id);}for(const id of winners)share[id]+=1/winners.length;}
+   const step=()=>{if(equityJobs.get(t)!==job)return;for(const end=Math.min(boards.length,i+Math.max(2,Math.floor(40/players.length)));i<end;i++){const full=[...board,...boards[i]];let best=null,winners=[];for(const p of players){const v=evaluateHand(game,p.cards,full),c=best?compare(v,best):1;if(c>0){best=v;winners=[p.id];}else if(c===0)winners.push(p.id);}for(const id of winners)share[id]+=1/winners.length;}
     if(i<boards.length)return setImmediate(step);job.value=Object.fromEntries(Object.entries(share).map(([id,n])=>[id,Math.round(n/boards.length*1000)/10]));job.ready=true;onEquity();};
    setImmediate(step);
   }
@@ -314,9 +330,9 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{}}){
  }
  function inspect(t){
   const eq=LIVE.includes(t.phase)||t.runout?equity(t):{};
-  return {id:t.id,name:t.name,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),turn:t.turn,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,deadline:t.turn>=0?t.deadline:null,runout:!!t.runout,
-   seats:t.seats.map((s,i)=>s?{position:i,userId:s.userId,username:s.username,stack:clean(s.stack),bet:clean(s.roundBet),committed:clean(s.committed),cards:s.cards,inHand:!!s.inHand,folded:!!s.folded,allIn:!!s.allIn,sittingOut:!!s.sittingOut,lastAction:s.lastAction||null,
-    made:s.cards.length===2&&t.board.length>=3?rankNamesSq[bestFive([...t.board,...s.cards]).rank]:null,equity:eq[s.id]??null}:null),
+  return {id:t.id,name:t.name,game:gameOf(t),sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),turn:t.turn,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,deadline:t.turn>=0?t.deadline:null,runout:!!t.runout,
+   seats:t.seats.map((s,i)=>s?{position:i,userId:s.userId,username:s.username,bot:!!s.isBot,stack:clean(s.stack),bet:clean(s.roundBet),committed:clean(s.committed),cards:s.cards,inHand:!!s.inHand,folded:!!s.folded,allIn:!!s.allIn,sittingOut:!!s.sittingOut,lastAction:s.lastAction||null,
+    made:s.cards.length>=2&&t.board.length>=3?rankNamesSq[bestHand(gameOf(t),s.cards,t.board).rank]:null,equity:eq[s.id]??null}:null),
    result:t.phase==='finished'&&t.lastResult?{winnerIds:t.lastResult.winnerIds,payments:Object.fromEntries(Object.entries(t.lastResult.payments).map(([k,v])=>[k,clean(v)])),rake:clean(t.lastResult.totalRake||0)}:null,
    events:t.events.slice(0,8)};
  }

@@ -11,8 +11,16 @@ export function evaluate(cards){if(cards.length<5)throw Error('Need at least fiv
 // Keep the first equally strong combination. Passing board cards first makes
 // a board-playing hand highlight the board instead of an arbitrary hole card.
 export function bestFive(cards){if(cards.length<5)throw Error('Need at least five cards');let best=null,selected=[];for(const c of combos(cards,5)){const score=score5(c);if(!best||compare(score,best)>0){best=score;selected=c;}}return {cards:selected,score:best,rank:rankNames[best[0]]};}
+// ---- Games: Texas Hold'em uses any five of its 2 + 5 cards; Omaha deals four hole
+// cards and a hand must use exactly two of them with exactly three from the board. ----
+export const GAMES={holdem:{hole:2,label:"Texas Hold'em",short:'NLH',limit:'No Limit'},omaha:{hole:4,label:'Omaha',short:'PLO',limit:'Pot Limit'}};
+export const gameOf=t=>GAMES[t?.game]?t.game:'holdem';
+function omahaBest(hole,board){let best=null,selected=[];for(const h of combos(hole,2))for(const b of combos(board,3)){const c=[...b,...h],score=score5(c);if(!best||compare(score,best)>0){best=score;selected=c;}}return {cards:selected,score:best};}
+// Best hand for a player: hole cards and board kept apart so Omaha's 2 + 3 rule holds.
+export function evaluateHand(game,hole,board){if(game!=='omaha')return evaluate([...hole,...board]);if(hole.length<2||board.length<3)throw Error('Need two hole cards and three board cards');return omahaBest(hole,board).score;}
+export function bestHand(game,hole,board){if(game!=='omaha')return bestFive([...board,...hole]);const b=omahaBest(hole,board);return {cards:b.cards,score:b.score,rank:rankNames[b.score[0]]};}
 export const rankNames=['High Card','One Pair','Two Pair','Three of a Kind','Straight','Flush','Full House','Four of a Kind','Straight Flush'];
-export function distribute(seats,board,rakePercent=0,rakeCap=Infinity,flopSeen=true){
+export function distribute(seats,board,rakePercent=0,rakeCap=Infinity,flopSeen=true,game='holdem'){
  const eligible=seats.filter(s=>s.committed>0),levels=[...new Set(eligible.map(s=>s.committed))].sort((a,b)=>a-b),alive=seats.filter(s=>!s.folded);
  let prev=0,totalRake=0,taxableTotal=0;
  const payments={},rakeContributions={},pots=[];
@@ -35,7 +43,7 @@ export function distribute(seats,board,rakePercent=0,rakeCap=Infinity,flopSeen=t
  for(const pot of pots){
   let winners=[];
   if(pot.candidates.length===1)winners=pot.candidates;
-  else{let best=null;for(const s of pot.candidates){const sc=evaluate([...s.cards,...board]);if(!best||compare(sc,best)>0){best=sc;winners=[s];}else if(compare(sc,best)===0)winners.push(s);}}
+  else{let best=null;for(const s of pot.candidates){const sc=evaluateHand(game,s.cards,board);if(!best||compare(sc,best)>0){best=sc;winners=[s];}else if(compare(sc,best)===0)winners.push(s);}}
   const each=Math.floor(pot.amount/winners.length),extra=pot.amount%winners.length;
   winners.sort((a,b)=>a.position-b.position);winners.forEach((w,i)=>payments[w.id]=(payments[w.id]||0)+each+(i<extra?1:0));
   pot.winners=winners.map(w=>w.id);delete pot.key;delete pot.candidates;
