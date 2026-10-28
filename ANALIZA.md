@@ -486,4 +486,5 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 
 ## Tingujt e tavolinës
 - Skedarët e qendrës në `public/sounds/`: `fold.m4a` (fold, edhe automatik), `check.m4a` (check, edhe automatik), `bet.m4a` (call, raise, bet, blinds; edhe më butë kur chips-at shkojnë në pot), `allin.m4a` (all-in dhe kur fituesi merr chips-at e pot-it), `card.m4a` (çdo letër: secila nga 3 letrat e flop-it, turn, river, shpërndarja dhe hapja e letrave).
+- Ndezja e tingullit nuk luan asnjë tingull vetë (më parë luante "check" si konfirmim, që dilte sapo hyje në tavolinë). Blinds-at automatike (SB, BB, post) janë pa tingull; call/raise/bet luajnë "bet" me volum të plotë. Kur tab-i nuk shihet, tingujt nuk luhen. Verifikuar në browser duke regjistruar çdo tingull gjatë hyrjes dhe disa duarve.
 - Tingulli është i ndezur si parazgjedhje dhe nis me prekjen e parë (browser-at nuk lejojnë audio para saj); lojtari mund ta fikë te "⋯ → Sound" dhe zgjedhja mbahet mend. Ziljet "radha jote" dhe "koha po mbaron" mbeten si më parë.

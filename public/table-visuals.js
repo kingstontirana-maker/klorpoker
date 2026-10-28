@@ -39,7 +39,7 @@ export class TableVisuals {
     const seat=seatNode(e.userId)?.querySelector('.avatarWrap');
     const pot=this.root.querySelector('#potChips')||this.root.querySelector('.pot'),potBox=this.root.querySelector('.pot');
     // A bet slides from the player to the chips in front of them.
-    if(e.type==='bet'&&e.amount>0&&seat){this.beep(e.label==='ALL-IN'?'allin':'chip');const spot=this.betSpot(seatNode(e.userId));await this.fly(seat,spot||pot,e.amount,0,420);}
+    if(e.type==='bet'&&e.amount>0&&seat){if(e.label==='ALL-IN')this.beep('allin');else if(!['SB','BB','POST'].includes(e.label))this.beep('bet');const spot=this.betSpot(seatNode(e.userId));await this.fly(seat,spot||pot,e.amount,0,420);}
     // End of a betting round: every stack in front of a player is pulled into the pot.
     else if(e.type==='collect'){this.beep('chip');potBox?.classList.add('incoming');await Promise.all(Object.entries(e.bets||{}).map(([id,amount],i)=>{const from=this.betSpot(seatNode(id));return from?this.fly(from,pot,amount,i*60,480):Promise.resolve();}));potBox?.classList.remove('incoming');this.animate(pot,[{transform:'scale(.8)'},{transform:'scale(1.12)',offset:.6},{transform:'scale(1)'}],{duration:320});}
     else if(e.type==='reveal'){this.beep('card');await Promise.all((e.ids||[]).map((id,i)=>Promise.all([...(seatNode(id)?.querySelectorAll('.seatCards .card')||[])].map((card,k)=>this.animate(card,[{opacity:0},{opacity:1}],{duration:260,delay:i*160+k*90,easing:'ease-out'})))));}
@@ -90,7 +90,7 @@ export class TableVisuals {
     const next=document.querySelector('#nextHandCountdown');if(next)next.textContent=t.nextHandAt?`Next hand in ${Math.max(0,Math.ceil((t.nextHandAt-now)/1000))}s`:'';
     const connection=document.querySelector('#connectionStatus');if(connection){const stale=Date.now()-this.lastSync>5000;connection.textContent=stale?'Reconnecting…':'Connected';connection.classList.toggle('disconnected',stale);if(stale||t.actionDeadline&&now>=t.actionDeadline){document.querySelectorAll('.actionButtons button,.betPicker input,.betPresets button').forEach(n=>n.disabled=true);if(stale){const info=document.querySelector('#turnInfo');if(info)info.textContent='Connection lost · Reconnecting…';}}}
   }
-  async enableSound(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return false;try{this.audio??=new Audio();await this.audio.resume();this.sound=true;await this.loadSounds();this.beep('check');return true;}catch{return false;}}
+  async enableSound(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return false;try{this.audio??=new Audio();await this.audio.resume();this.sound=true;await this.loadSounds();return true;}catch{return false;}}
   // Recorded table sounds (public/sounds): fold, check, bet (call/raise/bet/blinds),
   // allin (all-in and the winner collecting the pot) and card (every card dealt or turned).
   async loadSounds(){if(this.buffers)return;this.buffers={};await Promise.all(['fold','check','bet','allin','card'].map(async name=>{try{const r=await fetch('/sounds/'+name+'.m4a');this.buffers[name]=await this.audio.decodeAudioData(await r.arrayBuffer());}catch{}}));}
