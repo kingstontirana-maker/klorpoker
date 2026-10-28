@@ -338,3 +338,44 @@ body:not(.isPlayer) .playerOnly,body.isPlayer .staffOnly,body:not(.isCenter) .ce
 /* QR codes for crypto payments */
 .cdQr{display:grid;justify-items:center;gap:6px;margin:4px 0}.cdQr .qrSvg{width:190px;height:190px;border-radius:14px;box-shadow:0 0 0 6px #fff,0 12px 30px #000a}.cdQr small{color:var(--muted);font-size:11px;margin-top:6px}
 .cpQr{grid-column:1/-1;justify-self:start}.cpQr .qrSvg{width:120px;height:120px;border-radius:8px}
+
+/* Include bot rake: a switch on the center's reports */
+.botToggle{display:inline-flex;align-items:center;gap:9px;font-size:13px;color:#d6fbe9;cursor:pointer;white-space:nowrap;user-select:none}
+.botToggle input{position:absolute;opacity:0;width:1px;height:1px}
+.botToggle .tgl{position:relative;width:38px;height:22px;border-radius:999px;background:#25332e;border:1px solid #3a4d46;transition:background .2s,border-color .2s;flex:none}
+.botToggle .tgl::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#cfd8d4;transition:transform .2s,background .2s}
+.botToggle input:checked+.tgl{background:linear-gradient(180deg,#2fe39a,#0e7d51);border-color:#8dffcf}.botToggle input:checked+.tgl::after{transform:translateX(16px);background:#fff}
+.botToggle input:focus-visible+.tgl{outline:2px solid var(--mint);outline-offset:2px}
+.botToggle small{color:var(--muted);font-size:11px}.botToggle small:empty{display:none}
+.rakeHeadTools{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+body:not([data-role="CENTER"]) .botToggle{display:none}
+
+/* Several tables: chips to switch, a strip in the lobby, the waiting list */
+.myTablesStrip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px}.myTablesStrip>span{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
+.mtChip{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;border:1px solid #2f5a47;background:#0b1a14;color:#e8f3ee;font-size:13px;white-space:nowrap}
+.mtChip em{font-style:normal;color:#7ff0b9;font-weight:700}.mtChip .gameTag{margin:0}
+.mtChip.here{border-color:#7dffc0;background:#12392a}
+.mtChip.turn:not(.here){border-color:#f1d58e;background:#2b220e;animation:mtPulse 1.2s ease-in-out infinite}.mtChip i{font-style:normal;font-size:10px;font-weight:800;color:#160f05;background:#f1d58e;padding:2px 6px;border-radius:999px}
+@keyframes mtPulse{50%{box-shadow:0 0 0 4px #f1d58e33}}
+.mtChip.add{border-style:dashed;color:#9ff3cb}
+.myTablesBar{position:fixed;left:50%;top:calc(max(8px,env(safe-area-inset-top)) + 62px);transform:translateX(-50%);z-index:80;display:flex;gap:6px;max-width:min(720px,calc(100vw - 24px));overflow-x:auto;padding:4px;border-radius:999px;background:#050806cc;backdrop-filter:blur(8px);scrollbar-width:none}body:not([data-view="table"]) .myTablesBar{display:none}.myTablesBar .mtChip{padding:5px 10px;font-size:12px}.myTablesBar::-webkit-scrollbar{display:none}
+body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtChip{padding:4px 9px;font-size:11px}
+.llWait{padding:8px 10px;font-size:12px;margin-right:6px;white-space:nowrap}.llWait.on{border-color:#f1d58e88;color:#f1d58e}
+.llAct{display:flex;align-items:center;justify-content:flex-end}
+.seatOffer{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:calc(100vw - 24px);padding:14px 16px;border-radius:16px;background:linear-gradient(170deg,#12392a,#08110d);border:1px solid #7dffc0;box-shadow:0 20px 50px #000c}
+.seatOffer div{display:grid}.seatOffer span{font-size:13px;color:#cfe3da}.seatOffer strong{color:#f1d58e}
+
+/* Add-chips dialogs: wallet, table stack and limits always visible */
+.chipsDialog{width:min(420px,calc(100vw - 24px));padding:24px;border-color:#2f4a40;background:#0c1514}
+.chipsDialog h2{margin:0 0 6px;font-size:20px}.chipLead{margin:0 0 12px;color:#cfe3da}.chipLead b{color:#f1d58e}
+.chipFacts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 14px}.chipFacts div{display:grid;gap:2px;padding:10px;border-radius:12px;background:#ffffff06;border:1px solid #263735}
+.chipFacts small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.chipFacts strong{font-size:15px;color:#fff}.chipFacts div:first-child strong{color:#7ff0b9}
+.chipPresets{display:flex;gap:8px}.chipPresets button{flex:1;padding:8px;font-size:13px;border-radius:9px}
+.chipNote{margin:0;font-size:13px;color:#f1d58e;min-height:0}.chipNote:empty{display:none}
+.chipsDialog form{display:grid;gap:12px}.chipsDialog .chipDeposit{width:100%}
+
+/* House protection for bots */
+.guardRow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px}.guardRow label{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.guardRow input{padding:10px 12px;border-radius:10px;border:1px solid #2a3c37;background:#091011;color:#e8f3ee;width:160px;max-width:none}
+.guardToday{display:grid;padding:8px 14px;border-radius:10px;background:#ffffff06;border:1px solid #263735}.guardToday small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.guardToday strong.up{color:#7ff0b9}.guardToday strong.down{color:#ff8b98}.badge.alert{background:#3a1418;color:#ff8b98;border-color:#ef5d6b66}

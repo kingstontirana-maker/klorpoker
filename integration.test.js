@@ -115,8 +115,8 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     assert.equal((await call('table/1/sit',tokens[3],{position:0,buyin:20})).status,200);
     assert.equal((await call('table/1/sit',tokens[4],{position:1,buyin:20})).status,200);
     const room=runtime.get('1');
-    // A missed decision folds (or checks) and sits the player out at once:
-    // no further blind is taken until they come back themselves.
+    // A missed decision folds (or checks) for the player; play goes on and the
+    // player stays in (switching tabs is not leaving). Three such hands cash out.
     await call('table/1/start',tokens[3],{});
     if(room.seats[room.turn].userId==='4')assert.equal((await call('table/1/action',tokens[4],{type:'raise',amount:4})).status,200);
     assert.equal(room.seats[room.turn].userId,'3');
@@ -124,7 +124,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     assert.equal(room.phase,'finished');
     let mine=(await call('table/1/state',tokens[3])).data;
     assert.equal(mine.seats.find(s=>s?.id==='3').lastAction.type,'AUTO-FOLD');
-    assert.equal(mine.sittingOut,true);assert.equal(mine.timedOut,true);
+    assert.equal(mine.sittingOut,false);assert.equal(mine.seats.find(s=>s?.id==='3').inactiveHands,1);
     // Every hand is kept for the center: newest first, with all cards and actions.
     {const list=await call('hands',tokens[0],{});assert.equal(list.status,200);assert.ok(list.data.hands.length>=2);const last=list.data.hands[0];assert.equal(last.hand,room.hand);assert.ok(list.data.hands.every((h,i,a)=>!i||a[i-1].id>h.id),'newest first');
      const full=(await call('hands/get',tokens[0],{id:last.id})).data;assert.equal(full.tableId,'1');assert.ok(full.players.every(p=>p.cards.length===2));
@@ -133,6 +133,8 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.equal((await call('hands',tokens[1],{})).status,403,'admins cannot read hand history');assert.equal((await call('hands',tokens[3],{})).status,403);
      assert.equal((await call('hands',tokens[0],{player:'test4',limit:1})).data.hands.length,1);assert.equal((await call('hands',tokens[0],{player:'nobody'})).data.hands.length,0);
      assert.equal((await call('hands/get',tokens[0],{id:999999})).status,404);}
+    // A voluntary break: no blind is taken until the player comes back.
+    assert.equal((await call('table/1/sitout',tokens[3],{value:true})).status,200);
     const stackOut=room.seats.find(s=>s?.userId==='3').stack;
     assert.equal((await call('table/1/start',tokens[3],{})).status,400,'no hand without a second active player');
     assert.equal(room.seats.find(s=>s?.userId==='3').stack,stackOut,'no blind is taken while sitting out');

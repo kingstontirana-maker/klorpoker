@@ -1,6 +1,6 @@
 import {qrSvg} from './qr.js';
 import {gameInfo,renderCard,chipStack,TableVisuals,winningState,betLimits,describeHand,startingHand,preActionFor,seatLayout,feltBox,betPresets,TABLE_COLORS,tablePalette,paletteStyle} from './table-visuals.js';
-const $=s=>document.querySelector(s), api=async(path,body)=>{const response=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token},body:body===undefined?undefined:JSON.stringify(body)});const data=await response.json().catch(()=>({}));if(response.status===401&&path!=='login'&&token){sessionEnded(data.error||'Your session has ended. Please sign in again.');}if(!response.ok)throw Error(response.status===404&&path.startsWith('bots')?'The running server has not loaded the Bots update. Restart the Node server, then refresh this page.':data.error||'Request failed');return data;};let token=sessionStorage.getItem('pokerToken')||'',profile=null,tableId=null,current=null,updating=false;// Every amount on screen is shown in euro.
+const $=s=>document.querySelector(s), api=async(path,body)=>{const response=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token,'x-klor-visible':document.hidden?'0':'1'},body:body===undefined?undefined:JSON.stringify(body)});const data=await response.json().catch(()=>({}));if(response.status===401&&path!=='login'&&token){sessionEnded(data.error||'Your session has ended. Please sign in again.');}if(!response.ok)throw Error(response.status===404&&path.startsWith('bots')?'The running server has not loaded the Bots update. Restart the Node server, then refresh this page.':data.error||'Request failed');return data;};let token=sessionStorage.getItem('pokerToken')||'',profile=null,tableId=null,current=null,updating=false;// Every amount on screen is shown in euro.
 const fmt=n=>{const v=Number(n||0);return (v<0?'-€':'€')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.style.display='none',2800);};const safe=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const card=renderCard;
 // Each table lives in its own tab (/?table=ID); the main tab is the lobby.
 // A table opens in the same tab (/?table=ID) and goes fullscreen on the same click.
@@ -24,7 +24,7 @@ $('#rotateNow').onclick=async()=>{try{if(!document.fullscreenElement)await docum
 const roleNames={CENTER:'Center',ADMIN:'Administrator',AGENT:'Agent',USER:'Player'};
 function setView(){const player=profile.user.role==='USER';if(player&&TABLE_MODE&&!tableId){TABLE_MODE=null;document.body.classList.remove('tableTab');if(new URLSearchParams(location.search).get('table'))history.pushState({},'','/');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}if(!TABLE_MODE)tableId=null;$('#lobby').hidden=!player||!!tableId;$('.game').hidden=!player||!tableId;$('#sidebar').hidden=!player||!tableId;$('#backLobby').hidden=!player||!tableId;$('.selectWrap').hidden=true;$('#dashboard').hidden=player;$('#closeDashboard').hidden=!player;$('#adminToggle').hidden=true;$('#workspaceLabel').textContent=player?'Player area':'Panel · '+roleNames[profile.user.role];document.body.dataset.role=profile.user.role;document.body.dataset.view=player?(tableId?'table':'lobby'):'management';requestAnimationFrame(tableId?layoutTable:fitPhone);if(!$('#lobby').hidden)iosHint();}
 function showApp(){profile&&($('#login').hidden=true,$('#app').hidden=false);if($('#authDialog').open)$('#authDialog').close();$('#userTag').textContent=profile.user.username+' · '+roleNames[profile.user.role];$('#udName').textContent=profile.user.username;$('#udRole').textContent=roleNames[profile.user.role];$('#udBalance').textContent=fmt(profile.user.balance);document.body.classList.toggle('isPlayer',profile.user.role==='USER');document.body.classList.toggle('isCenter',profile.user.role==='CENTER');$('#balanceTag').textContent=fmt(profile.user.balance);$('#adminToggle').hidden=profile.user.role==='USER';}
-async function refreshProfile(){const oldSeat=profile?.seatedTableId;profile=await api('state');if(oldSeat&&!profile.seatedTableId&&tableId===oldSeat){tableId=null;current=null;visuals.reset();for(const id of ['#rebuyDialog','#chipDialog'])if($(id).open)$(id).close();toast(profile.lastTableExit?.reason==='IDLE_TABLE'?'You were removed from the table after 10 minutes without play. Your chips were returned to your wallet.':profile.lastTableExit?.reason==='INACTIVE'?'You left the table after two hands without acting. Your chips were returned to your wallet.':'You left the table. Your remaining chips were returned to your wallet.');}showApp();const prev=$('#tables').value;$('#tables').innerHTML=profile.tables.map(t=>`<option value="${t.id}">${safe(t.name)} • ${fmt(t.sb)}/${fmt(t.bb)} • ${t.players}/6</option>`).join('');$('#tables').value=profile.tables.some(t=>t.id===tableId)?tableId:profile.tables[0]?.id;setView();renderLobby();if(profile.user.role!=='USER'&&!$('#rakeForm').contains(document.activeElement)){$('#rakePct').value=profile.rakePercent;}if(profile.user.role!=='USER')renderManagedTables();if($('#chipDialog').open)syncDeposit('chip');}
+async function refreshProfile(){const oldSeats=new Set((profile?.myTables||[]).map(x=>x.id));profile=await api('state');if(tableId&&oldSeats.has(tableId)&&!(profile.myTables||[]).some(x=>x.id===tableId)){tableId=null;current=null;visuals.reset();for(const id of ['#rebuyDialog','#chipDialog'])if($(id).open)$(id).close();toast(profile.lastTableExit?.reason==='IDLE_TABLE'?'You were removed from the table after 10 minutes without play. Your chips were returned to your wallet.':profile.lastTableExit?.reason==='INACTIVE'?'You left the table after two hands without acting. Your chips were returned to your wallet.':'You left the table. Your remaining chips were returned to your wallet.');}showApp();renderMyTables();const prev=$('#tables').value;$('#tables').innerHTML=profile.tables.map(t=>`<option value="${t.id}">${safe(t.name)} • ${fmt(t.sb)}/${fmt(t.bb)} • ${t.players}/6</option>`).join('');$('#tables').value=profile.tables.some(t=>t.id===tableId)?tableId:profile.tables[0]?.id;setView();renderLobby();if(profile.user.role!=='USER'&&!$('#rakeForm').contains(document.activeElement)){$('#rakePct').value=profile.rakePercent;}if(profile.user.role!=='USER')renderManagedTables();if($('#chipDialog').open)syncDeposit('chip');}
 const portraitQuery=window.matchMedia('(max-width:900px) and (orientation:portrait), (max-width:520px)');const isPortrait=()=>portraitQuery.matches;
 // Phones in landscape get the app-style controls: round buttons, a bet panel on demand.
 const phoneQuery=window.matchMedia('(max-height:560px) and (orientation:landscape)');const isPhone=()=>phoneQuery.matches;
@@ -67,7 +67,7 @@ function render(t){if(t.color!==feltColor){feltColor=t.color;const g=$('.game');
  if(can&&!wasMyTurn){visuals.beep('turn');if(navigator.userActivation?.hasBeenActive)navigator.vibrate?.([40,60,40]);}if(!can)$('.dock').classList.remove('sizing');wasMyTurn=!!can;
  const dock=$('.dock'),inPlay=!!mine&&LIVE.includes(t.phase)&&mine.inHand&&!mine.folded&&!mine.allIn&&!t.leaving&&!t.runout;dock.classList.toggle('myTurn',!!can);dock.classList.toggle('waitingTurn',inPlay&&!can&&t.turn>=0);dock.classList.toggle('idle',!inPlay||t.turn<0&&!can);
  $('#turnInfo').textContent=t.runout?'All-in · cards are being dealt':actionBusy?'Sending your action…':can?'YOUR TURN':t.turn>=0?(t.seats[t.turn]?.username||'Player')+' is acting':t.phase==='finished'?'Hand finished':'Waiting for players';
- $('#inactivityNotice').hidden=!(mine?.inactiveHands>0);$('#inactivityNotice').textContent=mine?.inactiveHands?'Inactive: '+mine.inactiveHands+'/2 · Third hand: removal':'';$('#handStrength').textContent=describeHand(t.myHandScore)||(mine?.inHand&&LIVE.includes(t.phase)&&startingHand(t.myCards))||(mine?'Your chips: '+fmt(mine.stack):'YOUR CARDS');
+ $('#inactivityNotice').hidden=!(mine?.inactiveHands>0);$('#inactivityNotice').textContent=mine?.inactiveHands?'Timed out: '+mine.inactiveHands+'/3 hands · at 3 you leave the table':'';$('#handStrength').textContent=describeHand(t.myHandScore)||(mine?.inHand&&LIVE.includes(t.phase)&&startingHand(t.myCards))||(mine?'Your chips: '+fmt(mine.stack):'YOUR CARDS');
  $('#callSummary').textContent=t.leaving?'You folded · You leave at the end of the hand':t.timedOut?'You did not act in time · You are sitting out — press ↺ Back to play':t.sittingOut?'You are sitting out · No cards next hand':mine&&LIVE.includes(t.phase)&&!mine.inHand?'Waiting for the next hand'+(t.mustPost?' · You post a big blind to join':''):t.phase==='finished'?'Hand finished · Result credited':mine?call?'To call: '+fmt(Math.min(call,mine.stack))+(call>=mine.stack?' · All-in':''):'You can check for free':'Click JOIN to enter the game';$('#blindInfo').textContent='Blinds '+fmt(t.sb)+' / '+fmt(t.bb);
  for(const key of ['fold','check','call','raise','allIn'])$('#'+key).disabled=!can;$('#check').disabled=!can||call>0;$('#call').disabled=!can||call===0;$('#call').hidden=call===0;$('#check').hidden=call>0;$('#call span').innerHTML=call?`Call <small>${fmt(Math.min(call,mine?.stack||0))}</small>`:'Call';$('#timeBank').hidden=!can||!(t.timeBank>0);$('#timeBank span').textContent='+'+Math.min(20,t.timeBank||0)+'s';$('#raise').disabled=!can||!limits.canRaise;$('#allIn').disabled=!can||!mine?.stack||limits.max>t.currentBet&&!limits.canRaise;$('#allIn').textContent=mine&&limits.max<Math.round((mine.stack+mine.bet)*100)/100?'Pot':'All-in';
  const range=$('#betRange'),input=$('#betInput'),editKey=[t.id,t.hand,t.phase,t.turn,t.currentBet].join(':');range.min=String(limits.min);range.max=String(limits.max);range.step='.01';input.min=range.min;input.max=range.max;const editing=document.activeElement===input||document.activeElement===range;let value=Number(input.value);if(!editing&&(editKey!==betEditKey||!Number.isFinite(value)||value<limits.min||value>limits.max))value=limits.min;if(!editing){input.value=String(value);range.value=String(value);}betEditKey=editKey;syncBetLabel();range.disabled=input.disabled=!can||!limits.canRaise;const presets=can?betPresets(t,mine):[],key=presets.map(p=>p.label+p.value).join('|');if(key!==presetKey){presetKey=key;$('#betPresets').innerHTML=presets.map(p=>`<button type="button" data-value="${p.value}">${p.label}</button>`).join('');}document.querySelectorAll('#betPresets button,#stepBetDown,#stepBetUp').forEach(b=>b.disabled=!can||!limits.canRaise);
@@ -77,7 +77,13 @@ function render(t){if(t.color!==feltColor){feltColor=t.color;const g=$('.game');
 }
 $('#seats').addEventListener('click',e=>{const node=e.target.closest('.seat.winnerSeat');if(node&&current){winnerFocus=node.dataset.seatUser;render(current);}});
 setInterval(()=>{if(!document.hidden&&tableId)visuals.tick();},100);
-$('#soundToggle').onclick=async()=>{if(visuals.sound)visuals.sound=false;else if(!await visuals.enableSound())return toast('Sound is not supported in this browser.');$('#soundToggle').setAttribute('aria-pressed',String(visuals.sound));$('#soundToggle').textContent=visuals.sound?'♫ Sound: On':'♫ Sound: Off';};
+// Sound is on unless the player turned it off; browsers only allow audio after a
+// first tap or key press, so it starts then.
+const soundPref=()=>{try{return localStorage.getItem('klorSound')!=='off';}catch{return true;}};
+const showSound=()=>{$('#soundToggle').setAttribute('aria-pressed',String(visuals.sound));$('#soundToggle').textContent=visuals.sound?'♫ Sound: On':'♫ Sound: Off';};
+const startSound=async e=>{if(e?.target?.closest?.('#soundToggle'))return;if(soundPref()&&!visuals.sound){await visuals.enableSound();showSound();}};
+for(const type of ['pointerdown','keydown'])addEventListener(type,startSound,{once:true,capture:true});
+$('#soundToggle').onclick=async()=>{if(visuals.sound)visuals.sound=false;else if(!await visuals.enableSound())return toast('Sound is not supported in this browser.');try{localStorage.setItem('klorSound',visuals.sound?'on':'off');}catch{}showSound();};
 $('#motionToggle').onclick=()=>{visuals.motion=!visuals.motion;sessionStorage.setItem('pokerMotion',visuals.motion?'on':'off');$('#motionToggle').setAttribute('aria-pressed',String(visuals.motion));$('#motionToggle').textContent=visuals.motion?'◉ Animations: On':'◉ Animations: Off';$('.game').classList.toggle('reducedMotion',!visuals.motion);};
 $('#fullscreenToggle').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('Full screen is not supported.')}};
 async function applyTable(t){if(!tableId||String(t.id)!==String(tableId))return;render(t);if(current?.seats.every(s=>!s?.isMe)&&rebuyWasOpen){rebuyWasOpen=false;tableId=null;await refreshProfile();toast('Time is up. You left the table.');}}
@@ -126,11 +132,17 @@ addEventListener('pagehide',e=>{if(TABLE_MODE&&token&&!e.persisted&&current?.sea
 
 function renderLobby(){if(profile.user.role!=='USER')return;$('#lobbyBalance').textContent=fmt(profile.user.balance);$('#tableCount').textContent=profile.tables.length;$('#creditNotice').textContent=profile.user.balance<=0?'No credit · Contact your agent to play.':'Choose a table to continue';renderLobbyList();}
 $('#lobbyTables').onclick=e=>{const b=e.target.closest('[data-table]');if(b)openTableTab(b.dataset.table);};
-$('#backLobby').onclick=()=>{if(current?.seats.some(s=>s?.isMe))toast('You are still seated. Return to the table from the lobby within 25 seconds or you will be sat out.');leaveTableTab();};
-let rebuyWasOpen=false;
-function updateRebuy(t){const dialog=$('#rebuyDialog');if(t.rebuyDeadline&&t.serverNow>=(t.rebuyAvailableAt||0)){rebuyWasOpen=true;$('#rebuyMessage').textContent=`You have less than one big blind on the table. Add credit within ${Math.max(0,Math.ceil((t.rebuyDeadline-t.serverNow)/1000))} seconds. Wallet: ${fmt(profile.user.balance)}.`;syncDeposit('rebuy',!dialog.open?Math.min(profile.user.balance,20):undefined);if(!dialog.open)dialog.showModal();}else if(dialog.open)dialog.close();}
+$('#backLobby').onclick=()=>{if(current?.seats.some(s=>s?.isMe))toast('You stay seated. You will be told here when it is your turn.');leaveTableTab();};
+let rebuyWasOpen=false,rebuyKey='',rebuyDone='',rebuyClock=0,rebuyTimer=null;
+function rebuyCountdown(){const t=current;if(!t?.rebuyDeadline)return;const left=Math.max(0,Math.ceil((t.rebuyDeadline-(Date.now()+rebuyClock))/1000));$('#rebuyMessage').innerHTML='Add chips within <b>'+left+' s</b> to keep your seat.';}
+function updateRebuy(t){const dialog=$('#rebuyDialog'),key=t.id+':'+(t.rebuyDeadline||'');
+ if(t.rebuyDeadline&&t.serverNow>=(t.rebuyAvailableAt||0)&&key!==rebuyDone){rebuyWasOpen=true;rebuyClock=t.serverNow-Date.now();
+  if(!dialog.open||key!==rebuyKey){rebuyKey=key;const l=depositLimits('rebuy');syncDeposit('rebuy',Math.min(l.max,Math.max(l.min,Math.round(t.bb*50*100)/100)));dialog.showModal();clearInterval(rebuyTimer);rebuyTimer=setInterval(()=>{if(!dialog.open)return clearInterval(rebuyTimer);rebuyCountdown();refreshProfile().then(()=>dialog.open&&syncDeposit('rebuy')).catch(()=>{});},3000);}
+  else syncDeposit('rebuy');rebuyCountdown();}
+ else if(dialog.open){dialog.close();clearInterval(rebuyTimer);}}
 $('#rebuyDialog').addEventListener('cancel',e=>e.preventDefault());
-$('#rebuyForm').onsubmit=async e=>{e.preventDefault();if(!syncDeposit('rebuy'))return;try{await api('table/'+tableId+'/rebuy',{amount:Number($('#rebuyAmount').value)});rebuyWasOpen=false;await refreshProfile();await tableRefresh();}catch(err){toast(err.message)}};
+$('#rebuyForm').onsubmit=async e=>{e.preventDefault();if(!syncDeposit('rebuy'))return;const b=$('#rebuySubmit');b.disabled=true;try{await api('table/'+tableId+'/rebuy',{amount:Number($('#rebuyAmount').value)});rebuyDone=rebuyKey;rebuyWasOpen=false;$('#rebuyDialog').close();clearInterval(rebuyTimer);toast('Chips added · '+fmt(Number($('#rebuyAmount').value)));await refreshProfile();await tableRefresh();}catch(err){toast(err.message);syncDeposit('rebuy');}};
+$('#rebuyLeave').onclick=async()=>{try{rebuyDone=rebuyKey;rebuyWasOpen=false;$('#rebuyDialog').close();clearInterval(rebuyTimer);await api('table/'+tableId+'/leave',{});rebuyWasOpen=false;tableId=null;await refreshProfile();}catch(err){toast(err.message);}};
 
 let chipMode='sit',chipPosition=null;
 function depositLimits(prefix){
@@ -140,22 +152,25 @@ function depositLimits(prefix){
  return {min:sit?room.minBuyin:Math.max(.01,Math.round((room.bb-(mine?.stack||0))*100)/100),max:Math.max(0,Math.min(profile.user.balance,room.maxBuyin-(sit?0:mine?.stack||0)))};
 }
 function syncDeposit(prefix,value){
- const input=$('#'+prefix+'Amount'),range=$('#'+prefix+'Range'),wallet=Math.max(0,profile.user.balance),limits=depositLimits(prefix);
- input.min=0;input.max=wallet;range.max=wallet;range.disabled=wallet===0;
+ const input=$('#'+prefix+'Amount'),range=$('#'+prefix+'Range'),wallet=Math.max(0,profile.user.balance),limits=depositLimits(prefix),can=limits.max>=limits.min&&limits.max>0;
+ const mine=current?.seats.find(s=>s?.isMe);$('#'+prefix+'Wallet').textContent=fmt(wallet);$('#'+prefix+'Stack').textContent=fmt(prefix==='chip'&&chipMode==='sit'?0:mine?.stack||0);$('#'+prefix+'Limits').textContent=can?fmt(limits.min)+' – '+fmt(limits.max):'—';
+ document.querySelectorAll('#'+prefix+'Dialog .chipDeposit,#'+(prefix==='chip'?'chipDialog':'rebuyDialog')+' .chipDeposit').forEach(b=>b.hidden=can);
+ input.min=range.min=String(can?limits.min:0);input.max=range.max=String(can?limits.max:0);range.disabled=!can;
  if(value!==undefined)input.value=String(value);
- if(Number(input.value)>wallet)input.value=String(wallet);
- const amount=Number(input.value);range.value=String(Math.max(0,Math.min(wallet,amount||0)));
+ if(can)input.value=String(Math.min(limits.max,Math.max(limits.min,Number(input.value)||limits.min)));else input.value='0';
+ const amount=Number(input.value);range.value=String(amount||0);
  $('#'+prefix+'RangeMax').textContent=fmt(wallet);$('#'+prefix+'Selected').textContent=fmt(amount||0);range.setAttribute('aria-valuetext',fmt(amount||0));
  const valid=input.value!==''&&Number.isFinite(amount)&&amount>=limits.min&&amount<=limits.max&&Math.abs(amount*100-Math.round(amount*100))<.000001;
  $('#'+prefix+'Submit').disabled=!valid;
- $('#'+prefix+'Validation').textContent=wallet===0?'You have no credit. Contact your agent.':limits.max<limits.min?'Not enough credit or room at the table.':valid?'Selected amount: '+fmt(amount)+'.':'Allowed amount for this table: '+fmt(limits.min)+' – '+fmt(limits.max)+'.';
+ $('#'+prefix+'Validation').textContent=wallet===0?'Your wallet is empty. Deposit or ask your agent for credit.':!can?(wallet<limits.min?'Your wallet ('+fmt(wallet)+') is below the minimum of '+fmt(limits.min)+'. Deposit or ask your agent for credit.':'The table is already at its maximum for you.'):'';
  return valid;
 }
+document.addEventListener('click',e=>{const b=e.target.closest('[data-presets] [data-p]');if(!b)return;const prefix=b.closest('[data-presets]').dataset.presets,l=depositLimits(prefix);if(l.max<l.min)return;syncDeposit(prefix,b.dataset.p==='min'?l.min:b.dataset.p==='max'?l.max:Math.round((l.min+l.max)/2*100)/100);});
 for(const prefix of ['chip','rebuy']){
  $('#'+prefix+'Range').oninput=e=>syncDeposit(prefix,Number(e.target.value));
  $('#'+prefix+'Amount').oninput=()=>syncDeposit(prefix);
 }
-function openChipDialog(mode,position=null){chipMode=mode;chipPosition=position;const room=profile.tables.find(t=>t.id===tableId);if(!room)return;const limits=depositLimits('chip');$('#chipDialogTitle').textContent=mode==='sit'?'Sit at '+room.name:'Add chips to the table';$('#chipDialogInfo').textContent=`Wallet: ${fmt(profile.user.balance)} · Table limits: ${fmt(limits.min)} – ${fmt(limits.max)}`;syncDeposit('chip',Math.min(limits.max,Math.max(limits.min,mode==='sit'?100:20)));$('#chipDialog').showModal();}
+function openChipDialog(mode,position=null){chipMode=mode;chipPosition=position;const room=profile.tables.find(t=>t.id===tableId);if(!room)return;const limits=depositLimits('chip');$('#chipDialogTitle').textContent=mode==='sit'?'Sit at '+room.name:'Add chips to the table';$('#chipDialogInfo').textContent='';refreshProfile().then(()=>$('#chipDialog').open&&syncDeposit('chip')).catch(()=>{});syncDeposit('chip',Math.min(limits.max,Math.max(limits.min,mode==='sit'?100:20)));$('#chipDialog').showModal();}
 $('#topUp').onclick=()=>openChipDialog('rebuy');
 $('#closeChipDialog').onclick=()=>$('#chipDialog').close();
 $('#chipForm').onsubmit=async e=>{e.preventDefault();if(!syncDeposit('chip'))return;const button=$('#chipSubmit');button.disabled=true;try{const amount=Number($('#chipAmount').value);await api('table/'+tableId+'/'+chipMode,chipMode==='sit'?{position:chipPosition,buyin:amount}:{amount});$('#chipDialog').close();await refreshProfile();await tableRefresh();}catch(err){toast(err.message)}finally{syncDeposit('chip');}};
@@ -197,7 +212,8 @@ async function loadRakeReport(){
   const r=await api('rake/report');if(token!==requestedToken)return;renderRakeReport(r);startRakeStream();
  }catch(err){$('#rakeStatus').textContent='The report could not be loaded: '+err.message;}finally{rakeLoading=false;}
 }
-function renderRakeReport(r){
+let lastRake=null;
+function renderRakeReport(r){lastRake=r;const bots=botRakeOn()&&r.botTotal!=null;if(bots)r={...r,total:Math.round((r.total+r.botTotal)*100)/100,today:Math.round((r.today+r.botToday)*100)/100,hands:r.handsWithBots,rows:r.rows.map(x=>({...x,amount:Math.round((x.amount+(x.bot||0))*100)/100}))};else if(r.botTotal!=null)r={...r,rows:r.rows.filter(x=>x.amount>0)};$('#rakeBotsNote').textContent=lastRake.botTotal?(bots?'incl. '+fmt(lastRake.botTotal)+' from bots':fmt(lastRake.botTotal)+' from bots not shown'):'';
   $('#rakeScope').textContent=profile.user.role==='CENTER'?'All tables and the whole network.':'Only rake generated by players in your hierarchy.';
   const cards=[['Total rake',fmt(r.total),'generated','％'],['Rake today',fmt(r.today),'Europe/Berlin time','◷'],['Hands with rake',r.hands,'In your network','♠']];
   const html=([label,value,note,icon])=>`<article class="statCard"><div><span>${label}</span><i>${icon}</i></div><strong>${value}</strong><small>${note}</small></article>`;
@@ -283,7 +299,9 @@ $('#passwordForm').onsubmit=async e=>{e.preventDefault();const next=$('#newPass'
 // ---- Live table stream (server push); polling stays as a fallback ----
 let tableStream=null,streamTable=null,streamSeen=0,streamRetry=0;
 function stopTableStream(){tableStream?.abort();tableStream=null;streamTable=null;}
-function syncTableStream(){const want=token&&profile?.user.role==='USER'&&tableId&&!document.hidden?String(tableId):null;if(want===streamTable&&tableStream)return;stopTableStream();if(want&&Date.now()>=streamRetry)startTableStream(want);}
+// The live connection stays open while the tab is in the background: switching tabs
+// never makes a player "away". Only closing the page (or losing the network) does.
+function syncTableStream(){const want=token&&profile?.user.role==='USER'&&tableId?String(tableId):null;if(want===streamTable&&tableStream)return;stopTableStream();if(want&&Date.now()>=streamRetry)startTableStream(want);}
 async function startTableStream(id){const controller=new AbortController(),session=token;tableStream=controller;streamTable=id;
  try{const response=await fetch('/api/table/'+encodeURIComponent(id)+'/stream',{headers:{Authorization:'Bearer '+session},signal:controller.signal});
   if(response.status===401){const d=await response.json().catch(()=>({}));sessionEnded(d.error||'Your session has ended. Please sign in again.');return;}
@@ -355,7 +373,7 @@ $('#managedTables').addEventListener('change',async e=>{const i=e.target.closest
 // ---- Revenue report: how much, from whom and how, with date filters ----
 const revTz='Europe/Tirane',revDay=d=>new Intl.DateTimeFormat('en-CA',{timeZone:revTz,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 const revAdd=(d,n)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);};
-const revRoleNames={CENTER:'Center',ADMIN:'Admin',AGENT:'Agent',USER:'Player',LEGACY:'Archive'};
+const revRoleNames={BOTS:'House',CENTER:'Center',ADMIN:'Admin',AGENT:'Agent',USER:'Player',LEGACY:'Archive'};
 const revChildLabel={CENTER:'admins',ADMIN:'agents',AGENT:'players'};
 // Only the latest request is shown, even if replies arrive out of order.
 let revSeq=0;
@@ -367,10 +385,10 @@ function revDelta(cur,prev){if(!prev)return cur?'<em class="up">new</em>':'<em>�
 async function loadRevenue(){if(!profile||profile.user.role==='USER')return;
  if(revState.preset){const [f,t]=revPreset(revState.preset);revState.from=f;revState.to=t;}
  $('#revStatus').textContent='Loading…';
- const seq=++revSeq;try{const data=await api('revenue',{from:revState.from,to:revState.to,scope:revState.scope||undefined});if(seq!==revSeq)return;revData=data;revState.from=revData.from;revState.to=revData.to;$('#revFrom').value=revData.from;$('#revTo').value=revData.to;renderRevenue();$('#revStatus').textContent='Updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});}
+ const seq=++revSeq;try{const data=await api('revenue',{from:revState.from,to:revState.to,scope:revState.scope||undefined,includeBots:botRakeOn()});if(seq!==revSeq)return;revData=data;revState.from=revData.from;revState.to=revData.to;$('#revFrom').value=revData.from;$('#revTo').value=revData.to;renderRevenue();$('#revStatus').textContent='Updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});}
  catch(err){$('#revStatus').textContent=err.message;if(revState.scope){revState.scope=null;}}
  clearInterval(revTimer);revTimer=setInterval(()=>{if(panelPage==='revenue'&&!document.hidden&&revState.to===revDay(new Date()))loadRevenue();},30000);}
-function renderRevenue(){const d=revData;if(!d)return;
+function renderRevenue(){const d=revData;if(!d)return;$('#revBotsNote').textContent=d.totals.botRake?(d.totals.includeBots?'incl. '+fmt(d.totals.botRake)+' from bots':fmt(d.totals.botRake)+' from bots not shown'):'';
  document.querySelectorAll('#revPresets button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.preset===revState.preset)));
  $('#revPath').innerHTML=d.path.map((p,i)=>(i?'<span>›</span>':'')+(i<d.path.length-1?'<button type="button" data-scope="'+safe(p.id)+'">':'<b>')+'<small>'+revRoleNames[p.role]+'</small> '+safe(p.username)+(i<d.path.length-1?'</button>':'</b>')).join('');
  const fmtD=s=>s.split('-').reverse().join('.'),range=fmtD(d.from)+' – '+fmtD(d.to);
@@ -429,11 +447,11 @@ function renderLobbyList(){if(!profile||!$('#lobbyTables'))return;
  const list=profile.tables.filter(t=>(!q||t.name.toLowerCase().includes(q)||String(t.id).includes(q.replace('#','')))&&(!free||t.players<6)&&(!live||LOBBY_LIVE.includes(t.phase))&&(t.game||'holdem')===game);
  const val={id:t=>Number(t.id)||0,name:t=>t.name.toLowerCase(),blinds:t=>t.bb,buyin:t=>t.minBuyin,players:t=>t.players,status:t=>LOBBY_LIVE.includes(t.phase)?1:0};
  list.sort((a,b)=>{const x=val[lobbySort.key](a),y=val[lobbySort.key](b);return ((x>y)-(x<y))*lobbySort.dir||(Number(a.id)-Number(b.id));});
- const canPlay=t=>!(profile.user.balance<=0&&profile.seatedTableId!==t.id);
+ const mineAt=id=>(profile.myTables||[]).some(x=>x.id===id),canPlay=t=>!(profile.user.balance<=0&&!mineAt(t.id));
  const head=[['id','ID'],['name','Table'],['blinds','Blinds'],['buyin','Buy-in'],['players','Players'],['status','Status']];
  const arrow=k=>lobbySort.key===k?(lobbySort.dir>0?' ▲':' ▼'):'';
  $('#lobbyTables').innerHTML='<div class="lobbyList" role="table" aria-label="Tables"><div class="llHead" role="row">'+head.map(([k,l])=>'<button type="button" role="columnheader" class="llSort'+(lobbySort.key===k?' on':'')+'" data-sort="'+k+'" aria-sort="'+(lobbySort.key===k?(lobbySort.dir>0?'ascending':'descending'):'none')+'">'+l+arrow(k)+'</button>').join('')+'<span role="columnheader" class="llHeadAct"></span></div>'
-  +(list.length?list.map(t=>{const seated=profile.seatedTableId===t.id,ok=canPlay(t),playing=LOBBY_LIVE.includes(t.phase);
+  +(list.length?list.map(t=>{const seated=mineAt(t.id),wl=(profile.waitlists||[]).find(w=>w.tableId===t.id),ok=canPlay(t),playing=LOBBY_LIVE.includes(t.phase);
    const seats=Array.from({length:6},(_,i)=>'<i'+(i<t.players?' class="on"':'')+'></i>').join('');
    return '<div class="llRow'+(seated?' seated':'')+(ok?'':' locked')+'" role="row"'+(ok?' data-table="'+safe(t.id)+'"':'')+' style="'+paletteStyle(t.color)+'">'
     +'<span class="llId" role="cell">#'+safe(t.id)+'</span>'
@@ -442,7 +460,7 @@ function renderLobbyList(){if(!profile||!$('#lobbyTables'))return;
     +'<span class="llBuyin" role="cell"><small>Buy-in</small>'+fmt(t.minBuyin)+' – '+fmt(t.maxBuyin)+'</span>'
     +'<span class="llPlayers" role="cell"><small>Players</small><span class="llSeats" aria-hidden="true">'+seats+'</span>'+t.players+'/6'+(t.bots?'<i class="botTag" title="'+t.bots+' bot'+(t.bots>1?'s':'')+' at this table">'+t.bots+' BOT</i>':'')+'</span>'
     +'<span class="llStatus'+(playing?' live':'')+'" role="cell"><span class="statusDot"></span>'+phaseLabel(t.phase)+'</span>'
-    +'<span class="llAct" role="cell"><button class="primary" '+(ok?'data-table="'+safe(t.id)+'"':'disabled title="Your credit is zero"')+'>'+(seated?'Go to table':'Open')+' <span>↗</span></button></span></div>';}).join('')
+    +'<span class="llAct" role="cell">'+(!seated&&t.players>=6&&ok?(wl?'<button class="ghostButton llWait on" data-wait="leave" data-wait-table="'+safe(t.id)+'" title="Leave the waiting list">#'+wl.position+' in line ✕</button>':'<button class="ghostButton llWait" data-wait="join" data-wait-table="'+safe(t.id)+'">Wait for a seat'+(t.waiting?' · '+t.waiting:'')+'</button>'):'')+'<button class="primary" '+(ok?'data-table="'+safe(t.id)+'"':'disabled title="Your credit is zero"')+'>'+(seated?'Go to table':t.players>=6?'Watch':'Open')+' <span>↗</span></button></span></div>';}).join('')
    :'<p class="llEmpty">'+(profile.tables.some(t=>(t.game||'holdem')===game)?'No table matches your search.':'No '+(game==='omaha'?'Omaha':'Texas Hold’em')+' tables yet.')+'</p>')+'</div>';}
 $('#lobbyTables').addEventListener('click',e=>{const s=e.target.closest('[data-sort]');if(!s)return;e.stopPropagation();const k=s.dataset.sort;lobbySort=lobbySort.key===k?{key:k,dir:-lobbySort.dir}:{key:k,dir:k==='players'||k==='status'?-1:1};renderLobbyList();},true);
 for(const id of ['#lobbySearch','#lobbyFree','#lobbyLive'])$(id).addEventListener('input',renderLobbyList);
@@ -463,12 +481,13 @@ function renderBotCreateTables(){const select=$('#botCreateTable'),selected=sele
 $('#botCreateTable').onchange=syncBotCreateTable;
 const riskNames={low:'Low · tight, small bets',medium:'Medium · balanced',high:'High · aggressive'};
 async function loadBots(){if(profile?.user.role!=='CENTER')return;renderBotCreateTables();
+ api('bots/guard').then(g=>{const f=$('#guardForm');if(!f.contains(document.activeElement))f.dailyLimit.value=g.dailyLimit;const el=$('#guardToday');el.textContent=(g.today>0?'+':'')+fmt(g.today);el.className=g.today>0?'up':g.today<0?'down':'';$('#guardBadge').textContent=g.stopped?'STOPPED FOR TODAY':g.dailyLimit?'LIMIT '+fmt(g.dailyLimit):'NO LIMIT';$('#guardBadge').classList.toggle('alert',!!g.stopped);}).catch(()=>{});
  try{const rows=await api('bots');const money=v=>'<b class="'+(v>0?'up':v<0?'down':'')+'">'+(v>0?'+':'')+fmt(v)+'</b>';
-  $('#botCount').textContent=rows.length+' BOTS';
+  $('#botCount').textContent=rows.length+' BOTS · HOUSE '+(rows.reduce((n,b)=>n+b.house,0)>=0?'+':'')+fmt(rows.reduce((n,b)=>n+b.house,0));
   $('#botList').innerHTML=rows.length?rows.map(b=>'<form class="botCard surface'+(b.enabled?' on':'')+'" data-bot="'+safe(b.id)+'"><div class="botHead"><div><strong>'+safe(b.name)+'<i class="botTag">BOT</i></strong><small>'+safe(b.status)+'</small></div><button type="button" class="'+(b.enabled?'ghostButton dangerButton':'primary')+'" data-bot-toggle="'+(!b.enabled)+'">'+(b.enabled?'■ Stop':'▶ Start')+'</button></div>'
-   +'<div class="botStats"><div><small>Wallet + table</small><b>'+fmt(b.equity)+'</b></div><div><small>This session</small>'+money(b.session)+'</div><div><small>Since created</small>'+money(b.total)+'</div></div>'
+   +'<div class="botStats"><div><small>Wallet + table</small><b>'+fmt(b.equity)+'</b></div><div><small>This session</small>'+money(b.session)+'</div><div><small>Chips since created</small>'+money(b.total)+'</div><div><small>Rake paid · back to center</small><b>'+fmt(b.rakePaid)+'</b></div><div><small>Result for the house</small>'+money(b.house)+'</div><div><small>Hands with rake</small><b>'+b.rakeHands+'</b></div></div>'
    +'<fieldset '+(b.enabled?'disabled':'')+'><label>Table<select name="tableId">'+profile.tables.map(t=>'<option value="'+safe(t.id)+'" '+(t.id===b.tableId?'selected':'')+'>'+safe(t.name)+' · '+gameInfo(t.game).short+' ('+fmt(t.minBuyin)+'–'+fmt(t.maxBuyin)+')</option>').join('')+'</select></label>'
-   +'<label>Style<select name="risk">'+['low','medium','high'].map(r=>'<option value="'+r+'" '+(r===b.risk?'selected':'')+'>'+riskNames[r]+'</option>').join('')+'</select></label>'
+   +'<label>Mode<select name="mode"><option value="play"'+(b.mode!=='seat'?' selected':'')+'>Play hands</option><option value="seat"'+(b.mode==='seat'?' selected':'')+'>Seat only · never loses</option></select></label><label>Style<select name="risk">'+['low','medium','high'].map(r=>'<option value="'+r+'" '+(r===b.risk?'selected':'')+'>'+riskNames[r]+'</option>').join('')+'</select></label>'
    +'<label>Buy-in (€)<input name="buyin" type="number" min="0.01" step="0.01" value="'+b.buyin+'" required></label><label>Win limit (€)<input name="stopWin" type="number" min="0.01" step="0.01" value="'+b.stopWin+'" required></label><label>Loss limit (€)<input name="stopLoss" type="number" min="0.01" step="0.01" value="'+b.stopLoss+'" required></label>'
    +'<div class="botBtns"><button class="primary">Save</button><button type="button" class="ghostButton" data-bot-delete>Delete & refund</button></div></fieldset></form>').join(''):'<p class="muted">No bots yet. Create one above.</p>';
  }catch(e){toast(e.message);}}
@@ -598,3 +617,32 @@ async function openTransactions(){$('#txRows').innerHTML='<p class="muted">Loadi
    const ref=x.tableId?'Table #'+safe(x.tableId):x.usdt?x.usdt+' USDT':x.type==='TRANSFER'?(inflow?'From your agent':'Returned to your agent'):'';
    return '<div class="txRow"><span><b>'+txNames[x.type]+'</b><small>'+new Date(x.time).toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})+(ref?' · '+ref:'')+'</small></span><strong class="'+(sign==='+'?'up':sign?'down':'')+'">'+(x.type==='REGISTER'?'':sign+fmt(Math.abs(x.amount)))+'</strong></div>';}).join(''):'<p class="muted">No transactions yet.</p>';
  }catch(err){$('#txRows').innerHTML='<p class="muted">'+safe(err.message)+'</p>';}}
+
+// ---- Center: include or leave out the rake paid by bots, live, on every report ----
+const BOT_RAKE_KEY='klorBotRake';
+function botRakeOn(){try{return localStorage.getItem(BOT_RAKE_KEY)==='on';}catch{return false;}}
+function syncBotToggles(){for(const id of ['#revBots','#rakeBots'])if($(id))$(id).checked=botRakeOn();}
+for(const id of ['#revBots','#rakeBots'])$(id)?.addEventListener('change',e=>{try{localStorage.setItem(BOT_RAKE_KEY,e.target.checked?'on':'off');}catch{}syncBotToggles();if(lastRake)renderRakeReport(lastRake);if(panelPage==='revenue')loadRevenue();});
+syncBotToggles();
+
+// ---- Several tables at once and the waiting list ----
+let turnAlert=null,turnTitle=document.title,offerShown='';
+function renderMyTables(){if(profile?.user.role!=='USER')return;const mine=profile.myTables||[],bar=$('#myTablesBar'),strip=$('#myTablesStrip');
+ const chip=x=>'<button type="button" class="mtChip'+(x.id===tableId?' here':'')+(x.myTurn?' turn':'')+'" data-goto="'+safe(x.id)+'"><b class="gameTag '+(x.game==='omaha'?'omaha':'')+'">'+gameInfo(x.game).short+'</b><span>'+safe(x.name)+'</span><em>'+fmt(x.stack)+'</em>'+(x.myTurn&&x.id!==tableId?'<i>YOUR TURN</i>':'')+'</button>';
+ bar.hidden=mine.length<2;bar.innerHTML=mine.map(chip).join('')+(mine.length<(profile.maxTables||4)?'<button type="button" class="mtChip add" data-goto="lobby" title="Open another table">＋ Table</button>':'');
+ strip.hidden=mine.length<2;strip.innerHTML=mine.length>=2?'<span>Your tables</span>'+mine.map(chip).join(''):'';
+ // Your turn at a table that is not on screen: say so, in the tab title too.
+ const waiting=mine.filter(x=>x.myTurn&&x.id!==tableId);
+ if(waiting.length){if(!turnAlert){visuals.beep('turn');let on=false;turnAlert=setInterval(()=>{on=!on;document.title=on?'● Your turn · '+waiting[0].name:turnTitle;},900);}}
+ else if(turnAlert){clearInterval(turnAlert);turnAlert=null;document.title=turnTitle;}
+ // A seat held for you on a waiting list.
+ const offer=(profile.waitlists||[]).find(w=>w.offerUntil&&w.offerUntil>Date.now()),box=$('#seatOffer');
+ if(offer){box.hidden=false;box.innerHTML='<div><b>A seat is free at '+safe(offer.name)+'</b><span>It is held for you for <strong id="offerLeft"></strong>. Open the table and press JOIN.</span></div><button type="button" class="primary" data-goto="'+safe(offer.tableId)+'">Take the seat ↗</button><button type="button" class="ghostButton" data-wait="leave" data-wait-table="'+safe(offer.tableId)+'">No thanks</button>';
+  const tick=()=>{const n=$('#offerLeft');if(n)n.textContent=Math.max(0,Math.ceil((offer.offerUntil-Date.now())/1000))+' s';};tick();clearInterval(renderMyTables.t);renderMyTables.t=setInterval(tick,1000);
+  if(offerShown!==offer.tableId+offer.offerUntil){offerShown=offer.tableId+offer.offerUntil;visuals.beep('turn');}}
+ else{box.hidden=true;clearInterval(renderMyTables.t);}
+}
+document.addEventListener('click',async e=>{const g=e.target.closest('[data-goto]');if(g){e.preventDefault();e.stopPropagation();if(g.dataset.goto==='lobby'){leaveTableTab();return;}if(g.dataset.goto!==tableId)openTableTab(g.dataset.goto);return;}
+ const w=e.target.closest('[data-wait]');if(w){e.preventDefault();e.stopPropagation();try{const r=await api('table/'+w.dataset.waitTable+'/waitlist',{join:w.dataset.wait==='join'});if(w.dataset.wait==='join')toast('You are #'+r.position+' on the waiting list. We will hold a seat for you.');await refreshProfile();}catch(err){toast(err.message);}}},true);
+
+$('#guardForm').onsubmit=async e=>{e.preventDefault();try{await api('bots/settings',{dailyLimit:Number(e.target.dailyLimit.value)});toast('House protection saved');loadBots();}catch(err){toast(err.message);}};

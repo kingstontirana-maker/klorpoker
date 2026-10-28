@@ -122,8 +122,8 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .game .card.back .centerSuit{left:50%;top:50%;width:34%;height:34%;color:#e9d7a3}
 .game .card.blank{background:#ffffff08;border:1px dashed #ffffff1f;box-shadow:inset 0 0 12px #0003}
 .game .card.blank .centerSuit{left:50%;top:50%;width:30%;height:30%;color:#ffffff10}
-.game .card.winningCard{border:2px solid #9effcf;box-shadow:0 0 0 2px #2fe08c99,0 0 18px #2bff9daa,0 0 34px #12d77b66;z-index:5}
-.game .card.winningCard:after{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 20%,#c9ffe266 45%,transparent 70%);transform:translateX(-150%);animation:winnerShine 2.7s ease-in-out infinite;pointer-events:none}
+.game .card.winningCard{border-color:#9effcf;outline:2px solid #9effcf;outline-offset:-1px;box-shadow:0 0 0 2px #2fe08c99,0 0 18px #2bff9daa,0 0 34px #12d77b66;z-index:5}
+.game .card.winningCard:after{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 20%,#c9ffe266 45%,transparent 70%);transform:translateX(-150%);animation:none;display:none;pointer-events:none}
 .game .card.dimCard{opacity:.32;filter:grayscale(.6) brightness(.7)}
 .game .card.face{animation:faceReveal .32s ease-out backwards}
 

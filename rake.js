@@ -2,13 +2,18 @@
 export function rakeReport(db, user, now=Date.now()) {
   const ids=new Set([user.id]);
   for(let changed=true;changed;){changed=false;for(const u of db.users)if(ids.has(u.parentId)&&!ids.has(u.id)){ids.add(u.id);changed=true;}}
+  // Rake paid by bots is the house paying itself: it is not revenue and is listed apart.
+  const isBot=botCheck(db);
   const rows=db.ledger.filter(x=>x.type==='RAKE').flatMap(x=>{
-    const amount=user.role==='CENTER'?x.amount:(x.allocations||[]).filter(a=>ids.has(a.userId)).reduce((n,a)=>n+a.amount,0);
-    return amount>0?[{id:x.id,tableId:x.tableId,hand:x.hand??null,time:x.time,amount,legacy:!x.allocations}]:[];
+    const bot=user.role==='CENTER'?(x.allocations||[]).filter(a=>isBot(a)).reduce((n,a)=>n+a.amount,0):0;
+    const amount=user.role==='CENTER'?x.amount-bot:(x.allocations||[]).filter(a=>ids.has(a.userId)&&!isBot(a)).reduce((n,a)=>n+a.amount,0);
+    return amount>0||bot>0?[{id:x.id,tableId:x.tableId,hand:x.hand??null,time:x.time,amount,...(user.role==='CENTER'?{bot}:{}),legacy:!x.allocations}]:[];
   });
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'});
-  const today=day.format(now),total=rows.reduce((n,x)=>n+x.amount,0);
-  return {total,today:rows.filter(x=>day.format(x.time)===today).reduce((n,x)=>n+x.amount,0),hands:rows.length,rows:rows.slice(-100).reverse(),legacyTotal:rows.filter(x=>x.legacy).reduce((n,x)=>n+x.amount,0)};
+  const today=day.format(now),human=rows.filter(x=>x.amount>0),total=human.reduce((n,x)=>n+x.amount,0),botTotal=rows.reduce((n,x)=>n+(x.bot||0),0);
+  const todayRows=rows.filter(x=>day.format(x.time)===today);
+  return {total,today:todayRows.reduce((n,x)=>n+x.amount,0),hands:human.length,rows:rows.slice(-100).reverse(),legacyTotal:rows.filter(x=>x.legacy).reduce((n,x)=>n+x.amount,0),
+   ...(user.role==='CENTER'?{botTotal,botToday:todayRows.reduce((n,x)=>n+(x.bot||0),0),handsWithBots:rows.length}:{})};
 }
 
 // ---- Revenue report for CENTER / ADMIN / AGENT ----
@@ -22,9 +27,11 @@ const hourFmt=new Intl.DateTimeFormat('en-GB',{timeZone:TZ,hour:'2-digit',hourCy
 const validDay=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'));
 const addDays=(d,n)=>{const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);};
 const daysBetween=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/864e5)+1;
+// A rake allocation paid by a bot: flagged when written, or a bot account (older entries).
+export const botCheck=db=>{const bots=new Set(db.users.filter(u=>u.isBot).map(u=>u.id));return a=>!!a.bot||bots.has(a.userId);};
 export function isUnder(db,id,ancestorId){const byId=new Map(db.users.map(u=>[u.id,u]));for(let u=byId.get(id),i=0;u&&i<50;u=byId.get(u.parentId),i++)if(u.id===ancestorId)return true;return false;}
 
-export function revenueReport(db,viewer,{from,to,scope,detail=false}={},now=Date.now()){
+export function revenueReport(db,viewer,{from,to,scope,detail=false,includeBots=false}={},now=Date.now()){
  const byId=new Map(db.users.map(u=>[u.id,u]));
  const root=scope&&scope!==viewer.id?byId.get(scope):viewer;
  if(!root||!isUnder(db,root.id,viewer.id))throw Object.assign(Error('This report is not in your network'),{status:403});
@@ -41,11 +48,14 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false}={},now=Date
  const series=new Map();if(bucketMonth){for(let d=from;d<=to;d=addDays(d,1))series.set(d.slice(0,7),{key:d.slice(0,7),rake:0,hands:0});}else for(let d=from;d<=to;d=addDays(d,1))series.set(d,{key:d,rake:0,hands:0});
  const hours=Array.from({length:24},(_,h)=>({hour:h,rake:0,hands:0}));
  const children=new Map(),players=new Map(),tables=new Map(),recent=[],rows=[];
- for(const c of db.users.filter(u=>u.parentId===root.id&&u.role!=='CENTER'))children.set(c.id,{id:c.id,username:c.username,role:c.role,share:['ADMIN','AGENT'].includes(c.role)?pct(c.share):null,rake:0,earned:0,hands:new Set(),players:new Set()});
+ const isBot=botCheck(db);let botRake=0;const BOTS={id:'_bots',username:'Bots (house)',role:'BOTS'};
+ for(const c of db.users.filter(u=>u.parentId===root.id&&u.role!=='CENTER'&&!u.isBot))children.set(c.id,{id:c.id,username:c.username,role:c.role,share:['ADMIN','AGENT'].includes(c.role)?pct(c.share):null,rake:0,earned:0,hands:new Set(),players:new Set()});
  let total=0,hands=0,prevTotal=0,prevHands=0,earned=0,prevEarned=0,paid=0;const activePlayers=new Set();
  for(const x of rakes){
   const d=dayFmt.format(x.time),cur=d>=from&&d<=to,prev=d>=pFrom&&d<=pTo;if(!cur&&!prev)continue;
-  const parts=x.allocations?x.allocations.map(a=>({pid:a.userId,amount:a.amount,v:via(a.userId)})).filter(a=>a.v&&a.amount>0)
+  if(cur&&root.role==='CENTER')botRake+=(x.allocations||[]).filter(isBot).reduce((n,a)=>n+a.amount,0);
+  const withBots=includeBots&&root.role==='CENTER';
+  const parts=x.allocations?x.allocations.filter(a=>withBots||!isBot(a)).map(a=>({pid:a.userId,amount:a.amount,bot:isBot(a),v:isBot(a)?BOTS:via(a.userId)})).filter(a=>a.v&&a.amount>0)
    :root.role==='CENTER'?[{pid:null,amount:x.amount,v:null}]:[];
   const sum=parts.reduce((n,a)=>n+a.amount,0);if(!sum)continue;
   // What the root itself earned from this hand, and what went to members under it.
@@ -59,8 +69,8 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false}={},now=Date
   for(const a of parts){
    if(!a.pid){const k='_legacy';const c=children.get(k)||children.set(k,{id:null,username:'Unattributed (before detailed records)',role:'LEGACY',rake:0,hands:new Set(),players:new Set()}).get(k);c.rake+=a.amount;c.hands.add(x.id);continue;}
    activePlayers.add(a.pid);
-   const c=children.get(a.v.id)||children.set(a.v.id,{id:a.v.id,username:a.v.username,role:a.v.role,rake:0,hands:new Set(),players:new Set()}).get(a.v.id);c.rake+=a.amount;c.hands.add(x.id);c.players.add(a.pid);
-   const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:byId.get(a.pid)?.username||a.pid,...upline(a.pid),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
+   const c=children.get(a.v.id)||children.set(a.v.id,{id:a.v.id==='_bots'?null:a.v.id,username:a.v.username,role:a.v.role,rake:0,hands:new Set(),players:new Set()}).get(a.v.id);c.rake+=a.amount;c.hands.add(x.id);c.players.add(a.pid);
+   const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:byId.get(a.pid)?.username||a.pid,...(a.bot?{agent:null,admin:null,bot:true}:upline(a.pid)),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
    if(detail&&rows.length<20000)rows.push({time:x.time,table:t.name,hand:x.hand??null,player:p.username,agent:p.agent,admin:p.admin,amount:a.amount});
   }
   recent.push({time:x.time,table:t.name,tableId:x.tableId,hand:x.hand??null,amount:sum,parts:parts.map(a=>({player:a.pid?byId.get(a.pid)?.username||a.pid:null,amount:a.amount}))});
@@ -68,7 +78,7 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false}={},now=Date
  const share=n=>total?Math.round(n/total*1000)/10:0;
  const path=[];for(let u=root,i=0;u&&i<50;u=byId.get(u.parentId),i++){path.unshift({id:u.id,username:u.username,role:u.role});if(u.id===viewer.id)break;}
  return {from,to,days,bucket:bucketMonth?'month':'day',root:{id:root.id,username:root.username,role:root.role,share:['ADMIN','AGENT'].includes(root.role)?pct(root.share):null},path,
-  totals:{rake:total,earned,paidToNetwork:paid,hands,players:activePlayers.size,tables:tables.size,avgPerHand:hands?Math.round(total/hands):0},
+  totals:{rake:total,earned,paidToNetwork:paid,...(root.role==='CENTER'?{botRake,includeBots:!!includeBots}:{}),hands,players:activePlayers.size,tables:tables.size,avgPerHand:hands?Math.round(total/hands):0},
   previous:{from:pFrom,to:pTo,rake:prevTotal,earned:prevEarned,hands:prevHands},
   series:[...series.values()],hours,
   byChild:[...children.values()].map(c=>({id:c.id,username:c.username,role:c.role,rake:c.rake,earned:c.earned||0,sharePct:c.share??null,hands:c.hands.size,players:c.players.size,share:share(c.rake)})).sort((a,b)=>b.rake-a.rake||a.username.localeCompare(b.username)),

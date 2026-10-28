@@ -443,3 +443,47 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Transactions:** historia e portofolit të lojtarit (krediti nga agjenti, buy-in/dalje nga tavolina, depozita/tërheqje crypto). **Change password** tani edhe për lojtarët.
 - Menuja mbyllet me klik jashtë ose Esc; në celular hapet në gjithë gjerësinë.
 - **QR code:** te depozita lojtari sheh QR-në e adresës së wallet-it (skanohet me çdo wallet celulari); shuma unike mbetet e shkruar e madhe sipër. Te "Withdrawals to pay" qendra sheh QR-në e adresës së lojtarit për ta paguar duke skanuar. Gjeneruesi është i yni (`public/qr.js`, ISO 18004: byte mode, nivel M, versionet 1–10, zgjedhje automatike e maskës), sepse politika e sigurisë së faqes nuk lejon skripte të jashtme; `qr.test.js` e verifikon me vlerat zyrtare (Reed-Solomon "HELLO WORLD" 1-M, format/version info, alignment, kapaciteti).
+
+## Rake-u dhe botët
+- **Paratë:** botët paguajnë rake si çdo lojtar (loja është identike për lojtarët realë) dhe ai rake shkon te qendra. Çdo regjistrim RAKE shënon pjesën e botëve (bot: true).
+- **Ndërprerësi "Include bot rake"** (vetëm qendra, te **Revenue** dhe te **Rake**): i fikur = shifrat vetëm me rake-un e lojtarëve realë; i ndezur = shtohet edhe rake-u i botëve (te Revenue si grupi "Bots (house)"). Ndryshon menjëherë, edhe në rifreskimin live; pranë tij del shuma e botëve ("€X from bots not shown" / "incl. €X from bots"). Zgjedhja mbahet mend në atë browser.
+- **Adminët dhe agjentët** shohin dhe marrin përqindje vetëm nga lojtarët e tyre realë; botët nuk u përzihen kurrë.
+- **Paneli Bots:** chips, rake i paguar, rezultati për shtëpinë (chips + rake).
+
+## Letrat statike
+- Kur hapen letrat (flop/turn/river, showdown), kur shpërndahen letrat e tua dhe kur bën fold, numrat dhe simbolet nuk lëvizin më: letrat e hapura shfaqen në vend me një fade të shkurtër, pa rrotullim 3D, zmadhim apo zhvendosje. Vetëm letrat me shpinë (pa simbole) vijnë nga dealer-i. Letrat fituese kanë një shkëlqim statik (pa vijën që lëviz) dhe kufiri nuk ndryshon trashësi.
+
+## Çfarë i mungon platformës (analizë)
+**Kritike para parave reale:** (1) faqet Terms of Service, Privacy Policy dhe Responsible Gaming; (2) backup automatik i `state.json` dhe `hands.jsonl` (sot vetëm një kopje në disk); (3) "Forgot password" — llogaritë nuk kanë email/telefon, fjalëkalimin e rikthen vetëm menaxheri; (4) 2FA për qendrën dhe adminët (qendra kontrollon paratë dhe wallet-in); (5) fjalëkalimet e vjetra në historinë publike të git; (6) mjete loje të përgjegjshme: limite depozite, self-exclusion, kujtues kohe; (7) kontroll moshe/identiteti dhe licencë sipas vendit.
+**Të rëndësishme:** historia e duarve për vetë lojtarin; lista pritjeje kur tavolina është plot; shumë tavolina njëherësh (sot vetëm një); turnetë / Sit & Go (tab-i ekziston, motori jo); njoftime (Telegram/email) për depozitat, tërheqjet dhe tavolinat; mute/report në chat; strategji më e mirë për botët; databazë e vërtetë (SQLite/Postgres) në vend të një JSON-i që rishkruhet i tëri në çdo ruajtje.
+**Të mira për t'u pasur:** foto profili/avatar; statistika lojtari; VIP/rakeback; ante/straddle, PLO Hi-Lo; aplikacion PWA me service worker; disa gjuhë (anglisht + shqip).
+
+## Disa tavolina njëherësh dhe lista e pritjes
+- **Deri në 4 tavolina** për lojtar (`MAX_TABLES`), çdo tavolinë me buy-in-in e vet; jo dy herë në të njëjtën tavolinë.
+- **Kalimi mes tavolinave:** vetëm kur lojtari është në 2 ose më shumë tavolina, në tavolinë del shiriti me tavolinat e tua (lojë, emër, stack) dhe "＋ Table"; në lobby "Your tables". Kur të vjen radha në një tavolinë që nuk është në ekran, chip-i i saj ndizet në ari me "YOUR TURN", titulli i tab-it pulson dhe bie zilja (nëse tingulli është ndezur). Kur kthehesh në lobby mbetesh i ulur.
+- **Prania:** sa kohë një tab i lojtarit është në ekran, të gjitha vendet e tij llogariten "present" (nuk kalon "away" në tavolinat e tjera). Rregulli i timeout-it mbetet: nëse nuk vepron brenda 30 s kur të vjen radha, bën fold/check dhe kalon në pushim.
+- **Lista e pritjes:** te tavolinat plot lobby tregon "Wait for a seat · N" (ose "#2 in line ✕" për t'u hequr) dhe "Watch". Kur lirohet një vend, mbahet 45 s për të parin në listë: del njoftimi "A seat is free at … · Take the seat" me numërim mbrapsht; askush tjetër (as botët) nuk e zë vendin e fundit të lirë gjatë asaj kohe. Nëse nuk e zë, vendi i shkon tjetrit dhe ai del nga lista.
+- Testet: `waitlist.test.js` (4 tavolina, radha, vendi i mbajtur, skadimi, dy vende të lira). 77/77.
+
+## Dritarja "Out of chips" (rimbushja në tavolinë)
+- **Hapet vetëm një herë** për çdo rast pa chips; pasi shton chips (ose largohesh) nuk rihapet më nga përditësimet e vonuara të tavolinës, dhe mbyllet vetë kur nuk vlen më.
+- **Gjithmonë e saktë dhe e përditësuar:** tregon **wallet-in** (rifreskohet çdo 3 s, edhe pas një depozite crypto), **sa ke në tavolinë**, **sa mund të shtosh** (nga 1 big blind deri te maksimumi i tavolinës, jo më shumë se wallet-i) dhe numërimin mbrapsht. Shiriti lëviz vetëm brenda kufijve të lejuar; butonat Min · ½ · Max.
+- Nëse wallet-i nuk mjafton: mesazh i qartë + "＋ Deposit to my wallet"; edhe butoni "Leave the table". E njëjta pamje (wallet, stack, kufijtë) edhe kur ulesh ose shton chips me "＋".
+
+## Botët: strategji e re + mbrojtje e shtëpisë
+- **Nuk ka bot të ndershëm që nuk humb kurrë**; boti nuk sheh letrat e askujt dhe nuk manipulon rezultatin. Mbrojtja e platformës bëhet me tre mjete:
+- **Strategji me equity:** boti llogarit shansin e vet të fitores duke luajtur dorën qindra herë kundër letrave të rastësishme (vetëm letrat e veta + board-i janë të njohura; letrat e kundërshtarëve nuk shihen kurrë) dhe e krahason me pot odds + një diferencë sigurie; vë para vetëm kur ka avantazh matematikor, bën bet për vlerë me duar të forta, bluf rrallë, nuk rrezikon pjesën më të madhe të stack-ut pa dorë shumë të fortë. Simulim (€/100 duar, €1/€2): kundër lojtarëve që bëjnë call shumë Hold'em +594 → +1625; kundër agresivëve −531 → +6480; kundër lojtarëve të disiplinuar afër barazimit (−120 → −235, me luhatje të madhe).
+- **Mbrojtja e shtëpisë:** limit ditor humbjeje për të gjithë botët bashkë (chips + rake i kthyer te qendra, ditë sipas orës së Tiranës). Kur arrihet, të gjithë botët ndalojnë dhe ngrihen; nesër nisin vetë. Paneli tregon rezultatin e ditës dhe gjendjen.
+- **Modaliteti "Seat only":** boti ulet dhe mbush vendin, por kalon menjëherë në sit-out para çdo dore — nuk paguan blinds dhe **nuk humb asnjë cent** (test me 80 duar).
+- Testet: equity (AA ≈ 85%), seat-only 0 humbje, limiti ditor ndal të gjithë botët. 79/79.
+- **Rregullim kundër all-in-eve (pas testit të qendrës):** boti nuk bën më fold të tepërt kundër all-in: paguan kur shansi i tij kalon çmimin (pot odds); pasi ka futur ≥ 1/3 e stack-ut në pot "mbron" chips-at; mban mend kush shkon all-in shpesh (nga veprimet që shihen nga të gjithë) dhe kundër tij vendos vetëm pot odds. Bluf-et janë të vogla (≤ 10% e stack-ut) që të mos humbasë shuma të mëdha. Matje pa fat (EV, heads-up €1/€2, €100): kundër "all-in në çdo dorë" +327 → **+741 €/100 duar** (paguan 55% të rasteve në vend të 18%). Disa duar mund të humben gjithmonë nga fati; limiti ditor i shtëpisë mbetet mbrojtja e garantuar.
+
+## Tab tjetër ≠ largim
+- **Problemi:** kur lojtari kalonte në një tab tjetër, faqja mbyllte lidhjen live; serveri e merrte si largim dhe pas pak sekondash e nxirrte "sit out" — me dy lojtarë dora nuk shpërndahej më.
+- **Tani:** lidhja live mbetet e hapur edhe kur tab-i është në sfond, dhe çdo lojtar me lidhje të hapur llogaritet i pranishëm në të gjitha vendet e tij. "Away" ndodh vetëm kur faqja mbyllet ose interneti bie.
+- **Limiti kohor:** kur skadon koha e veprimit, timer-i bën check (nëse është falas) ose fold për lojtarin dhe loja vazhdon — nuk e kalon më në pushim. Nëse ndodh në 3 duar radhazi, vendi mbyllet dhe chips-at kthehen në portofol (paralajmërim në tavolinë: "Timed out: x/3 hands").
+- Verifikim: lojtari me tab-in e fshehur për 75 s nuk kaloi asnjëherë në sit out dhe duart vazhduan. Testet 81/81.
+
+## Tingujt e tavolinës
+- Skedarët e qendrës në `public/sounds/`: `fold.m4a` (fold, edhe automatik), `check.m4a` (check, edhe automatik), `bet.m4a` (call, raise, bet, blinds; edhe më butë kur chips-at shkojnë në pot), `allin.m4a` (all-in dhe kur fituesi merr chips-at e pot-it), `card.m4a` (çdo letër: secila nga 3 letrat e flop-it, turn, river, shpërndarja dhe hapja e letrave).
+- Tingulli është i ndezur si parazgjedhje dhe nis me prekjen e parë (browser-at nuk lejojnë audio para saj); lojtari mund ta fikë te "⋯ → Sound" dhe zgjedhja mbahet mend. Ziljet "radha jote" dhe "koha po mbaron" mbeten si më parë.

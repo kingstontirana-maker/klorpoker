@@ -9,6 +9,11 @@ export const ACTION_MS=30000,BETWEEN_HANDS_MS=8000,RESULT_REVEAL_MS=8000,REBUY_W
 // A seated player whose browser stops checking in is protected: sat out after
 // AWAY_MS, cashed out to the wallet after AWAY_CASHOUT_MS.
 export const AWAY_MS=25000,AWAY_CASHOUT_MS=3*60000;
+// A player may sit at up to MAX_TABLES tables at once. When a full table frees a
+// seat, the first player on its waiting list has WAIT_OFFER_MS to take it.
+export const MAX_TABLES=4,WAIT_OFFER_MS=45000;
+// A player whose action timer runs out in three hands in a row is cashed out.
+export const INACTIVE_HANDS=3;
 // Only players whose screen is connected are dealt in: no check-in for PRESENT_MS
 // at the start of a hand means they are sat out before any blind is taken.
 export const PRESENT_MS=12000;
@@ -68,8 +73,23 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
  // Bets in front of the players slide into the middle at the end of a round.
  function collect(t){const bets=Object.fromEntries(t.seats.filter(s=>s?.roundBet>0).map(s=>[s.userId,clean(s.roundBet)]));if(Object.keys(bets).length)visual(t,'collect',{bets});}
 
- function cashOutSeat(t,index,reason){const s=t.seats[index];if(!s)return;const u=findUser(s.userId);if(u){u.balance+=s.stack;u.tableExit={tableId:t.id,reason,at:Date.now()};}db.ledger.push({id:uid(),type:'CASH_OUT',to:s.userId,tableId:t.id,amount:s.stack,reason,time:Date.now()});t.seats[index]=null;event(t,`${s.username} left · ${exitNames[reason]||reason}`);visual(t,'leave',{userId:s.userId,position:index,reason});}
- function removeInactive(t){for(let i=0;i<t.seats.length;i++)if((t.seats[i]?.inactiveHands||0)>=2)cashOutSeat(t,i,'INACTIVE');}
+ function cashOutSeat(t,index,reason){const s=t.seats[index];if(!s)return;const u=findUser(s.userId);if(u){u.balance+=s.stack;u.tableExit={tableId:t.id,reason,at:Date.now()};}db.ledger.push({id:uid(),type:'CASH_OUT',to:s.userId,tableId:t.id,amount:s.stack,reason,time:Date.now()});t.seats[index]=null;event(t,`${s.username} left · ${exitNames[reason]||reason}`);visual(t,'leave',{userId:s.userId,position:index,reason});offerNext(t);}
+ // ---- Waiting list ----
+ function offerNext(t,now=Date.now()){
+  if(t.waitOffer&&t.waitOffer.until>now&&t.seats.some(s=>!s))return;
+  // An offer that ran out drops that player; the seat goes to the next one.
+  if(t.waitOffer){if(t.waitOffer.until<=now)t.waitlist=(t.waitlist||[]).filter(w=>w.userId!==t.waitOffer.userId);t.waitOffer=null;}
+  if(!t.waitlist?.length||!t.seats.some(s=>!s))return;
+  const w=t.waitlist[0];t.waitOffer={userId:w.userId,username:w.username,until:now+WAIT_OFFER_MS};event(t,`A seat is held for ${w.username} (waiting list)`);}
+ function joinWaitlist(t,u){
+  if(u.role!=='USER'||u.isBot)fail('Only players can join the waiting list',403);
+  if(t.seats.some(s=>s?.userId===u.id))fail('You are already seated at this table');
+  t.waitlist??=[];if(t.seats.some(s=>!s)&&!t.waitlist.length)fail('A seat is free: sit down directly');
+  if(!t.waitlist.some(w=>w.userId===u.id))t.waitlist.push({userId:u.id,username:u.username,at:Date.now()});
+  offerNext(t);return {ok:true,position:t.waitlist.findIndex(w=>w.userId===u.id)+1};}
+ function leaveWaitlist(t,u){t.waitlist=(t.waitlist||[]).filter(w=>w.userId!==u.id);if(t.waitOffer?.userId===u.id){t.waitOffer=null;offerNext(t);}return {ok:true};}
+ const waitInfo=(t,userId)=>{const list=t.waitlist||[],i=list.findIndex(w=>w.userId===userId);return {count:list.length,position:i>=0?i+1:null,offerUntil:t.waitOffer?.userId===userId?t.waitOffer.until:null};};
+ function removeInactive(t){for(let i=0;i<t.seats.length;i++)if((t.seats[i]?.inactiveHands||0)>=INACTIVE_HANDS)cashOutSeat(t,i,'INACTIVE');}
  function commit(t,s,n){s.stack-=n;s.roundBet+=n;s.committed+=n;t.pot+=n;s.allIn=s.stack===0;}
 
  // Back to an empty felt: no board, no cards, no result, no pot.
@@ -164,7 +184,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   for(const s of t.seats)if(s&&s.stack<t.bb&&!s.rebuyDeadline){s.rebuyAvailableAt=t.lastResult.at+RESULT_REVEAL_MS;s.rebuyDeadline=s.rebuyAvailableAt+REBUY_WINDOW_MS;}
   // Rake is split at once: each admin/agent receives its percentage of the rake its
   // players paid (revenue share), the centre keeps the rest. The split is stored.
-  if(result.totalRake){const allocations=Object.entries(result.rakeContributions).map(([userId,amount])=>({userId,amount})),split=rakeShares(db,allocations);db.users.find(u=>u.role==='CENTER').balance+=split.center;for(const sh of split.shares){const r=findUser(sh.userId);if(r)r.balance+=sh.amount;}for(const [id,c] of Object.entries(split.carry)){const r=findUser(id);if(r)r.shareCarry=c;}db.ledger.push({id:uid(),type:'RAKE',tableId:t.id,hand:t.hand,amount:result.totalRake,allocations,...(split.shares.length?{shares:split.shares}:{}),time:Date.now()});}
+  if(result.totalRake){const allocations=Object.entries(result.rakeContributions).map(([userId,amount])=>({userId,amount,...(t.seats.find(s=>s?.userId===userId)?.isBot?{bot:true}:{})})),botRake=allocations.filter(a=>a.bot).reduce((n,a)=>n+a.amount,0),split=rakeShares(db,allocations);db.users.find(u=>u.role==='CENTER').balance+=split.center;for(const sh of split.shares){const r=findUser(sh.userId);if(r)r.balance+=sh.amount;}for(const [id,c] of Object.entries(split.carry)){const r=findUser(id);if(r)r.shareCarry=c;}db.ledger.push({id:uid(),type:'RAKE',tableId:t.id,hand:t.hand,amount:result.totalRake,allocations,...(botRake?{botRake}:{}),...(split.shares.length?{shares:split.shares}:{}),time:Date.now()});}
   save();onSettle();
  }
 
@@ -193,13 +213,16 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    event(t,`${s.username} ${opening?'bets':'raises to'} ${eur(target)}${s.allIn?' · all-in':''}`);
   }
   else fail('Invalid action');
-  if(automatic){if(s.lastTimeoutHand!==t.hand){s.inactiveHands=(s.inactiveHands||0)+1;s.lastTimeoutHand=t.hand;}if(!s.sittingOut){s.sittingOut=true;s.sitOutSince=Date.now();s.timedOut=true;event(t,`${s.username} did not act in time · sitting out until they return`);}}else{s.inactiveHands=0;s.lastTimeoutHand=null;s.lastSeen=Date.now();}
+  if(automatic){if(s.lastTimeoutHand!==t.hand){s.inactiveHands=(s.inactiveHands||0)+1;s.lastTimeoutHand=t.hand;}}else{s.inactiveHands=0;s.lastTimeoutHand=null;s.lastSeen=Date.now();}
   progress(t);save();
  }
 
  function sit(t,u,position,buyin,allTables){
   if(u.role!=='USER')fail('Only players can play',403);
-  if(allTables.some(room=>room.seats.some(s=>s?.userId===u.id)))fail('You are already seated at a table');
+  if(t.seats.some(s=>s?.userId===u.id))fail('You are already seated at this table');
+  if(allTables.filter(room=>room.seats.some(s=>s?.userId===u.id)).length>=MAX_TABLES)fail(`You can play at most ${MAX_TABLES} tables at the same time`);
+  // While a seat is held for the waiting list, the last free seat is kept for that player.
+  if(t.waitOffer&&t.waitOffer.until>Date.now()&&t.waitOffer.userId!==u.id&&t.seats.filter(s=>!s).length<=1)fail('This seat is held for the next player on the waiting list');
   const pos=Number(position),amount=money(buyin),limits=buyinLimits(t);
   if(!Number.isInteger(pos)||pos<0||pos>=6||t.seats[pos])fail('That seat is taken');
   if(!Number.isSafeInteger(amount)||amount<limits.min||amount>limits.max||u.balance<amount)fail(`Invalid buy-in (${eur(limits.min)}–${eur(limits.max)})`);
@@ -207,6 +230,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   // Joining a running game requires a live big blind before the first hand.
   const running=t.hand>0&&t.seats.filter(s=>eligible(t,s)).length>=2;
   t.seats[pos]={id:u.id,userId:u.id,username:u.username,isBot:!!u.isBot,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
+  if(t.waitlist?.length){t.waitlist=t.waitlist.filter(w=>w.userId!==u.id);if(t.waitOffer?.userId===u.id)t.waitOffer=null;offerNext(t);}
   db.ledger.push({id:uid(),type:'BUY_IN',from:u.id,tableId:t.id,amount,time:Date.now()});event(t,`${u.username} sat down in seat ${pos+1}${LIVE.includes(t.phase)?' · plays from the next hand':''}`);save();
  }
 
@@ -282,6 +306,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    nextHandAt:['waiting','finished'].includes(t.phase)&&ready>=2?Math.max(t.lastActionAt+BETWEEN_HANDS_MS,Date.now()):null,
    legalActions:{canRaise:!!mine&&canRaise(t,mine),isBet:t.currentBet===0,toCall:clean(mine?toCall(t,mine):0),minRaiseTo:clean(t.currentBet+t.minRaise),maxRaiseTo:clean(mine?maxRaiseTo(t,mine):0),potLimit:game==='omaha'},
    serverNow:Date.now(),actionDeadline:t.turn>=0?t.deadline:null,actionDuration:t.turn>=0?t.deadline-t.turnStartedAt:ACTION_MS,runout:!!t.runout,timeBank:Math.floor((mine?.timeBank||0)/1000),chat:t.chat,
+   waitlist:waitInfo(t,userId),
    rebuyAvailableAt:mine?.rebuyAvailableAt||null,rebuyDeadline:mine?.rebuyDeadline||null,
    sittingOut:!!mine?.sittingOut,timedOut:!!mine?.timedOut,leaving:!!mine?.leaveAfterHand,mustPost:!!mine?.mustPost,
    canShow:!!mine&&t.phase==='finished'&&!!result&&mine.cards.length>0&&!shown.has(mine.id),
@@ -297,6 +322,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
  function tickTable(t,now=Date.now()){
   let changed=false;
   const real=Date.now();
+  if(t.waitOffer&&now>=t.waitOffer.until){offerNext(t,now);changed=true;}
   for(let i=0;i<t.seats.length;i++){const s=t.seats[i];if(!s)continue;const idle=!s.inHand||!LIVE.includes(t.phase);
    if(!s.sittingOut&&real-(s.lastSeen??real)>=AWAY_MS){markAway(t,s);changed=true;}
    if(s.autoSitOut&&real-s.sitOutSince>=AWAY_CASHOUT_MS&&idle){cashOutSeat(t,i,'DISCONNECTED');changed=true;continue;}
@@ -305,7 +331,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    else if(t.phase==='waiting'){s.idleSince??=now;if(now-s.idleSince>=IDLE_TABLE_MS){cashOutSeat(t,i,'IDLE_TABLE');changed=true;}}
    else delete s.idleSince;}
   if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}if(t.turn>=0&&(now>=t.deadline||t.seats[t.turn].autoSitOut))act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}
-  if(now-t.lastActionAt>=BETWEEN_HANDS_MS){if(t.seats.some(s=>(s?.inactiveHands||0)>=2)){removeInactive(t);changed=true;}if(t.seats.filter(s=>eligible(t,s)).length>=2){startHand(t);changed=true;}else if(t.phase==='finished'||t.board.length||t.seats.some(s=>s?.cards.length)){clearTable(t);changed=true;}}
+  if(now-t.lastActionAt>=BETWEEN_HANDS_MS){if(t.seats.some(s=>(s?.inactiveHands||0)>=INACTIVE_HANDS)){removeInactive(t);changed=true;}if(t.seats.filter(s=>eligible(t,s)).length>=2){startHand(t);changed=true;}else if(t.phase==='finished'||t.board.length||t.seats.some(s=>s?.cards.length)){clearTable(t);changed=true;}}
   if(changed)save();
  }
 
@@ -337,5 +363,5 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    events:t.events.slice(0,8)};
  }
 
- return {makeTable,startHand,act,sit,leave,rebuy,sitOut,away,show,useTimeBank,chat,snapshot,tickTable,cashOutSeat,buyinLimits,inspect};
+ return {joinWaitlist,leaveWaitlist,waitInfo,makeTable,startHand,act,sit,leave,rebuy,sitOut,away,show,useTimeBank,chat,snapshot,tickTable,cashOutSeat,buyinLimits,inspect};
 }
