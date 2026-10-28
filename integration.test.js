@@ -190,6 +190,24 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.equal((await call('tables/color',tokens[2],{id:made.data.id,color:'#1d4fb3'})).status,403,'only the centre recolours');
      assert.equal((await call('tables/color',tokens[0],{id:made.data.id,color:'#1d4fb3'})).status,200);
      assert.equal(runtime.get(made.data.id).color,'#1d4fb3');}
+    // The centre edits or closes a table; blinds and game change only while it is empty.
+    {const id=(await call('tables/create',tokens[0],{name:'Temp',sb:1,bb:2})).data.id,t=runtime.get(id);
+     assert.equal((await call('tables/update',tokens[1],{id,name:'X'})).status,403,'only the centre edits tables');
+     assert.equal((await call('tables/update',tokens[0],{id,name:'Sapphire',sb:2,bb:5,game:'omaha'})).status,200);
+     assert.deepEqual([t.name,t.sb,t.bb,t.minRaise,t.game],['Sapphire',200,500,500,'omaha']);
+     assert.equal((await call('tables/update',tokens[0],{id,sb:2,bb:3})).status,400,'big blind at least twice the small blind');
+     assert.equal((await call('tables/update',tokens[0],{id,name:'   '})).status,400);
+     assert.equal((await call('tables/update',tokens[0],{id:'nope',name:'X'})).status,404);
+     // A seated player (same shape as the engine's seats; sitting out so no hand starts).
+     t.seats[2]={userId:'ghost',username:'ghost',isBot:false,position:2,stack:500,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:false,sittingOut:true,sitOutSince:Date.now(),lastSeen:Date.now(),timeBank:0};
+     assert.equal((await call('tables/update',tokens[0],{id,sb:1,bb:2})).status,400,'blinds locked while someone is seated');
+     assert.equal((await call('tables/update',tokens[0],{id,name:'Sapphire Two'})).status,200,'renaming is always allowed');assert.equal(t.name,'Sapphire Two');
+     assert.equal((await call('tables/delete',tokens[0],{id})).status,400,'an occupied table stays open');
+     t.seats[2]=null;
+     assert.equal((await call('tables/delete',tokens[2],{id})).status,403);
+     assert.equal((await call('tables/delete',tokens[0],{id})).status,200);
+     assert.equal(runtime.has(id),false);assert.ok(!(await call('state',tokens[0])).data.tables.some(x=>x.id===id),'gone from the lobby');
+     assert.equal((await call('tables/delete',tokens[0],{id})).status,404);}
     // Revenue share: centre → admin (≤100%), admin → agent (≤ its own); lowering an admin caps its agents.
     {assert.equal((await call('users/share',tokens[0],{userId:'1',share:20})).status,200);
      assert.equal((await call('users/share',tokens[1],{userId:'2',share:25})).status,400,'an agent never above its admin');

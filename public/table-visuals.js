@@ -9,13 +9,16 @@ const suitShapes={
  c:'<circle cx="50" cy="27" r="20"/><circle cx="29" cy="55" r="20"/><circle cx="71" cy="55" r="20"/><path d="M45 53H55L59 90H41Z"/>'
 };
 const suitIcon=suit=>`<svg class="centerSuit" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true" fill="currentColor">${suitShapes[suit]}</svg>`;
-const cardIndex=(rank,suit,bottom=false)=>`<span class="cardCorner ${bottom?'bottomCorner':''}" aria-hidden="true"><svg class="cornerArtwork" viewBox="0 0 20 34" fill="currentColor"><text x="10" y="14" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700">${rank}</text><svg x="4" y="19" width="12" height="12" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" fill="currentColor">${suitShapes[suit]}</svg></svg></span>`;
+// The card face: a large rank with its suit in the top-left corner and one large suit
+// in the bottom-right, so the whole card is used and reads at a glance at every size.
+// Overlapping cards (Omaha) still show the corner. "10" is narrowed to fit the corner.
+const cardIndex=(rank,suit)=>`<span class="cardCorner" aria-hidden="true"><svg class="cornerArtwork" viewBox="0 0 24 42" fill="currentColor"><text x="12" y="19.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="700"${rank==='10'?' textLength="23" lengthAdjust="spacingAndGlyphs"':''}>${rank}</text><svg x="2.5" y="23" width="19" height="19" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" fill="currentColor">${suitShapes[suit]}</svg></svg></span>`;
 export function renderCard(code,{winning=false,dim=false,index=0}={}){
  if(!code)return `<div class="card blank" aria-label="Card not dealt yet">${suitIcon('s')}</div>`;
  if(code==='BACK')return `<div class="card back" style="--deal-index:${index}" aria-label="Hidden card">${suitIcon('s')}</div>`;
  if(!/^[2-9TJQKA][cdhs]$/.test(code))return renderCard(null);
  const rank=code[0]==='T'?'10':code[0],suit=code[1];
- return `<div class="card face ${'hd'.includes(suit)?'red':''} ${winning?'winningCard':''} ${dim?'dimCard':''}" data-card="${escape(code)}" data-suit="${suit}" style="--deal-index:${index}" aria-label="${escape(rank+symbols[suit])}${winning?' · winning hand':''}">${cardIndex(rank,suit)}${suitIcon(suit)}${cardIndex(rank,suit,true)}</div>`;
+ return `<div class="card face ${'hd'.includes(suit)?'red':''} ${winning?'winningCard':''} ${dim?'dimCard':''}" data-card="${escape(code)}" data-suit="${suit}" style="--deal-index:${index}" aria-label="${escape(rank+symbols[suit])}${winning?' · winning hand':''}">${cardIndex(rank,suit)}${suitIcon(suit)}</div>`;
 }
 export const denominations=[{cents:100000,color:'gold'},{cents:50000,color:'violet'},{cents:10000,color:'black'},{cents:2500,color:'green'},{cents:500,color:'red'},{cents:100,color:'blue'},{cents:25,color:'white'},{cents:5,color:'red'},{cents:1,color:'white'}];
 export function splitChips(amount){let remaining=Math.max(0,Math.round(Number(amount)*100));if(!Number.isSafeInteger(remaining))return [];const result=[];for(const d of denominations){const count=Math.floor(remaining/d.cents);if(count){result.push({...d,count});remaining%=d.cents;}}return result;}
@@ -37,7 +40,7 @@ export class TableVisuals {
   async play(e,t,generation){if(this.state?.hand!==e.hand)return;
     const seatNode=id=>this.root.querySelector(`[data-seat-user="${id||''}"]`);
     const seat=seatNode(e.userId)?.querySelector('.avatarWrap');
-    const pot=this.root.querySelector('#potChips')||this.root.querySelector('.pot'),potBox=this.root.querySelector('.pot');
+    const potBox=this.root.querySelector('.pot'),potChips=this.root.querySelector('#potChips'),pot=potChips?.getClientRects().length?potChips:potBox;
     // A bet slides from the player to the chips in front of them.
     if(e.type==='bet'&&e.amount>0&&seat){if(e.label==='ALL-IN')this.beep('allin');else if(!['SB','BB','POST'].includes(e.label))this.beep('bet');const spot=this.betSpot(seatNode(e.userId));await this.fly(seat,spot||pot,e.amount,0,420);}
     // End of a betting round: every stack in front of a player is pulled into the pot.
@@ -131,11 +134,18 @@ export function preActionFor(choice,toCall){if(choice==='checkFold')return toCal
 
 // Seat, bet-spot and dealer-button coordinates (percent of the felt) for the
 // player-relative positions 0..5; position 3 is always the local player.
-export function seatLayout(portrait=false,phone=false){
+// A bet entry may carry an alignment: 'start' puts its left edge on the point, 'end' its
+// right edge, so a long amount grows away from the nearest name plate.
+export function seatLayout(portrait=false,phone=false,narrow=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action
  // buttons own the bottom-right corner.
- if(phone&&!portrait)return {seats:[[50,-3],[93,24],[93,67],[50,97],[7,67],[7,24]],bets:[[64,22],[74,40],[74,60],[37,83],[26,60],[26,40]],dealer:[[38,18],[82,44],[82,54],[62,85],[18,54],[18,44]]};
+ // Side bets sit beside the cards, above or below the board, never on it; the dealer
+ // button sits in the gap next to its seat. (Checked from 568x320 to 932x430.)
+ if(phone&&!portrait)return {seats:[[50,-3],[93,24],[93,67],[50,97],[7,67],[7,24]],bets:[[62,20],[76.7,28,'end'],[76.7,70.5,'end'],[40.1,83,'end'],[23.3,70.5,'start'],[23.3,28,'start']],dealer:[[38,18],[82,40],[82,50.5],[63,83],[18,50.5],[18,40]]};
+ // Narrow upright windows: the top player's bet sits under the name plate, the side bets
+ // grow toward the middle, and the dealer button is beside the seat, never on it.
+ if(portrait&&narrow)return {seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[50,25.5],[80.5,25.5,'end'],[85,63,'end'],[50,67.5],[15,63,'start'],[19.5,25.5,'start']],dealer:[[26,12.5],[81,9],[81,75],[76,86],[19,75],[19,9]]};
  return portrait?{seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[66,17],[70,36],[76,63],[50,63],[24,63],[30,36]],dealer:[[34,12],[84,9],[84,86],[74,86],[16,86],[16,9]]}
   :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[77,32],[77,68],[36,74],[23,68],[23,32]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
 }

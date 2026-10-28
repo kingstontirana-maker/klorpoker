@@ -60,9 +60,9 @@ test('a short room cannot shrink the felt until JOIN buttons overlap',()=>{
  }
 });
 
-test('all 52 cards use matching SVG suits and two rank indices',()=>{
+test('all 52 cards use matching SVG suits and one large rank index',()=>{
  for(const suit of 'cdhs')for(const rank of '23456789TJQKA'){
-  const html=renderCard(rank+suit);assert.match(html,new RegExp('data-suit="'+suit+'"'));assert.equal((html.match(/class="cornerArtwork"/g)||[]).length,2);assert.equal((html.match(/class="centerSuit"/g)||[]).length,1);assert.equal((html.match(/<text /g)||[]).length,2);assert.equal(html.includes('face red'),suit==='h'||suit==='d');assert.equal((html.match(/>10<\/text>/g)||[]).length,rank==='T'?2:0);
+  const html=renderCard(rank+suit);assert.match(html,new RegExp('data-suit="'+suit+'"'));assert.equal((html.match(/class="cornerArtwork"/g)||[]).length,1);assert.equal((html.match(/class="centerSuit"/g)||[]).length,1);assert.equal((html.match(/<text /g)||[]).length,1);assert.equal(html.includes('face red'),suit==='h'||suit==='d');assert.equal((html.match(/>10<\/text>/g)||[]).length,rank==='T'?1:0);
  }
 });
 

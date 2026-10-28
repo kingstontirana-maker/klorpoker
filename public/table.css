@@ -22,11 +22,11 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 
 /* ---------- Toolbar ---------- */
 .tableToolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 4px;min-height:52px}
-.tableTitle{display:flex;align-items:center;gap:12px;min-width:0}
+.tableTitle{display:flex;align-items:center;gap:12px;min-width:0;flex:1 1 auto}.tableTitle>div{min-width:0}
 .tableTitle h2{margin:0;font-size:17px;font-weight:650;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tableSessionMeta{display:flex;gap:12px;margin-top:3px;font-size:11px;color:var(--ink-3);white-space:nowrap}
+.tableSessionMeta{display:flex;gap:12px;margin-top:3px;font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden}.tableSessionMeta>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #nextHandCountdown{color:var(--gold-soft)}
-.tableTools{display:flex;align-items:center;gap:6px}
+.tableTools{display:flex;align-items:center;gap:6px;flex:none}
 .tableTools .tool,.iconTool{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;font-size:12px;border-radius:9px;background:#ffffff08;border:1px solid var(--line-2);color:var(--ink-2);position:relative;white-space:nowrap}
 .iconTool{width:34px;padding:0;justify-content:center;font-size:15px}
 .tableTools .tool:hover:not(:disabled),.iconTool:hover{background:#ffffff12;color:var(--ink);filter:none}
@@ -105,7 +105,8 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 /* Hole cards sit above the avatar, centred. */
 .game .seatCards{position:absolute;left:50%;bottom:calc(100% - 16px);transform:translateX(-50%);display:flex;gap:4px;z-index:2;perspective:600px}
 .game .seatCards .card{width:var(--hole-w);height:var(--hole-h);flex:none;border-radius:5px}
-.game .seat.me .seatCards{bottom:calc(100% - 18px);gap:6px}
+/* Your cards overlap the avatar only slightly, so their large suits stay visible. */
+.game .seat.me .seatCards{bottom:calc(100% - 6px);gap:6px}
 .game .seat.me .seatCards .card{width:var(--me-hole-w);height:var(--me-hole-h);border-radius:7px}
 .game .seat.me .seatCards .card:first-child{transform:rotate(-4deg) translateY(2px)}.game .seat.me .seatCards .card:nth-child(2){transform:rotate(4deg) translateY(2px)}
 .game .foldedSeat .seatCards{opacity:.25;filter:saturate(.3)}
@@ -114,18 +115,19 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .game .card{position:relative;display:block;overflow:hidden;padding:0;aspect-ratio:auto;font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-weight:650;border-radius:7px;backface-visibility:hidden;transition:filter .35s,opacity .35s,box-shadow .35s;isolation:isolate}
 .game .card.face{background:linear-gradient(150deg,#ffffff 0%,#f4f7f9 60%,#e7edf0 100%);border:1px solid #d5dde2;color:#14283a;box-shadow:0 1px 0 #fff inset,0 6px 14px #0007}
 .game .card.face.red{color:#d02a49}
-.game .card .cardCorner{position:absolute;left:5px;top:5px;display:block;width:clamp(11px,28%,24px);aspect-ratio:20 / 34;transform:none;z-index:1}
-.game .card .cardCorner.bottomCorner{inset:auto 5px 5px auto;transform:rotate(180deg)}
-.game .card .cornerArtwork{display:block;width:100%;height:100%;overflow:visible;fill:currentColor}
-.game .card .centerSuit{position:absolute;left:55%;top:57%;width:46%;height:46%;transform:translate(-50%,-50%);overflow:visible;pointer-events:none}
+/* Card face, for every card on every page (table, dialogs, panel, home page): a large
+   rank with its suit in the top-left corner and one large suit in the bottom-right.
+   Sizes are shares of the card, so small and large cards look the same. */
+.card.face .cardCorner{position:absolute;left:6%;top:4%;width:38%;aspect-ratio:24 / 42;display:block;z-index:1}
+.card.face .cornerArtwork{display:block;width:100%;height:100%;overflow:visible;fill:currentColor}
+.card.face .centerSuit{position:absolute;right:6%;bottom:5%;width:56%;height:auto;aspect-ratio:1;overflow:visible;pointer-events:none}
+.game .card.back .centerSuit,.game .card.blank .centerSuit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:visible;pointer-events:none}
 .game .card.back{background:radial-gradient(circle at 50% 50%,#24584a 0 18%,transparent 19%),repeating-linear-gradient(45deg,#12392f 0 4px,#0d2a23 4px 8px);border:2px solid #e9dcb4;box-shadow:inset 0 0 0 2px #0d2a23,inset 0 0 0 3px #d8b46a88,0 5px 12px #0008}
 .game .card.back .centerSuit{left:50%;top:50%;width:34%;height:34%;color:#e9d7a3}
 .game .card.blank{background:#ffffff08;border:1px dashed #ffffff1f;box-shadow:inset 0 0 12px #0003}
 .game .card.blank .centerSuit{left:50%;top:50%;width:30%;height:30%;color:#ffffff10}
 .game .card.winningCard{border-color:#9effcf;outline:2px solid #9effcf;outline-offset:-1px;box-shadow:0 0 0 2px #2fe08c99,0 0 18px #2bff9daa,0 0 34px #12d77b66;z-index:5}
-.game .card.winningCard:after{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 20%,#c9ffe266 45%,transparent 70%);transform:translateX(-150%);animation:none;display:none;pointer-events:none}
 .game .card.dimCard{opacity:.32;filter:grayscale(.6) brightness(.7)}
-.game .card.face{animation:faceReveal .32s ease-out backwards}
 
 /* ---------- Board, pot, bets ---------- */
 .game .community{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;gap:7px;z-index:6;width:auto;height:auto;perspective:900px}
@@ -143,6 +145,10 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .runoutLabel[hidden]{display:none}
 .tableBet{position:absolute;left:var(--bx);top:var(--by);transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;z-index:6;pointer-events:none}
 .tableBet[hidden]{display:none}
+.tableBet[data-align=start]{transform:translate(0,-50%)}.tableBet[data-align=end]{transform:translate(-100%,-50%)}
+/* Narrow upright windows: the pot shows its amount only, a little lower, so the top
+   player's bet has room under their name. */
+.game.narrowFelt #potChips{display:none}.game.narrowFelt .pot,.game.narrowFelt .pot.settled{top:36%}
 .tableBet .chipStacks{transform:scale(.72);transform-origin:right center;height:30px}
 .betAmount{font:700 11px/1 Inter,system-ui,sans-serif;padding:4px 7px;border-radius:999px;background:#000000b3;color:var(--gold-soft);border:1px solid #d8b46a40;font-variant-numeric:tabular-nums;white-space:nowrap}
 .dealerButton{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;display:grid;place-items:center;font:900 11px/1 Inter,system-ui,sans-serif;color:#1d1608;background:radial-gradient(circle at 35% 30%,#fffdf2,#e5dcc0 60%,#b9ac87);border:2px solid #fff6;box-shadow:0 3px 8px #000b,inset 0 -2px 3px #0002;z-index:9;transition:left .7s cubic-bezier(.4,.1,.2,1),top .7s cubic-bezier(.4,.1,.2,1)}
@@ -247,17 +253,13 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .handRankings li{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:16px;padding:8px 12px;border:1px solid #22362f;border-radius:10px;background:#0f1d1a}
 .handRankings strong{display:block;font-size:14px;color:#e8f3ec}.handRankings small{display:block;margin-top:3px;letter-spacing:0;font-size:11px;color:#8faaa1}
 .rankingCards{display:flex;gap:3px}
+/* Narrow windows: the cards sit above the name so a row never runs past the dialog. */
+@media(max-width:480px){.rulesDialog{padding:22px 18px}.handRankings li{grid-template-columns:1fr;gap:8px}}
 .rulesDialog .card{position:relative;display:block;overflow:hidden;flex:none;width:30px;height:43px;border-radius:4px;background:linear-gradient(150deg,#fff,#eef2f4);border:1px solid #d5dde2;color:#14283a;box-shadow:1px 2px 4px #0006}
 .rulesDialog .card.red{color:#d02a49}
-.rulesDialog .card .cardCorner{position:absolute;left:2px;top:2px;width:12px;aspect-ratio:20 / 34;display:block}
-.rulesDialog .card .cornerArtwork{display:block;width:100%;height:100%;overflow:visible;fill:currentColor}
-.rulesDialog .card .centerSuit{position:absolute;left:58%;top:60%;width:46%;height:46%;transform:translate(-50%,-50%)}
-.rulesDialog .card .bottomCorner{display:none}
 .rulesList{margin:0;padding-left:18px;display:grid;gap:8px;font-size:13px;line-height:1.55;color:#c3d4cc}.rulesList b{color:#eaf5ef}
 
 /* ---------- Motion ---------- */
-@keyframes faceReveal{from{opacity:.3;filter:brightness(.85)}to{opacity:1}}
-@keyframes winnerShine{0%,25%{transform:translateX(-150%)}65%,100%{transform:translateX(150%)}}
 @keyframes bannerReveal{from{opacity:0;transform:translate(-50%,-30%) scale(.85)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes winnerGlow{from{box-shadow:0 8px 18px #000a,0 0 10px #d8b46a40}to{box-shadow:0 8px 18px #000a,0 0 28px #f1dca488}}
 @keyframes turnGlow{from{box-shadow:0 -10px 40px #0009,0 0 0 1px #5ef0a833,0 0 18px #5ef0a81a}to{box-shadow:0 -10px 40px #0009,0 0 0 1px #5ef0a855,0 0 38px #5ef0a840}}
@@ -298,10 +300,7 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .game .seatAction{top:calc(100% + 26px);font-size:9px;line-height:14px;padding:1px 7px}
  .game .seat.me .seatAction{display:none}
  .game .seatCards{gap:3px;bottom:calc(100% - 12px)}
- .game .seat .seatCards .card .cardCorner{width:10px;left:3px;top:3px}.game .seat .seatCards .card .bottomCorner{display:none}
- .game .seat.me .seatCards .card .cardCorner{width:15px;left:4px;top:4px}.game .seat.me .seatCards .card .bottomCorner{display:block;inset:auto 4px 4px auto}
  .game .community{top:47%;gap:4px}.game .community .card{border-radius:6px}
- .game .community .card .cardCorner{width:12px;left:3px;top:3px}.game .community .card .bottomCorner{display:none}
  .game .pot{top:27%;padding:4px 12px;gap:2px 7px;flex-wrap:wrap;justify-content:center;max-width:58%;border-radius:14px}.game .pot>strong{font-size:17px}.game .pot>span{font-size:9px}#potChips{display:none}
  .game .sidePots{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:2px 8px;padding:0;border:0;width:100%}.game .sidePots span{font-size:9px}
  .runoutLabel{top:17%}
@@ -392,11 +391,6 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .dockExtras{display:flex;justify-content:flex-end}.dockExtras button{height:34px;border-radius:999px;font-size:12px}
 
  .tableStage{--board-w:clamp(30px,min(calc(var(--felt-h,260px)*.185),calc(var(--felt-w,600px)*.066)),62px);--me-hole-h:clamp(44px,calc(var(--felt-h,260px)*.27),88px);--me-hole-w:calc(var(--me-hole-h)/1.4);--hole-w:34px;--hole-h:48px}
- /* Small cards use a phone-style face: a large rank and suit in one corner and a
-    clear suit in the other, so nothing overlaps and every card reads at a glance. */
- .game .card .cardCorner,.game .seat .seatCards .card .cardCorner,.game .community .card .cardCorner{width:44%;left:6%;top:5%}
- .game .card .cardCorner.bottomCorner,.game .seat .seatCards .card .cardCorner.bottomCorner,.game .seat.me .seatCards .card .cardCorner.bottomCorner,.game .community .card .cardCorner.bottomCorner{display:none}
- .game .card.face .centerSuit{left:auto;top:auto;right:7%;bottom:6%;width:48%;height:48%;transform:none}
  .game .card.face{border-radius:6px}
  .game .seat.me .seatCards .card:first-child{transform:rotate(-3deg)}.game .seat.me .seatCards .card:nth-child(2){transform:rotate(3deg)}
  .game .pot{top:31%;padding:3px 10px;gap:6px}.game .pot>strong{font-size:16px}.game .pot>span{font-size:9px}#potChips{display:none}
@@ -529,17 +523,19 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 .game .flyingCard .card{width:100%;height:100%;border-radius:8px}
 
 /* ---------- Phones in landscape: final placement (measured) ----------
-   Board: exactly in the middle of the felt; the pot sits right above the cards
-   (half a board card + half the pot + a 3 px gap), so neither moves with guesses.
+   Board: 6 px above the middle of the felt, so your cards fit under it; the pot sits
+   right above the cards (half a board card + half the pot + a 3 px gap).
    Buttons: as far right as possible but never in the corner; the offset is the
    space left after your seat (half plate 55 px + 40 px clearance) and the row of
    three buttons, capped at 40 px from the edge. */
 @media(max-height:560px) and (orientation:landscape){
- .game .community{top:50%}
+ .game .community{top:calc(50% - 6px)}
+ /* Your cards sit just under the board: they overlap your avatar a little, never the board. */
+ .game .seat.me .seatCards{bottom:calc(100% - 10px)}
  /* The top player: plate on the left of the avatar, cards on the right, so the
     seat takes only the avatar's height and the pot has room above the board. */
  .game .seat[data-visual-position="0"]:not(.me) .seatName{left:auto;right:calc(100% + 4px);top:50%;transform:translateY(-50%)}
- .game .pot,.game .pot.settled{top:calc(50% - var(--board-w) * .7 - 20px)}
+ .game .pot,.game .pot.settled{top:calc(50% - 6px - var(--board-w) * .7 - 20px)}
  .dockActions,.dock.sizing .betPicker{right:calc(clamp(12px,calc(50vw - 349px),40px) + env(safe-area-inset-right))}
 }
 
@@ -636,4 +632,3 @@ body.fitPhone{background:#040806}
 .game.omaha .seat.me .seatCards .card:nth-child(2){transform:rotate(-3deg) translateY(1px)}
 .game.omaha .seat.me .seatCards .card:nth-child(3){transform:rotate(3deg) translateY(1px)}
 .game.omaha .seat.me .seatCards .card:nth-child(4){transform:rotate(9deg) translateY(5px)}
-.game.omaha .seat .seatCards .card .bottomCorner{display:none}
