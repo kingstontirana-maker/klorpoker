@@ -81,8 +81,11 @@ setInterval(()=>{if(!document.hidden&&tableId)visuals.tick();},100);
 // first tap or key press, so it starts then.
 const soundPref=()=>{try{return localStorage.getItem('klorSound')!=='off';}catch{return true;}};
 const showSound=()=>{$('#soundToggle').setAttribute('aria-pressed',String(visuals.sound));$('#soundToggle').textContent=visuals.sound?'♫ Sound: On':'♫ Sound: Off';};
-const startSound=async e=>{if(e?.target?.closest?.('#soundToggle'))return;if(soundPref()&&!visuals.sound){await visuals.enableSound();showSound();}};
-for(const type of ['pointerdown','keydown'])addEventListener(type,startSound,{once:true,capture:true});
+// Sound exists only at the table, for players: the home page, sign-in, lobby and every
+// management panel stay silent. Turning it on plays nothing by itself.
+const atTable=()=>document.body.dataset.view==='table'&&profile?.user.role==='USER';
+const startSound=async e=>{if(!atTable()||e?.target?.closest?.('#soundToggle'))return;if(soundPref()&&!visuals.sound){for(const type of ['pointerdown','keydown'])removeEventListener(type,startSound,true);await visuals.enableSound();showSound();}};
+for(const type of ['pointerdown','keydown'])addEventListener(type,startSound,true);
 $('#soundToggle').onclick=async()=>{if(visuals.sound)visuals.sound=false;else if(!await visuals.enableSound())return toast('Sound is not supported in this browser.');try{localStorage.setItem('klorSound',visuals.sound?'on':'off');}catch{}showSound();};
 $('#motionToggle').onclick=()=>{visuals.motion=!visuals.motion;sessionStorage.setItem('pokerMotion',visuals.motion?'on':'off');$('#motionToggle').setAttribute('aria-pressed',String(visuals.motion));$('#motionToggle').textContent=visuals.motion?'◉ Animations: On':'◉ Animations: Off';$('.game').classList.toggle('reducedMotion',!visuals.motion);};
 $('#fullscreenToggle').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('Full screen is not supported.')}};
