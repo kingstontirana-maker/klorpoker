@@ -509,3 +509,11 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Shkaku i "check" pa hyrë:** faqja live po ekzekutonte ende versionin e orës 05:08 (pa rregullimin e tingujve). Kodi i ri ndez audio vetëm brenda tavolinës dhe nuk luan asnjë tingull konfirmimi; duhet bërë deploy.
 - **Pa përplasje:** i njëjti tingull dy herë brenda 60 ms luhet një herë; tingulli i chips-ave që shkojnë në pot nuk luhet menjëherë pas bastit/call-it që mbylli raundin; letrat e reja të tavolinës presin 0.3 s pas veprimit të fundit dhe ndjekin njëra-tjetrën çdo 150 ms; zilja "radha jote" bie pasi të kenë tingëlluar veprimet e lojtarëve të tjerë, dhe nuk bie kur një para-veprim (p.sh. Check/Fold) përgjigjet menjëherë.
 - **Dalja:** pas "Sign out" lidhja e tavolinës mbyllet dhe nuk luhet më asnjë tingull. Verifikuar duke regjistruar çdo tingull: 42 tinguj në 42 s lojë, 0 përplasje; 0 tinguj në faqen kryesore dhe pas daljes.
+
+## Tingujt në telefon dhe Safari
+- Në telefon (iOS Safari, Android) audio lejohet vetëm brenda një prekjeje, kur gishti ngrihet; prekja e parë (`pointerdown`) nuk mjaftonte, ndaj tingulli mbetej i fikur dhe nuk provohej më. Tani tingulli ndizet në `touchend`/`click`/`pointerup`/`keydown`, me një tingull të heshtur brenda prekjes (kërkesë e iOS), dhe quhet i ndezur vetëm kur audio punon vërtet; përndryshe provohet në prekjen tjetër. Pas sfondit ose një telefonate, prekja e radhës e rindez.
+- Në iPhone, audio luhet edhe me çelësin e heshtjes (kur shfletuesi e lejon `audioSession`). Tingujt që s'kanë mbaruar së ngarkuari kapërcehen, kurrë s'zëvendësohen me tone.
+
+## Chat në një dritare të vogël
+- Poshtë majtas tani është butoni i chat-it (me numrin e mesazheve të palexuara). Hap një dritare të vogël në të majtë që nuk bllokon tavolinën: butonat Fold/Check/Raise mbeten të përdorshëm. Mbyllet me ✕ ose Esc dhe kur del nga tavolina.
+- Teksti me përshkrimin e letrave (p.sh. "Pair of J", "9-6 offsuit") u hoq nga ai cep. Në telefon horizontal pranë butonit del vetëm "+20s" (koha shtesë) ose paralajmërimi i kohës kur duhen. Dritarja anësore "History" tani ka vetëm historikun.

@@ -95,21 +95,30 @@ export class TableVisuals {
     const next=document.querySelector('#nextHandCountdown');if(next)next.textContent=t.nextHandAt?`Next hand in ${Math.max(0,Math.ceil((t.nextHandAt-now)/1000))}s`:'';
     const connection=document.querySelector('#connectionStatus');if(connection){const stale=Date.now()-this.lastSync>5000;connection.textContent=stale?'Reconnecting…':'Connected';connection.classList.toggle('disconnected',stale);if(stale||t.actionDeadline&&now>=t.actionDeadline){document.querySelectorAll('.actionButtons button,.betPicker input,.betPresets button').forEach(n=>n.disabled=true);if(stale){const info=document.querySelector('#turnInfo');if(info)info.textContent='Connection lost · Reconnecting…';}}}
   }
-  async enableSound(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return false;try{this.audio??=new Audio();await this.audio.resume();this.sound=true;await this.loadSounds();return true;}catch{return false;}}
+  // Phones (iOS Safari, Android) only allow audio from inside a tap, and only once the
+  // finger lifts. Everything that unlocks it runs synchronously in that tap: create or
+  // resume the context and start a silent sound. Sound counts as on only when the
+  // context is really running; otherwise the next tap tries again.
+  enableSound(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return Promise.resolve(false);
+    try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch{}
+    try{this.audio??=new Audio();const ctx=this.audio,silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);
+      const resumed=ctx.state==='running'?Promise.resolve():Promise.race([ctx.resume(),wait(1500)]);
+      return resumed.then(()=>{this.sound=ctx.state==='running';if(this.sound)this.loadSounds();return this.sound;}).catch(()=>false);}catch{return Promise.resolve(false);}}
   // Recorded table sounds (public/sounds): fold, check, bet (call/raise/bet/blinds),
   // allin (all-in and the winner collecting the pot) and card (every card dealt or turned).
-  async loadSounds(){if(this.buffers)return;this.buffers={};await Promise.all(['fold','check','bet','allin','card'].map(async name=>{try{const r=await fetch('/sounds/'+name+'.m4a');this.buffers[name]=await this.audio.decodeAudioData(await r.arrayBuffer());}catch{}}));}
+  async loadSounds(){if(this.buffers)return;this.buffers={};await Promise.all(['fold','check','bet','allin','card'].map(async name=>{try{const r=await fetch('/sounds/'+name+'.m4a');const data=await r.arrayBuffer();this.buffers[name]=await new Promise((ok,no)=>this.audio.decodeAudioData(data,ok,no));}catch{}}));}
   // Table sounds play only for a table on screen, one clear sound at a time: the same
   // sound twice within 60 ms plays once, chips moving to the pot stay quiet right after
   // the bet or call that closed the round, new board cards wait 0.3 s after it, and the
   // 'your turn' chime comes 0.25 s after the previous sound.
-  beep(type){if(!this.sound||!this.audio||document.hidden||!this.tableId&&type!=='turn')return;
+  beep(type){if(!this.sound||!this.audio||this.audio.state!=='running'||document.hidden||!this.tableId&&type!=='turn')return;
     const ctx=this.audio,now=ctx.currentTime,last=this.lastSound||{type:'',at:-1};
     if(type===last.type&&type!=='card'&&now-last.at<.06)return;if(type==='chip'&&now-last.at<.45)return;
     // Cards wait for the action that closed the round, then follow each other 150 ms apart.
     const gap=type==='card'?(last.type==='card'?.15:.3):type==='turn'?.25:0,when=Math.max(now,last.at+gap);this.lastSound={type,at:when};
     const file={fold:'fold',check:'check',chip:'bet',bet:'bet',allin:'allin',win:'allin',card:'card'}[type],buf=file&&this.buffers?.[file];
-    if(buf){const src=ctx.createBufferSource(),gain=ctx.createGain();gain.gain.value=type==='chip'?.45:.9;src.buffer=buf;src.connect(gain);gain.connect(ctx.destination);src.start(when);return;}const start=when,notes=type==='win'?[523,659,784]:type==='turn'?[660,880]:type==='allin'?[392,523,659]:[({chip:900,card:420,fold:180,check:600,alert:880})[type]||500];notes.forEach((frequency,i)=>{const oscillator=ctx.createOscillator(),gain=ctx.createGain();oscillator.type=type==='chip'?'triangle':'sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start+i*.1);gain.gain.linearRampToValueAtTime(.035,start+i*.1+.01);gain.gain.exponentialRampToValueAtTime(.001,start+i*.1+.13);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start+i*.1);oscillator.stop(start+i*.1+.15);});}
+    // A recorded sound that has not finished loading is skipped, never replaced by a tone.
+    if(file){if(buf){const src=ctx.createBufferSource(),gain=ctx.createGain();gain.gain.value=type==='chip'?.45:.9;src.buffer=buf;src.connect(gain);gain.connect(ctx.destination);src.start(when);}return;}const start=when,notes=type==='win'?[523,659,784]:type==='turn'?[660,880]:type==='allin'?[392,523,659]:[({chip:900,card:420,fold:180,check:600,alert:880})[type]||500];notes.forEach((frequency,i)=>{const oscillator=ctx.createOscillator(),gain=ctx.createGain();oscillator.type=type==='chip'?'triangle':'sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start+i*.1);gain.gain.linearRampToValueAtTime(.035,start+i*.1+.01);gain.gain.exponentialRampToValueAtTime(.001,start+i*.1+.13);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start+i*.1);oscillator.stop(start+i*.1+.15);});}
 }
 
 // Geometry changes the felt only. Cards, names and controls keep native sizes.

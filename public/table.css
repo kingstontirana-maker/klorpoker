@@ -236,7 +236,15 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 #events{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--ink-2)}
 #events>span{display:flex;gap:10px;padding:6px 8px;border-radius:7px;line-height:1.45}#events>span:nth-child(odd){background:#ffffff05}
 #events time{color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
-.chatPanel{display:flex;flex-direction:column;gap:10px}.chatPanel[hidden]{display:none}
+.chatPanel{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0}.chatPanel[hidden]{display:none}
+/* Chat button in the bottom-left corner of the table and its small window above it. */
+.chatFab{position:absolute;left:12px;bottom:12px;z-index:40;width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#20c47e,#0f8f5a);border:1px solid #7dffc466;box-shadow:0 8px 20px #000a,inset 0 1px 0 #ffffff40;color:#04140d}
+.chatFab svg{width:22px;height:22px;fill:currentColor}.chatFab.on{background:linear-gradient(180deg,#7dffc4,#2fd38a)}
+.chatFab #chatBadge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font:700 10px/18px Inter,system-ui,sans-serif;font-style:normal;box-shadow:0 0 0 2px #07100d}
+.chatPop{position:absolute;left:12px;bottom:68px;z-index:41;width:min(320px,calc(100% - 24px));height:min(360px,calc(100% - 90px));display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:16px;background:#0b1411f5;border:1px solid #5ef0a840;box-shadow:0 18px 50px #000d;backdrop-filter:blur(10px)}
+.chatPop[hidden]{display:none}.chatPopHead{display:flex;align-items:center;justify-content:space-between}.chatPopHead b{font-size:13px;letter-spacing:.06em;color:var(--ink)}.chatPopHead .iconTool{width:28px;height:28px;font-size:12px}
+/* What your cards make is no longer spelled out in the corner. */
+#handStrength{display:none}
 .chatLog{flex:1;overflow:auto;display:flex;flex-direction:column;gap:6px;min-height:120px}
 .chatLog p{margin:0;padding:7px 10px;border-radius:10px;background:#ffffff08;font-size:13px;line-height:1.4;color:var(--ink);display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px}
 .chatLog p b{color:var(--gold-soft);font-weight:650}.chatLog p span{grid-column:1 / -1;word-break:break-word}.chatLog time{grid-row:1;grid-column:3;font-size:10px;color:var(--ink-3)}
@@ -353,10 +361,12 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .dock.idle .dockActions{display:none}
 
  /* Hand info: a small pill at the bottom-left. */
- .dockInfo{position:fixed;left:8px;bottom:8px;max-width:min(150px,30vw);display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 10px;border-radius:12px;background:#07100dd9;border:1px solid var(--line-2);text-align:left}
+ .dockInfo{position:fixed;left:62px;bottom:8px;max-width:min(150px,30vw);display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 10px;border-radius:12px;background:#07100dd9;border:1px solid var(--line-2);text-align:left}
  .dock.idle .dockInfo{align-items:flex-start;text-align:left}
  .dock.idle:not(.hasExtras) .dockInfo{display:none}
- #turnInfo{font-size:9px}#handStrength{font-size:13px}.actionSummary{display:none}#blindInfo{display:none}#inactivityNotice{font-size:9px}
+ #turnInfo{display:none}.actionSummary{display:none}#blindInfo{display:none}#inactivityNotice{font-size:9px}
+ .dockInfo:not(:has(#timeBank:not([hidden]),#inactivityNotice:not([hidden])))){display:none!important}
+ .chatFab{left:8px;bottom:8px;width:44px;height:44px}.chatPop{left:8px;bottom:60px;height:min(300px,calc(100% - 76px))}
  .timeBankButton{height:22px;font-size:10px;padding:0 8px}
 
  /* Three round buttons in a row in the bottom-right corner. */
@@ -558,7 +568,7 @@ body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at 
 body.fitPhone .game{position:fixed;left:0;top:0;width:var(--fit-w);height:var(--fit-h);min-height:0;max-width:none;margin:0;transform:scale(var(--fit-s));transform-origin:0 0;grid-template-rows:minmax(0,1fr);
  padding:calc(env(safe-area-inset-top) / var(--fit-s)) calc(env(safe-area-inset-right) / var(--fit-s)) calc(env(safe-area-inset-bottom) / var(--fit-s)) calc(env(safe-area-inset-left) / var(--fit-s))}
 body.fitPhone .tableToolbar{left:calc(6px + env(safe-area-inset-left) / var(--fit-s));right:calc(6px + env(safe-area-inset-right) / var(--fit-s));top:calc(4px + env(safe-area-inset-top) / var(--fit-s))}
-body.fitPhone .dockInfo{left:calc(8px + env(safe-area-inset-left) / var(--fit-s));bottom:calc(8px + env(safe-area-inset-bottom) / var(--fit-s));max-width:150px}
+body.fitPhone .dockInfo{left:calc(62px + env(safe-area-inset-left) / var(--fit-s));bottom:calc(8px + env(safe-area-inset-bottom) / var(--fit-s));max-width:150px}
 body.fitPhone .dockActions{right:calc(40px + env(safe-area-inset-right) / var(--fit-s));bottom:calc(12px + env(safe-area-inset-bottom) / var(--fit-s))}
 body.fitPhone .dock.sizing .betPicker{right:calc(40px + env(safe-area-inset-right) / var(--fit-s));bottom:calc(98px + env(safe-area-inset-bottom) / var(--fit-s));width:270px}
 /* Phones (fit canvas): larger cards and names so the table reads clearly. */
