@@ -1,11 +1,12 @@
 import crypto from 'node:crypto';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {evaluateHand,compare,ranks,suits} from './poker.js';
+import {tableEquityInput,playerEquity} from './exact-equity.js';
+import {calculateTableEquity} from './equity-service.js';
 
-// ---- Fair table-filling bots ----
-// A bot is an ordinary seated player funded by the center. It decides from a
-// public view of the table plus its OWN hole cards only: it never sees another
-// player's cards, the deck or the outcome, and it never plays to lose on purpose.
+// ---- Experimental virtual-credit table-filling bots ----
+// The server calculates exact equity from all dealt hands. The decision receives
+// percentages only, never opponents' cards or the actual upcoming deck order.
 // The center controls the risk: budget, buy-in, loss limit, win limit and style.
 
 // Bots carry ordinary names; only the center sees which players are bots
@@ -35,25 +36,38 @@ export function handStrength(v){
 // cards. Only the bot's own cards and the board are known; every unknown card
 // (opponents' hands, the rest of the board) is drawn at random from the cards the
 // bot cannot see. It never looks at a real opponent's hand.
-export function equity(v,iterations,random=Math.random){
+export function equityEstimate(v,iterations,random=Math.random){
  const opp=Math.max(1,Math.min(5,v.opponents||1)),hole=v.game==='omaha'?4:2,known=new Set([...v.cards,...v.board]),deck=[];
  for(const su of suits)for(const r of ranks)if(!known.has(r+su))deck.push(r+su);
- const n=iterations??(v.game==='omaha'?70:170);let won=0;
+ const n=iterations??(v.game==='omaha'?70:170),shares=Array(opp+1).fill(0);
+ if(!Number.isInteger(n)||n<1)throw new RangeError('Iterations must be a positive integer');
  for(let i=0;i<n;i++){
   const need=opp*hole+(5-v.board.length);for(let k=0;k<need;k++){const j=k+Math.floor(random()*(deck.length-k));[deck[k],deck[j]]=[deck[j],deck[k]];}
-  const board=[...v.board,...deck.slice(opp*hole,need)],mine=evaluateHand(v.game,v.cards,board);let best=1,ties=1;
-  for(let o=0;o<opp;o++){const c=compare(evaluateHand(v.game,deck.slice(o*hole,o*hole+hole),board),mine);if(c>0){best=0;break;}if(c===0)ties++;}
-  if(best)won+=1/ties;}
- return won/n;}
+  const board=[...v.board,...deck.slice(opp*hole,need)],scores=[evaluateHand(v.game,v.cards,board)];
+  for(let o=0;o<opp;o++)scores.push(evaluateHand(v.game,deck.slice(o*hole,o*hole+hole),board));
+  let winners=[0];for(let j=1;j<scores.length;j++){const c=compare(scores[j],scores[winners[0]]);if(c>0)winners=[j];else if(c===0)winners.push(j);}
+  for(const j of winners)shares[j]+=1/winners.length;}
+ // Equity includes the player's share of tied pots. Opponents are anonymous:
+ // no individual advantage can be inferred without public evidence about them.
+ const mine=shares[0]/n;
+ return {equity:mine,opponentEquities:shares.slice(1).map(x=>x/n),opponentsEquity:1-mine,iterations:n};}
+export function equity(v,iterations,random=Math.random){return equityEstimate(v,iterations,random).equity;}
 // Tight and disciplined: the bot puts money in only when its chance of winning beats
 // the price it has to pay (pot odds) by a safety margin, and bets for value with
 // strong hands. Bluffs are rare and small. "risk" only changes the margins.
 const PLAN={low:{margin:.1,value:.68,bluff:.01,size:.6},medium:{margin:.06,value:.62,bluff:.03,size:.66},high:{margin:.03,value:.56,bluff:.05,size:.75}};
-export function botDecision(v,risk='low',random=Math.random){
- const p=PLAN[risk]||PLAN.low,eq=equity(v,undefined,random),opp=Math.max(1,v.opponents||1);
+export function botDecision(v,risk='low',random=Math.random,probabilities){
+ const p=PLAN[risk]||PLAN.low,estimate=probabilities??equityEstimate(v,undefined,random),eq=estimate.equity,opp=Math.max(1,v.opponents||1);
+ // Budget is cumulative for the whole hand, including blinds and earlier streets.
+ // Reconstruct the starting table stack so repeated bets cannot reset the limit.
+ const invested=v.committed||0,startingStack=v.stack+invested;
+ const leading=v.board.length===5&&estimate.opponentEquities.every(x=>eq>x);
+ const investmentRate=leading?.4:.15,investmentLimit=Math.floor(startingStack*investmentRate);
+ const remainingInvestment=Math.max(0,Math.min(v.stack,investmentLimit-invested));
+ const result=action=>({...action,...estimate,investmentRate,investmentLimit,remainingInvestment});
  // Against more players a hand needs more equity to be strong.
  const strong=Math.max(p.value-(opp-1)*.08,1/(opp+1)+.18);
- const price=v.toCall/Math.max(1,v.pot+v.toCall);
+ const callCost=Math.min(v.toCall,v.stack),price=callCost/Math.max(1,v.pot+callCost);
  // Share of its chips the bot has already put into this pot: past a third it is
  // committed and calls whenever the price is right instead of giving the pot away.
  const committed=(v.committed||0)/Math.max(1,(v.committed||0)+v.stack);
@@ -61,17 +75,29 @@ export function botDecision(v,risk='low',random=Math.random){
  // Someone who shoves often holds all kinds of hands: then pot odds alone decide.
  const loose=(v.shoveRate||0)>=.25;
  const margin=committed>=.3||loose?0:allInCall?p.margin*.3:p.margin;
- if(v.canRaise){
-  const bluff=eq<strong&&!v.toCall&&random()<p.bluff;
+ if(v.canRaise&&remainingInvestment>0){
+  const bluff=!estimate.exact&&eq<strong&&!v.toCall&&random()<p.bluff;
   if(eq>=strong||bluff){
-   const want=v.currentBet===0?p.size*Math.max(v.pot,v.bb*2):v.currentBet+p.size*(v.pot+v.toCall),target=Math.max(v.minRaiseTo,Math.min(v.maxRaiseTo,Math.round(want))),cost=target-v.roundBet;
-   // A bluff stays small. A value bet only puts in chips the bot will defend:
-   // up to a third of the stack, or everything with a very strong hand.
-   if(target>v.currentBet&&(bluff?cost<=Math.min(v.pot*.5,v.stack*.1):cost<=v.stack*.35||eq>=.75))return {type:'raise',amount:target/100,equity:eq};}}
- if(!v.toCall)return {type:'check',equity:eq};
- return {type:eq>=price+margin?'call':'fold',equity:eq};}
+   const want=v.currentBet===0?p.size*Math.max(v.pot,v.bb*2):v.currentBet+p.size*(v.pot+v.toCall),ceiling=Math.min(v.maxRaiseTo,v.roundBet+remainingInvestment),target=Math.min(ceiling,Math.max(v.minRaiseTo,Math.round(want))),cost=target-v.roundBet;
+   // Respect both the cumulative budget and the engine's minimum raise.
+   const legalRaise=target>=v.minRaiseTo||target===v.roundBet+v.stack;
+   if(legalRaise&&target>v.currentBet&&cost<=remainingInvestment&&(!bluff||cost<=Math.min(v.pot*.5,v.stack*.1)))return result({type:'raise',amount:target/100});}}
+ if(!v.toCall)return result({type:'check'});
+ return result({type:callCost<=remainingInvestment&&eq>=price+margin?'call':'fold'});}
 
-export function createBots({db,runtime,engine,save}){
+export function createBots({db,runtime,engine,save,calculateEquity=calculateTableEquity}){
+ const calculations=new WeakMap();
+ function probabilities(t){
+  const input=tableEquityInput(t),key=JSON.stringify(input);let cached=calculations.get(t);
+  if(!cached||cached.key!==key){
+   cached={key};calculations.set(t,cached);
+   const result=calculateEquity(input);
+   if(result&&typeof result.then==='function')result.then(value=>{cached.result=value;},error=>{cached.error=error;});
+   else cached.result=result;
+  }
+  if(cached.error)throw cached.error;
+  return cached.result;
+ }
  for(const u of db.users)if(u.isBot&&u.username.endsWith(OLD_SUFFIX)){const plain=u.username.slice(0,-OLD_SUFFIX.length);if(!db.users.some(x=>x!==u&&x.username.toLowerCase()===plain.toLowerCase()))u.username=plain;}
  const bots=()=>db.users.filter(u=>u.isBot),center=()=>db.users.find(x=>x.role==='CENTER');
  const seatOf=u=>{for(const t of runtime.values()){const s=t.seats.find(x=>x?.userId===u.id);if(s)return {t,s};}return null;};
@@ -151,7 +177,8 @@ export function createBots({db,runtime,engine,save}){
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
      // Think for 1.5–4 seconds like a person would.
      s.botThink??=1500+Math.floor(Math.random()*2500);
-     if(now-t.turnStartedAt>=s.botThink){delete s.botThink;const d=botDecision(botView(t,s,{shoveRate:shoveRate(t)}),b.bot.risk);try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}}}
+     const exact=probabilities(t);
+     if(exact&&now-t.turnStartedAt>=s.botThink){delete s.botThink;const d=botDecision(botView(t,s,{shoveRate:shoveRate(t)}),b.bot.risk,Math.random,playerEquity(exact,b.id));try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}}}
    }catch(e){stop(b,e.message,seatOf(b));}
   }
  }

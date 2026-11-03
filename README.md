@@ -2,6 +2,21 @@
 
 **Playable demo with virtual credits, not a production real-money gambling platform.** Node.js 20+, no npm dependencies. The interface recreates the emerald / black / gold feel of the reference design using responsive CSS and includes the original reference PNG in `public/design-reference.png`.
 
+Experimental bots use server-calculated equity from every player's actual dealt
+cards. These are informed opponents for virtual-credit experiments. The server
+enumerates every possible remaining board, excluding dealt and folded cards;
+it does not inspect the upcoming deck order. Equity includes shares of tied pots
+and is not a guarantee of winning before the river. Only percentages reach the
+bot decision; other players' cards stay out of player snapshots.
+
+Bot investment is capped cumulatively at 15% of its starting table stack per
+hand, including blinds. On the river the cap becomes 40% only for a bot whose
+equity strictly exceeds every opponent's. Ties retain the 15% cap. Exact
+enumeration runs in a background worker and is cached for an unchanged set of
+hands and board. Preflop enumeration, especially Omaha, may exceed an action
+timer under load; normal timeout rules still apply, without substituting guessed
+probabilities.
+
 ## Launch
 
 ```bash
