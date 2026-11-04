@@ -84,6 +84,15 @@ test('sessions, activity and reports are stored; statistics fill in for older da
  s=openStore(file);assert.equal(s.playerStats('u').hands,1,'filled from the stored hands');s.close();
 });
 
+test('during a rolling deploy the older server can no longer write',()=>{
+ const file=path.join(tmp(),'h.db'),a=openStore(file);a.claim();const old=sample();a.commit(old);assert.equal(a.isOwner(),true);
+ const b=openStore(file);b.claim();const fresh=b.load();assert.equal(a.isOwner(),false);assert.equal(b.isOwner(),true);
+ old.users[1].balance=999;old.escrow=[{userId:'u',amount:77}];assert.throws(()=>a.commit(old),/owns the database/);
+ assert.throws(()=>a.addHand({id:5,players:[]}),/owns the database/);assert.throws(()=>a.putSession('x',{}),/owns the database/);assert.throws(()=>a.addAudit({at:1,action:'x'}),/owns the database/);
+ fresh.users[0].balance+=1;b.commit(fresh);a.close();b.close();
+ const c=openStore(file),now=c.load();c.close();assert.equal(now.users[1].balance,100,'the old server changed nothing');assert.deepEqual(now.escrow,[{userId:'u',amount:50}]);assert.equal(now.users[0].balance,901);assert.equal(now.handSeq,0);
+});
+
 test('no files: nothing to import',()=>{
  const dir=tmp(),s=openStore(path.join(dir,'klor.db'));assert.equal(s.importFiles(path.join(dir,'a'),path.join(dir,'b')),null);s.close();
 });

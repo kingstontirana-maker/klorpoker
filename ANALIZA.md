@@ -534,3 +534,8 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Rilidhje:** një lidhje e humbur ka 20 sekonda për t'u kthyer (faqja e mbyllur 5). Rilidhja niset menjëherë kur kthehet interneti, dhe në tavolinë del njoftim.
 - **Qendra dhe agjentët:** menu e grupuar, ballina "Needs attention", raport lojtarësh me eksport CSV.
 - **Teknike:** mbyllje e kontrolluar kur serveri ndalet (asnjë dorë e re, duart e nisura kanë deri 25 sekonda); sesione që mbijetojnë rinisjen (ruhet vetëm hash-i i token-it); `/api/health`; në memorie mbahen vetëm 20 000 transaksionet më të reja, të vjetrat lexohen kur duhen.
+
+## Deploy me dy serverë njëkohësisht (rolling update)
+- Coolify nis serverin e ri para se të ndalë të vjetrin, ndaj për disa sekonda të dy punojnë mbi të njëjtën bazë. Pa mbrojtje, chips-at e tavolinave mund të ktheheshin dy herë.
+- Tani serveri më i ri merr pronësinë e bazës që në nisje. I vjetri nuk shkruan më, ndalon lojën dhe përgjigjet 503; lojtarët rilidhen te i riu me të njëjtin sesion. Provuar me dy serverë realë me chips në tavolinë: shuma e parave mbeti e njëjtë, edhe pas një rinisjeje tjetër.
+- Pasojë: gjatë një rolling update, duart që po luhen ndërpriten dhe chips-at kthehen në portofol. Pritja deri në 25 sekonda vlen vetëm kur serveri ndalet pa një server të ri që e zëvendëson. Veprimet e bëra te serveri i vjetër në ato sekonda pas nisjes së të riut refuzohen.

@@ -8,15 +8,15 @@ const ROOT=path.dirname(fileURLToPath(import.meta.url));const SAVE=process.env.S
 // A fresh database never uses a known password: CENTER_PASSWORD, or a random one
 // that is printed once in the server log.
 const DB_FILE=process.env.DB_FILE||path.join(path.dirname(SAVE),'klor.db'),HANDS_FILE=process.env.HANDS_FILE||path.join(path.dirname(SAVE),'hands.jsonl');
-export const store=openStore(DB_FILE);export const currentDb=()=>db;
+export const store=openStore(DB_FILE);export const currentDb=()=>db;store.claim();
 let db=store.load();
 if(!db){const moved=store.importFiles(SAVE,HANDS_FILE);if(moved){db=store.load();console.log(`[Klor Poker] Moved to SQLite (${DB_FILE}): ${db.users.length} accounts, ${db.ledger.length} transactions, ${moved.hands} hands${moved.skipped?`, ${moved.skipped} damaged hand lines skipped`:''}. The old files were left untouched.`);}}
 if(!db){const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBytes(9).toString('base64url');if(!process.env.CENTER_PASSWORD)console.log(`[Klor Poker] New database at ${DB_FILE}. Temporary "center" password: ${initial}`);else console.log(`[Klor Poker] New database at ${DB_FILE} ("center" password from CENTER_PASSWORD).`);db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(initial,salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};store.commit(db);}
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];
-let saveFailed=false,draining=false;
-export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);saveFailed=false;}catch(err){saveFailed=true;console.error('[Klor Poker] state not saved',err.message);}queuePush();};
+let saveFailed=false,draining=false,replaced=false;
+export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{if(replaced)return;db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);saveFailed=false;}catch(err){saveFailed=true;console.error('[Klor Poker] state not saved',err.message);}queuePush();};
 const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h),canDeal:()=>!draining});
 // Hand history: every finished hand is one row of its own, stored as it finishes.
 function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{store.addHand(h);}catch(err){console.error('[Klor Poker] hand history not saved',err);}}
@@ -179,13 +179,18 @@ function openTableStream(req,res,tableId){const token=(req.headers.authorization
  tableSubs.set(res,{token,userId:u.id,tableId});res.write('data: '+JSON.stringify(engine.snapshot(t,u.id))+'\n\n');
  const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();
  res.on('close',()=>{clearInterval(beat);tableSubs.delete(res);if(![...tableSubs.values()].some(s=>s.userId===u.id&&s.tableId===tableId))engine.away(t,u,RECONNECT_GRACE_MS);});}
-setInterval(()=>{for(const t of runtime.values())tickTable(t);},250).unref();
+setInterval(()=>{if(!replaced)for(const t of runtime.values())tickTable(t);},250).unref();
+// A newer server took over the database (rolling deploy): this one stops playing and
+// answering, and its players reconnect to the new one. It does not exit, or the container
+// could restart and take the database back.
+function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner||replaced)return;replaced=true;draining=true;console.log('[Klor Poker] A newer server took over the database. This one has stopped.');for(const res of tableSubs.keys())res.end();tableSubs.clear();for(const res of inspectSubs.keys())res.end();inspectSubs.clear();for(const res of rakeClients.keys())res.end();rakeClients.clear();}
+setInterval(checkOwner,1000).unref();
 // Table-filling bots act from the server; they are never logged in.
 const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake()});
-setInterval(()=>{try{botManager.tick();}catch(err){console.error('[Klor Poker] bots',err);}},500).unref();
+setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Klor Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});
-setInterval(()=>{payments.scan().catch(err=>console.error('[Klor Poker] crypto scan',err.message));},30000).unref();
+setInterval(()=>{if(replaced)return;payments.scan().catch(err=>console.error('[Klor Poker] crypto scan',err.message));},30000).unref();
 // Center inspection: every table with every hole card, live. Only the center
 // account can open it, it can never sit at a table, and each session is logged.
 // Players at one table who connect from the same address are flagged.
@@ -206,7 +211,7 @@ function openInspectStream(req,res){const token=(req.headers.authorization||'').
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.webp':'image/webp','.m4a':'audio/mp4'};
 const SECURITY_HEADERS={'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()','cross-origin-opener-policy':'same-origin',
  'content-security-policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
-export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost');const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
+export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost');if(url.pathname.startsWith('/api/')){checkOwner();if(replaced)fail('The server is restarting. Please try again in a moment.',503);}const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
  const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Login required',401);roleCheck(u,'CENTER','ADMIN','AGENT');
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
  rakeClients.set(res,token);res.write('data: '+JSON.stringify(staffRakeReport(u))+'\n\n');
@@ -220,5 +225,5 @@ server.listen(PORT,()=>console.log(`Klor Poker http://localhost:${PORT}`));
 // Stopping (a deploy sends SIGTERM): no new hands, running hands may finish, then the
 // state is saved. A hand still running at the time limit gets its chips back on the next start.
 const STOP_WAIT_MS=Number(process.env.STOP_WAIT_MS||25000);let stopping=null;
-export function shutdown(wait=STOP_WAIT_MS){return stopping??=new Promise(resolve=>{draining=true;const until=Date.now()+wait,busy=()=>[...runtime.values()].filter(t=>LIVE.includes(t.phase)).length;console.log(`[Klor Poker] Stopping: waiting for ${busy()} running hand(s).`);queuePush();const check=setInterval(()=>{if(busy()&&Date.now()<until)return;clearInterval(check);console.log(`[Klor Poker] Stopped with ${busy()} hand(s) unfinished.`);save();resolve();},200);});}
+export function shutdown(wait=STOP_WAIT_MS){return stopping??=new Promise(resolve=>{if(replaced)return resolve();draining=true;const until=Date.now()+wait,busy=()=>[...runtime.values()].filter(t=>LIVE.includes(t.phase)).length;console.log(`[Klor Poker] Stopping: waiting for ${busy()} running hand(s).`);queuePush();const check=setInterval(()=>{if(busy()&&Date.now()<until)return;clearInterval(check);console.log(`[Klor Poker] Stopped with ${busy()} hand(s) unfinished.`);save();resolve();},200);});}
 for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{if(stopping)process.exit(0);shutdown().then(()=>{try{store.close();}catch{}process.exit(0);});});

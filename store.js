@@ -3,6 +3,7 @@
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const SCHEMA=`
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -56,7 +57,13 @@ export function openStore(file){
  // What is already stored, so a save only touches rows that changed. It is updated only
  // after a commit: a failed save is simply written again by the next one.
  let saved={users:new Map(),tables:new Map(),settings:new Map(),ledger:0};
- const transaction=fn=>{sql.exec('BEGIN IMMEDIATE');try{const value=fn();sql.exec('COMMIT');return value;}catch(err){sql.exec('ROLLBACK');throw err;}};
+ // During a rolling deploy the old and the new server run together on this file. The
+ // newest server claims it; from then on the older one can no longer write, so the two
+ // can never mix their data (for example paying table chips back twice).
+ const instance=crypto.randomUUID();let claimed=false;
+ const guard=()=>{if(claimed&&q.getMeta.get('owner')?.value!==instance)throw new Error('Another server now owns the database');};
+ const owned=fn=>(...args)=>{guard();return fn(...args);};
+ const transaction=fn=>{sql.exec('BEGIN IMMEDIATE');try{guard();const value=fn();sql.exec('COMMIT');return value;}catch(err){sql.exec('ROLLBACK');throw err;}};
  const syncRows=(rows,before,after,put,del)=>{for(const row of rows){const json=JSON.stringify(row);after.set(row.id,json);if(before.get(row.id)!==json)put.run(row.id,json);}for(const id of before.keys())if(!after.has(id))del.run(id);};
  const write=db=>{
   const next={users:new Map(),tables:new Map(),settings:new Map(),ledger:db.ledger.length};
@@ -74,6 +81,8 @@ export function openStore(file){
  if(!q.getMeta.get('handPlayers'))transaction(()=>{for(const r of sql.prepare('SELECT data FROM hands').all())insertPlayers(JSON.parse(r.data));q.setMeta.run('handPlayers','1');});
  let oldestSeq=1;
  const store={
+  claim(){claimed=true;q.setMeta.run('owner',instance);},
+  isOwner:()=>!claimed||q.getMeta.get('owner')?.value===instance,
   // The stored data, or null for a database that was never filled.
   load(keep=LEDGER_KEEP){
    if(!q.getMeta.get('created'))return null;
@@ -94,17 +103,17 @@ export function openStore(file){
   olderLedger(before=Infinity,size=2000){const rows=sql.prepare('SELECT seq,data FROM ledger WHERE seq<? ORDER BY seq DESC LIMIT ?').all(Math.min(before,oldestSeq),size).reverse();return {rows:rows.map(r=>JSON.parse(r.data)),seq:rows[0]?.seq??0};},
   // Sessions: only a hash of the token is stored, so the file cannot be used to sign in.
   sessions:()=>sql.prepare('SELECT key,data FROM sessions').all().map(r=>[r.key,JSON.parse(r.data)]),
-  putSession:(key,s)=>{sql.prepare('INSERT INTO sessions(key,data) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data').run(key,JSON.stringify(s));},
-  delSession:key=>{sql.prepare('DELETE FROM sessions WHERE key=?').run(key);},
+  putSession:owned((key,s)=>{sql.prepare('INSERT INTO sessions(key,data) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data').run(key,JSON.stringify(s));}),
+  delSession:owned(key=>{sql.prepare('DELETE FROM sessions WHERE key=?').run(key);}),
   // Who did what, and when.
-  addAudit:e=>{sql.prepare('INSERT INTO audit(at,actor_id,actor,role,action,target,details,ip) VALUES(?,?,?,?,?,?,?,?)').run(e.at,e.actorId??null,e.actor??null,e.role??null,e.action,e.target??null,e.details?JSON.stringify(e.details):null,e.ip??null);},
+  addAudit:owned(e=>{sql.prepare('INSERT INTO audit(at,actor_id,actor,role,action,target,details,ip) VALUES(?,?,?,?,?,?,?,?)').run(e.at,e.actorId??null,e.actor??null,e.role??null,e.action,e.target??null,e.details?JSON.stringify(e.details):null,e.ip??null);}),
   listAudit({before=Infinity,actor='',action='',limit=50}={}){const where=[],args=[];if(Number.isFinite(before)){where.push('id<?');args.push(before);}if(actor){where.push('instr(lower(actor),?)>0');args.push(actor);}if(action){where.push('action=?');args.push(action);}return sql.prepare(`SELECT id,at,actor,role,action,target,details,ip FROM audit ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY id DESC LIMIT ?`).all(...args,limit).map(r=>({...r,details:r.details?JSON.parse(r.details):null}));},
   // Chat reports.
-  addReport:r=>{sql.prepare('INSERT INTO chat_reports(at,reporter_id,reporter,target_id,target,table_name,message) VALUES(?,?,?,?,?,?,?)').run(r.at,r.reporterId,r.reporter,r.targetId,r.target,r.table,r.message);},
+  addReport:owned(r=>{sql.prepare('INSERT INTO chat_reports(at,reporter_id,reporter,target_id,target,table_name,message) VALUES(?,?,?,?,?,?,?)').run(r.at,r.reporterId,r.reporter,r.targetId,r.target,r.table,r.message);}),
   reportExists:(reporterId,targetId,message)=>!!sql.prepare("SELECT 1 FROM chat_reports WHERE reporter_id=? AND target_id=? AND message=? AND status='open'").get(reporterId,targetId,message),
   listReports:(status='open',limit=200)=>sql.prepare('SELECT * FROM chat_reports WHERE status=? ORDER BY id DESC LIMIT ?').all(status,limit).map(r=>({...r})),
   getReport:id=>{const r=sql.prepare('SELECT * FROM chat_reports WHERE id=?').get(id);return r?{...r}:null;},
-  resolveReport:(id,by,outcome)=>{sql.prepare("UPDATE chat_reports SET status='closed',resolved_by=?,resolved_at=?,outcome=? WHERE id=?").run(by,Date.now(),outcome,id);},
+  resolveReport:owned((id,by,outcome)=>{sql.prepare("UPDATE chat_reports SET status='closed',resolved_by=?,resolved_at=?,outcome=? WHERE id=?").run(by,Date.now(),outcome,id);}),
   // A player's own hands and numbers.
   playerHands:(userId,before,limit)=>sql.prepare('SELECT h.data FROM hand_players p JOIN hands h ON h.id=p.hand_id WHERE p.user_id=? AND p.hand_id<? ORDER BY p.hand_id DESC LIMIT ?').all(userId,Number.isFinite(before)?before:Number.MAX_SAFE_INTEGER,limit).map(r=>JSON.parse(r.data)),
   playerStats(userId,since=0){const t=sql.prepare('SELECT COUNT(*) AS hands,COALESCE(SUM(won),0) AS won,COALESCE(SUM(vpip),0) AS vpip,COALESCE(SUM(result),0) AS net,COALESCE(MAX(result),0) AS best,COALESCE(MIN(result),0) AS worst FROM hand_players WHERE user_id=? AND started_at>=?').get(userId,since);return {...t,days:sql.prepare("SELECT date(started_at/1000,'unixepoch') AS day,COUNT(*) AS hands,SUM(result) AS net FROM hand_players WHERE user_id=? AND started_at>=? GROUP BY day ORDER BY day").all(userId,since).map(d=>({...d}))};},
