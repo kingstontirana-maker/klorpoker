@@ -13,7 +13,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const users=['CENTER','ADMIN','AGENT','USER','USER'].map((role,i)=>({id:String(i),username:'test'+i,role,parentId:i?String(i===4?2:i-1):null,salt:'test-salt',passHash:crypto.scryptSync(password,'test-salt',64).toString('hex'),balance:i===0?100000:0}));
   fs.writeFileSync(file,JSON.stringify({users,rakePercent:5,rakeCap:300,ledger:[],tables:[],nextTable:2}));
   process.env.STATE_FILE=file;process.env.PORT='0';
-  const {server,runtime,tickTable,store,currentDb}=await import('./server.js');
+  const {server,runtime,tickTable,store,currentDb,shutdown}=await import('./server.js');
   if(!server.listening)await new Promise(resolve=>server.once('listening',resolve));
   const base='http://127.0.0.1:'+server.address().port;
   const call=async(route,token,body)=>{const r=await fetch(base+'/api/'+route,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+(token||''),'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json()};};
@@ -233,7 +233,51 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      for(const t of runtime.values()){const seen=view.tables.find(x=>x.id===t.id);assert.ok(seen);t.seats.forEach((s,i)=>assert.deepEqual(seen.seats[i]?.cards??null,s?s.cards:null));}
      assert.ok((await call('ledger',tokens[0])).data.some(x=>x.type==='INSPECT'),'inspection is logged');}
     const page=await fetch(base+'/');assert.equal(page.headers.get('x-frame-options'),'DENY');assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+    const pass=i=>i===4?'NewPass987':password,signIn=async i=>(await call('login','',{username:'test'+i,password:pass(i)})).data.token;
+    // Health check, open to the proxy without signing in.
+    {const h=await call('health','');assert.equal(h.status,200);assert.equal(h.data.ok,true);}
+    // Activity log: staff changes are recorded without secrets; only the center reads it.
+    {const C=await signIn(0);
+     await call('rake',C,{percent:4});await call('users/password',C,{userId:'1',password:'Another12345'});await call('users/password',C,{userId:'1',password});
+     const log=await call('audit',C,{limit:200});assert.equal(log.status,200);const rake=log.data.rows.find(r=>r.action==='rake');assert.equal(rake.actor,'test0');assert.equal(rake.details.percent,4);assert.equal(typeof rake.details.before,'number');
+     const pw=log.data.rows.find(r=>r.action==='users/password');assert.equal(pw.target,'test1');assert.ok(!JSON.stringify(log.data).includes('Another12345'),'passwords never reach the log');
+     assert.ok(log.data.rows.some(r=>r.action==='login'&&r.actor==='test0'),'staff sign-ins are logged');
+     assert.equal((await call('audit',await signIn(2),{})).status,403);await call('rake',C,{percent:5});}
+    // Blocking a whole network, and restoring exactly what it blocked.
+    {const C=await signIn(0),A=await signIn(2);
+     await call('users/status',A,{userId:'4',blocked:true});
+     const listed=(await call('users',C)).data.find(x=>x.id==='1');assert.ok(listed.below>=3,'the panel knows how many are below');
+     const b=await call('users/status',C,{userId:'1',blocked:true,network:true});assert.equal(b.status,200);assert.ok(b.data.network>=2,'the agent and its players; one was already blocked');
+     for(const i of [2,3,4])assert.equal((await call('login','',{username:'test'+i,password:pass(i)})).status,403,'test'+i+' cannot sign in');
+     assert.equal((await call('users/status',C,{userId:'1',blocked:false})).data.network,b.data.network);
+     for(const i of [2,3])assert.equal((await call('login','',{username:'test'+i,password})).status,200,'test'+i+' is back');
+     assert.equal((await call('login','',{username:'test4',password:pass(4)})).status,403,'blocked for their own reason, it stays');
+     await call('users/status',await signIn(2),{userId:'4',blocked:false});
+     const one=await call('users/status',await signIn(0),{userId:'1',blocked:true});assert.equal(one.data.network,0);assert.equal((await call('login','',{username:'test2',password})).status,200,'without the option only that account stops');await call('users/status',await signIn(0),{userId:'1',blocked:false});}
+    // Chat: report, review, mute; staff only inside their network.
+    {const P3=await signIn(3),P4=await signIn(4),A=await signIn(2),C=await signIn(0);const t=runtime.get('1');
+     t.chat=[{id:900,user:'test4',text:'rude words',at:Date.now()}];
+     assert.equal((await call('table/1/report',P3,{message:999})).status,404);
+     assert.equal((await call('table/1/report',P4,{message:900})).status,400,'not your own message');
+     assert.equal((await call('table/1/report',P3,{message:900})).status,200);await call('table/1/report',P3,{message:900});
+     const list=await call('moderation',A,{});assert.equal(list.status,200);assert.equal(list.data.reports.length,1,'reporting twice counts once');assert.equal(list.data.reports[0].target,'test4');
+     assert.equal((await call('moderation',P3,{})).status,403);
+     assert.equal((await call('moderation/resolve',A,{id:list.data.reports[0].id,minutes:30})).status,200);assert.equal((await call('moderation',A,{})).data.reports.length,0);
+     assert.equal((await call('table/1/chat',P4,{text:'hello'})).status,403,'muted');
+     assert.equal((await call('users/mute',C,{userId:'4',minutes:0})).status,200);assert.equal((await call('table/1/chat',P4,{text:'hello'})).status,200,'unmuted');
+     assert.equal((await call('users/mute',P3,{userId:'4',minutes:5})).status,403);
+     const alerts=await call('alerts',C,{});assert.equal(alerts.status,200);assert.ok(Array.isArray(alerts.data.alerts));assert.equal((await call('alerts',P3,{})).status,403);
+     assert.equal((await call('security',C,{})).status,200);assert.equal((await call('security',A,{})).status,403);
+     const report=await call('reports/players',A,{days:30});assert.equal(report.status,200);assert.ok(report.data.rows.length&&report.data.rows.every(r=>r.agent==='test2'),'an agent sees its own players');assert.equal((await call('reports/players',P3,{})).status,403);}
+    // A player's own hands: their cards, others' only if shown, no bot marks or ids.
+    {const P=await signIn(3),C=await signIn(0);store.addHand({id:900001,tableId:'1',table:'One',game:'holdem',hand:9,sb:1,bb:2,startedAt:Date.now(),button:1,board:['2h','3h','4c','9s','Kd'],pot:10,rake:0,showdown:true,winners:['test3'],shown:[{username:'test3',cards:['Ah','Kh'],rank:'Pair'}],winningHands:{test3:{rank:'Pair',cards:[]}},actions:[{street:'preflop',username:'test3',type:'RAISE',amount:4}],players:[{seat:1,userId:'3',username:'test3',cards:['Ah','Kh'],stack:50,end:55,result:5},{seat:2,userId:'b1',username:'hidden',bot:true,cards:['Qs','Qd'],stack:50,end:45,result:-5,folded:true}]});
+     const mine=await call('my/hands',P,{limit:1});assert.equal(mine.status,200);assert.equal(mine.data.hands[0].id,900001);assert.deepEqual(mine.data.hands[0].cards,['Ah','Kh']);
+     const full=await call('my/hands/get',P,{id:900001});assert.equal(full.status,200);const text=JSON.stringify(full.data);assert.ok(!text.includes('Qs'),'a card that was not shown stays hidden');assert.ok(!text.includes('"bot"')&&!text.includes('userId'));
+     assert.equal((await call('my/hands/get',await signIn(4),{id:900001})).status,404,'not your hand');
+     const stats=await call('my/stats',P,{});assert.equal(stats.status,200);assert.ok(stats.data.hands>=1);assert.ok(stats.data.vpip>=1);assert.equal((await call('my/stats',C,{})).status,403);}
+    // Stopping: running hands may finish, no new hands, no new seats, and the state is saved.
+    {await shutdown(1500);const before=[...runtime.values()].map(x=>x.hand);for(const x of runtime.values()){for(const s of x.seats)if(s)s.lastSeen=Date.now();x.lastActionAt=0;tickTable(x);}assert.deepEqual([...runtime.values()].map(x=>x.hand),before,'no new hand is dealt');assert.equal((await call('table/1/sit',await signIn(3),{position:5,buyin:20})).status,503);}
     // What is stored is exactly what the game has in memory, after the whole session.
-    store.commit(currentDb());assert.deepEqual(stored(),JSON.parse(JSON.stringify(currentDb())));
+    store.commit(currentDb());assert.deepEqual({...stored(),handSeq:0},{...JSON.parse(JSON.stringify(currentDb())),handSeq:0});
   } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));store.close();fs.rmSync(dir,{recursive:true,force:true});}
 });

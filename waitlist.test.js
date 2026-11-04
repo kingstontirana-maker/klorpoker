@@ -65,3 +65,9 @@ test('the action timer folds for an absent player without sitting them out; thre
  for(const s of t.seats)if(s)s.lastSeen=Date.now();t.lastActionAt=0;e.startHand(t);
  assert.ok(!t.seats.some(s=>s?.userId==='u1'),'after three timed-out hands the seat is cashed out');
 });
+
+test('a lost connection gets longer to come back than a closed page',()=>{
+ const {e,tables:[t],users}=world(2),all=[t];e.sit(t,users[0],0,100,all);e.sit(t,users[1],1,100,all);const s=t.seats[1];
+ e.away(t,users[1],20000);e.tickTable(t);assert.ok(!s.autoSitOut,'still in after the connection drops');
+ s.lastSeen-=21000;e.tickTable(t);assert.equal(s.autoSitOut,true,'away once the grace has passed');
+});

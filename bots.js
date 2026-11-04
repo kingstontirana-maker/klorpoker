@@ -71,7 +71,7 @@ export function botDecision(v,risk='low',random=Math.random){
  if(!v.toCall)return {type:'check',equity:eq};
  return {type:eq>=price+margin?'call':'fold',equity:eq};}
 
-export function createBots({db,runtime,engine,save}){
+export function createBots({db,runtime,engine,save,olderRake}){
  for(const u of db.users)if(u.isBot&&u.username.endsWith(OLD_SUFFIX)){const plain=u.username.slice(0,-OLD_SUFFIX.length);if(!db.users.some(x=>x!==u&&x.username.toLowerCase()===plain.toLowerCase()))u.username=plain;}
  const bots=()=>db.users.filter(u=>u.isBot),center=()=>db.users.find(x=>x.role==='CENTER');
  const seatOf=u=>{for(const t of runtime.values()){const s=t.seats.find(x=>x?.userId===u.id);if(s)return {t,s};}return null;};
@@ -82,8 +82,8 @@ export function createBots({db,runtime,engine,save}){
  // (Tirana time). The house result counts chips and the rake bots paid back to the center.
  db.botGuard??={dailyLimit:5000,day:'',start:0};
  const dayOf=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
- let rakeSeen=0,rakeTotal=0,rakeMap=new Map();
- function botRake(){const ids=new Set(bots().map(u=>u.id));for(;rakeSeen<db.ledger.length;rakeSeen++){const x=db.ledger[rakeSeen];if(x.type!=='RAKE')continue;for(const a of x.allocations||[])if(a.bot||ids.has(a.userId)){rakeTotal+=a.amount;const r=rakeMap.get(a.userId)||{rake:0,hands:0};r.rake+=a.amount;r.hands++;rakeMap.set(a.userId,r);}}return rakeTotal;}
+ let rakeSeen=0,rakeTotal=0,rakeMap=new Map(),oldCounted=false;
+ function botRake(){const ids=new Set(bots().map(u=>u.id)),count=x=>{if(x.type!=='RAKE')return;for(const a of x.allocations||[])if(a.bot||ids.has(a.userId)){rakeTotal+=a.amount;const r=rakeMap.get(a.userId)||{rake:0,hands:0};r.rake+=a.amount;r.hands++;rakeMap.set(a.userId,r);}};if(!oldCounted){oldCounted=true;for(const x of olderRake?.()||[])count(x);}for(;rakeSeen<db.ledger.length;rakeSeen++)count(db.ledger[rakeSeen]);return rakeTotal;}
  const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake();
  function guardToday(now=Date.now()){const g=db.botGuard,d=dayOf(now);if(g.day!==d){g.day=d;g.start=houseValue();for(const b of bots())if(b.bot.error==='House daily limit reached'){b.bot.error=null;b.bot.enabled=true;b.bot.baseline=equity(b);}save();}return houseValue()-g.start;}
  const cents=(v,label)=>{const n=Math.round(Number(v)*100);if(!Number.isSafeInteger(n)||n<=0)fail(label+' must be a positive amount');return n;};

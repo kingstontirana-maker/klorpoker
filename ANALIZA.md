@@ -524,3 +524,13 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - **Importi:** në nisjen e parë serveri lexon `state.json` dhe `hands.jsonl`, krahason numrin e llogarive, shumën e balancave, transaksionet dhe duart, dhe i lë skedarët e vjetër të paprekur. Nëse diçka nuk përputhet, nuk ndryshon asgjë. Një `state.json` i dëmtuar ndal nisjen në vend që të hapë një bazë bosh.
 - **Verifikim në një kopje demo:** 15 llogari, 344 transaksione dhe 129 duar u importuan saktë. Serveri u ndal me forcë në mes të një dore: paratë mbetën të plota dhe chips-at u kthyen në portofol pas rinisjes. Një ruajtje me 200 000 transaksione: nga rreth 318 ms në rreth 6 ms.
 - Kërkon Node 22.13 ose më të ri (`.node-version`). Provuar me Node 24; në server do të përdoret Node 22.
+
+## Regjistër, bllokim rrjeti, loja e ndershme, lojtarët, panelet dhe pjesa teknike
+- **Regjistri i veprimeve (Activity log, vetëm qendra):** çdo ndryshim i stafit ruhet pasi ka kaluar me sukses: kush, çfarë, mbi kë, kur, nga cila adresë dhe vlera e mëparshme për rake, përqindje dhe tavolina. Hyrjet e stafit ruhen. Fjalëkalimet nuk ruhen kurrë.
+- **Bllokimi i rrjetit:** kur bllokon një admin ose agjent, zgjedh nëse bllokon edhe gjithë llogaritë poshtë tij. Zhbllokimi kthen vetëm ato që ai bllokim mbylli; llogaritë e bllokuara më parë për arsyen e tyre mbeten të bllokuara.
+- **Loja e ndershme (Fair play, vetëm qendra):** pajisje e njëjtë, adresë e njëjtë, lojtarë pothuajse gjithmonë bashkë dhe para që lëvizin në një drejtim. Del vetëm çifti me 2 ose më shumë shenja dhe të paktën 20 duar bashkë. Janë arsye për të parë duart, jo provë, dhe nuk bllokojnë asgjë vetë.
+- **Chat:** lojtari raporton një mesazh ose fsheh një lojtar në pajisjen e vet. Stafi sheh raportet e rrjetit të vet dhe mund të heshtë lojtarin (ai vazhdon të luajë).
+- **Lojtarët:** "My hands & stats": fitim/humbje, duar, duar të fituara, luajtje vullnetare, duart e veta me letrat e veta. Letrat e të tjerëve shfaqen vetëm nëse u hapën në tavolinë; asnjë shenjë bot-i ose id.
+- **Rilidhje:** një lidhje e humbur ka 20 sekonda për t'u kthyer (faqja e mbyllur 5). Rilidhja niset menjëherë kur kthehet interneti, dhe në tavolinë del njoftim.
+- **Qendra dhe agjentët:** menu e grupuar, ballina "Needs attention", raport lojtarësh me eksport CSV.
+- **Teknike:** mbyllje e kontrolluar kur serveri ndalet (asnjë dorë e re, duart e nisura kanë deri 25 sekonda); sesione që mbijetojnë rinisjen (ruhet vetëm hash-i i token-it); `/api/health`; në memorie mbahen vetëm 20 000 transaksionet më të reja, të vjetrat lexohen kur duhen.

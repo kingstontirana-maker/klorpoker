@@ -371,3 +371,19 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 .guardRow input{padding:10px 12px;border-radius:10px;border:1px solid #2a3c37;background:#091011;color:#e8f3ee;width:160px;max-width:none}
 .guardToday{display:grid;padding:8px 14px;border-radius:10px;background:#ffffff06;border:1px solid #263735}.guardToday small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .guardToday strong.up{color:#7ff0b9}.guardToday strong.down{color:#ff8b98}.badge.alert{background:#3a1418;color:#ff8b98;border-color:#ef5d6b66}
+
+/* ---- Panel: grouped navigation, attention list and report pages ---- */
+.navGroup{display:block;margin:14px 12px 4px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#6d857d}
+.navCount{margin-left:auto;min-width:18px;padding:0 5px;border-radius:9px;background:#d9534f;color:#fff;font:700 10px/18px Inter,system-ui,sans-serif;font-style:normal;text-align:center}.navItem:has(.navCount){display:flex;align-items:center}
+.alertRows{display:grid;gap:8px}.alertRow{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;text-align:left;border-radius:10px;background:#0d1714;border:1px solid #283c30;color:inherit;font-size:13px}.alertRow:hover{border-color:#5ef0a866;filter:none}.alertRow i{flex:none;width:9px;height:9px;border-radius:50%;background:#8eaaa1}.alertRow.warn i{background:#f0c04a}.alertRow.high i{background:#ef5d6b;box-shadow:0 0 8px #ef5d6b}.alertRow span{flex:1}.alertRow b{color:#8eaaa1;font-weight:400}
+.reportTools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.tableScroll{overflow-x:auto}
+.adminRows{display:grid;gap:8px}.adminRow{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:#0d1714;border:1px solid #283c30}.adminRow small{display:block;margin-top:4px;letter-spacing:0;font-size:11px;color:#8eaaa1}.adminRow p{margin:6px 0 0;font-size:12px;color:#b6cab8}.adminRow .quote{padding:6px 10px;border-left:2px solid #d8b46a66;color:#f2f6f4}
+.levelTag{padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700}.levelTag.high{background:#ef5d6b2e;color:#ffb3b9}.levelTag.medium{background:#f0c04a26;color:#ffdf8a}
+.dataTable .up,.mhStats .up,.mhRow .up{color:#7dffc4}.dataTable .down,.mhStats .down,.mhRow .down{color:#ff9aa2}
+/* ---- A player's hands ---- */
+.myHandsDialog{width:min(560px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 24px);overflow:auto}
+.mhPeriod{display:flex;gap:6px;margin:10px 0}.mhPeriod button{flex:1;padding:7px 4px;font-size:12px;border-radius:9px;background:#ffffff08;border:1px solid #2a3c37;color:inherit}.mhPeriod button.on{border-color:#5ef0a8;color:#a8f5c9}
+.mhStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.mhStats div{padding:9px 10px;border-radius:10px;background:#0d1714;border:1px solid #283c30}.mhStats small{display:block;font-size:10px;letter-spacing:0;color:#8eaaa1}.mhStats strong{font-size:15px}
+.mhRows{display:grid;gap:6px}.mhRow{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;text-align:left;border-radius:10px;background:#0d1714;border:1px solid #283c30;color:inherit}.mhRow:hover{border-color:#5ef0a866;filter:none}.mhCards{display:flex;gap:3px;flex:none}.mhInfo{flex:1;min-width:0}.mhInfo b{display:block;font-size:13px}.mhInfo small{display:block;font-size:11px;letter-spacing:0;color:#8eaaa1}
+.myHandsDialog .card{position:relative;display:block;overflow:hidden;flex:none;width:30px;height:42px;border-radius:4px;background:linear-gradient(150deg,#fff,#eef2f4);border:1px solid #d5dde2;color:#14283a}.myHandsDialog .card.red{color:#d02a49}
+@media(max-width:760px){.navGroup{display:none}.mhStats{grid-template-columns:repeat(2,1fr)}}

@@ -63,6 +63,27 @@ test('a damaged state file stops the start instead of opening an empty database'
  const s=openStore(file);assert.throws(()=>s.importFiles(state,path.join(dir,'none')),/Cannot read/);assert.equal(s.load(),null);s.close();
 });
 
+test('only the newest transactions load into memory; older ones stay reachable and new ones keep their place',()=>{
+ const file=path.join(tmp(),'f.db');let s=openStore(file);const db={...sample(),ledger:Array.from({length:10},(_,i)=>({id:'l'+i,type:i%2?'RAKE':'BUY_IN',amount:i,time:i}))};s.commit(db);s.close();
+ s=openStore(file);const back=s.load(3);assert.deepEqual(back.ledger.map(l=>l.id),['l7','l8','l9']);assert.deepEqual(s.olderRake().map(l=>l.id),['l1','l3','l5']);
+ const page=s.olderLedger(Infinity,4);assert.deepEqual(page.rows.map(l=>l.id),['l3','l4','l5','l6']);assert.deepEqual(s.olderLedger(page.seq,4).rows.map(l=>l.id),['l0','l1','l2']);
+ back.ledger.push({id:'l10',type:'RAKE',amount:1,time:10});s.commit(back);s.close();
+ s=openStore(file);assert.deepEqual(s.load(100).ledger.map(l=>l.id),Array.from({length:11},(_,i)=>'l'+i));s.close();
+});
+
+test('sessions, activity and reports are stored; statistics fill in for older databases',()=>{
+ const file=path.join(tmp(),'g.db');let s=openStore(file);s.commit(sample());
+ s.putSession('k1',{userId:'u',created:1});s.putSession('k2',{userId:'c',created:2});s.delSession('k2');assert.deepEqual(s.sessions(),[['k1',{userId:'u',created:1}]]);
+ s.addAudit({at:1,actorId:'c',actor:'center',role:'CENTER',action:'rake',details:{percent:4}});s.addAudit({at:2,actor:'admin1',action:'transfer',target:'x'});
+ assert.equal(s.listAudit({action:'rake'})[0].details.percent,4);assert.equal(s.listAudit({actor:'admin'}).length,1);assert.equal(s.listAudit({limit:1})[0].action,'transfer');
+ s.addHand({id:1,tableId:'1',startedAt:Date.now(),winners:['Ana'],actions:[{street:'preflop',username:'Ana',type:'CALL'},{street:'flop',username:'Besi',type:'BET'}],players:[{userId:'u',username:'Ana',result:5},{userId:'b',username:'Besi',result:-5}]});
+ const a=s.playerStats('u'),b=s.playerStats('b');assert.deepEqual([a.hands,a.won,a.vpip,a.net],[1,1,1,5]);assert.deepEqual([b.won,b.vpip,b.net],[0,0,-5]);assert.equal(a.days[0].net,5);
+ assert.equal(s.playerHands('u',Infinity,5).length,1);assert.equal(s.playerHands('u',1,5).length,0);s.close();
+ // An older database: hands without statistics rows.
+ const old=new DatabaseSync(file);old.exec("DELETE FROM hand_players;DELETE FROM meta WHERE key='handPlayers'");old.close();
+ s=openStore(file);assert.equal(s.playerStats('u').hands,1,'filled from the stored hands');s.close();
+});
+
 test('no files: nothing to import',()=>{
  const dir=tmp(),s=openStore(path.join(dir,'klor.db'));assert.equal(s.importFiles(path.join(dir,'a'),path.join(dir,'b')),null);s.close();
 });

@@ -58,7 +58,7 @@ export function livePots(t){
  return pots;
 }
 
-export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onHand=()=>{}}){
+export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onHand=()=>{},canDeal=()=>true}){
  const findUser=id=>db.users.find(u=>u.id===id);
  const event=(t,text)=>{t.events.unshift({text,at:Date.now(),hand:t.hand});t.events=t.events.slice(0,60);};
  // Hand history: every hand is recorded from the deal to the payout (all hole cards,
@@ -99,6 +99,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
  }
 
  function startHand(t){
+  if(!canDeal())return false;
   removeInactive(t);
   const real=Date.now();for(const s of t.seats)if(s&&!s.sittingOut&&real-(s.lastSeen??real)>PRESENT_MS)markAway(t,s);
   if(t.seats.filter(s=>eligible(t,s)).length<2){clearTable(t);return false;}
@@ -264,8 +265,8 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   event(t,`${s.username} is back in the game`);save();
  }
  // The tab was closed: if the player is not back within 5 seconds (a reload is),
- // the normal away protection takes over.
- function away(t,u){const s=t.seats[seatOf(t,u.id)];if(s&&!s.sittingOut)s.lastSeen=Math.min(s.lastSeen??Date.now(),Date.now()-AWAY_MS+5000);}
+ // the normal away protection takes over. A lost connection is given longer.
+ function away(t,u,graceMs=5000){const s=t.seats[seatOf(t,u.id)];if(s&&!s.sittingOut)s.lastSeen=Math.min(s.lastSeen??Date.now(),Date.now()-AWAY_MS+graceMs);}
 
  function sitOut(t,u,value){
   const s=t.seats[seatOf(t,u.id)];if(!s)fail('You are not seated at this table');
@@ -287,6 +288,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
  }
 
  function chat(t,u,text){
+  if(u.mutedUntil>Date.now())fail('You cannot write in chat for now. You were muted by your manager.',403);
   const message=String(text||'').replace(/\s+/g,' ').trim().slice(0,200);if(!message)fail('The message is empty');
   t.chatTimes??={};if(Date.now()-(t.chatTimes[u.id]||0)<1200)fail('Wait a moment before your next message');t.chatTimes[u.id]=Date.now();
   t.chat.push({id:++t.chatSeq,user:u.username,text:message,at:Date.now()});t.chat=t.chat.slice(-CHAT_LIMIT);
@@ -312,6 +314,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    canShow:!!mine&&t.phase==='finished'&&!!result&&mine.cards.length>0&&!shown.has(mine.id),
    id:t.id,name:t.name,game,color:t.color||null,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,turn:t.turn,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),minRaise:clean(t.minRaise),
    pots:LIVE.includes(t.phase)?livePots(t).map(p=>({amount:clean(p.amount),eligible:p.eligible})):[],
+   restarting:!canDeal(),
    seats:t.seats.map((s,i)=>s?{inactiveHands:s.inactiveHands||0,lastAction:s.lastAction||null,id:s.id,position:i,username:s.username,stack:clean(s.stack),bet:clean(s.roundBet),folded:s.folded,allIn:s.allIn,inHand:s.inHand,sittingOut:!!s.sittingOut,leaving:!!s.leaveAfterHand,waiting:!s.inHand&&!s.sittingOut,cardCount:s.cards.length,cards:s.userId===userId||shown.has(s.id)?s.cards:[],isMe:s.userId===userId}:null),
    events:t.events.slice(0,30),
    lastResult:result?{...Object.fromEntries(Object.entries(result).filter(([k])=>!['totalRake','rakeContributions'].includes(k))),payments:Object.fromEntries(Object.entries(result.payments).map(([k,v])=>[k,clean(v)])),pots:result.pots.map(p=>({...Object.fromEntries(Object.entries(p).filter(([k])=>k!=='rake')),amount:clean(p.amount)}))}:null
