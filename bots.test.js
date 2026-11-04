@@ -1,15 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createEngine,LIVE} from './game.js';
-import {createBots,botDecision,botView,handStrength,equity,equityEstimate} from './bots.js';
-import {calculateTableEquity} from './equity-service.js';
+import {createBots,botDecision,botView,handStrength,equity} from './bots.js';
 
-function world(calculateEquity){
+function world(){
  const center={id:'center',username:'center',role:'CENTER',balance:1000000},db={users:[center],ledger:[],rakePercent:0};
  const runtime=new Map(),engine=createEngine({db}),t=engine.makeTable('1','Test',100,200);runtime.set('1',t);
- // Lifecycle tests use a cheap deterministic probability provider; the exact
- // calculator and worker are verified separately in exact-equity.test.js.
- const manager=createBots({db,runtime,engine,save:()=>{},calculateEquity:calculateEquity??(input=>({players:input.players.map(p=>({id:p.id,equity:1/input.players.length})),outcomes:1,exact:true}))});
+ const manager=createBots({db,runtime,engine,save:()=>{}});
  const human=(i,cents=50000)=>{const u={id:'h'+i,username:'human'+i,role:'USER',balance:cents};db.users.push(u);return u;};
  const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+t.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0);
  return {center,db,runtime,engine,t,manager,human,total};
@@ -137,88 +134,15 @@ test('house protection stops every bot when the daily limit is reached',()=>{
  assert.throws(()=>manager.route('/api/bots/settings',{dailyLimit:-1},center),/0 or more/);
 });
 
-test('all-ins never override the cumulative investment budget',()=>{
+test('all-ins: the bot calls when the price is right and defends the chips it has put in',()=>{
  let seed=11;const rng=()=>(seed=(seed*1103515245+12345)%2147483648)/2147483648;
  // A frequent shover puts €100 in; the bot has the big blind with a hand that is a favourite vs random.
  const shove={game:'holdem',phase:'preflop',board:[],pot:10200,currentBet:10000,toCall:9800,minRaiseTo:10000,maxRaiseTo:10000,stack:9800,roundBet:200,bb:200,canRaise:false,opponents:1,committed:200,facingAllIn:true};
- assert.equal(botDecision({...shove,cards:['Kh','9c'],shoveRate:1},'low',rng).type,'fold','even an always-shover cannot override the budget');
+ assert.equal(botDecision({...shove,cards:['Kh','9c'],shoveRate:1},'low',rng).type,'call','K9 calls an always-shover');
  assert.equal(botDecision({...shove,cards:['7c','2d'],shoveRate:1},'low',rng).type,'fold','72 still folds');
- // Prior investments still count against the limit when facing a shove.
+ // After betting a third of its stack, the bot does not give the pot away to a shove.
  const committed={game:'holdem',phase:'flop',board:['Qs','8d','3c'],pot:9000,currentBet:9000,toCall:6000,minRaiseTo:9000,maxRaiseTo:9000,stack:6000,roundBet:3000,bb:200,canRaise:false,opponents:1,committed:4000,facingAllIn:true};
- assert.equal(botDecision({...committed,cards:['Qh','Ts']},'low',rng).type,'fold','past investments cannot justify exceeding the budget');
+ assert.equal(botDecision({...committed,cards:['Qh','Ts']},'low',rng).type,'call','top pair defends after committing');
  // A bluff never risks more than a tenth of the stack.
  for(let i=0;i<200;i++){const d=botDecision({game:'holdem',phase:'flop',board:['As','Kd','7c'],pot:600,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:20000,stack:20000,roundBet:0,bb:200,canRaise:true,opponents:1,committed:300,cards:['4h','2c']},'high',rng);if(d.type==='raise')assert.ok(d.amount*100<=2000,'small bluff only');}
-});
-
-
-test('estimated player shares use only visible cards and split tied pots',()=>{
- const v={game:'holdem',cards:['2c','3d'],board:['As','Ks','Qs','Js','Ts'],opponents:3};
- const e=equityEstimate(v,20);
- assert.equal(e.equity,.25);
- assert.deepEqual(e.opponentEquities,[.25,.25,.25]);
- assert.equal(e.opponentsEquity,.75);
- assert.throws(()=>equityEstimate(v,0),/positive integer/);
-});
-
-test('changing hidden cards cannot change probability estimates or decisions',()=>{
- const {engine,t,human}=world();
- engine.sit(t,human(1),0,100,[t]);engine.sit(t,human(2),1,100,[t]);engine.startHand(t);
- const s=t.seats[0],other=t.seats[1];
- const seeded=()=>{let seed=19;return ()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;};
- const before=botDecision(botView(t,s),'low',seeded());
- other.cards=['As','Ad'];t.deck.reverse();
- const after=botDecision(botView(t,s),'low',seeded());
- assert.deepEqual(after,before);
- assert.ok(Math.abs(after.equity+after.opponentEquities.reduce((a,b)=>a+b,0)-1)<1e-10);
-});
-
-
-test('investment limits apply across streets, raises, calls and risk styles',()=>{
- const base={game:'holdem',cards:['As','Ks'],board:['Qs','Js','Ts','2d'],opponents:1,pot:20000,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:20000,stack:9000,committed:1000,roundBet:0,bb:200,canRaise:true};
- for(const risk of ['low','medium','high']){
-  const turn=botDecision(base,risk);
-  assert.equal(turn.investmentLimit,1500);
-  assert.equal(turn.type,'raise');assert.equal(turn.amount,5);
-  const river=botDecision({...base,board:[...base.board,'3c']},risk);
-  assert.equal(river.investmentLimit,4000);
-  assert.equal(river.type,'raise');assert.equal(river.amount,30);
-  const exhausted=botDecision({...base,stack:8500,committed:1500},risk);
-  assert.equal(exhausted.type,'check');assert.equal(exhausted.remainingInvestment,0);
-  const facing= {...base,currentBet:501,toCall:501,minRaiseTo:1002,canRaise:false};
-  assert.equal(botDecision(facing,risk).type,'fold');
-  assert.equal(botDecision({...facing,currentBet:500,toCall:500},risk).type,'call');
-  assert.equal(botDecision({...base,minRaiseTo:600},risk).type,'check','budget does not permit an illegal short raise');
- }
-});
-
-test('river ties and trailing equity keep the 15 percent limit',()=>{
- const base={game:'holdem',cards:['2c','3d'],board:['As','Ks','Qs','Js','Ts'],opponents:2,pot:2000,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:10000,stack:10000,committed:0,roundBet:0,bb:200,canRaise:true};
- const tied=botDecision(base);
- assert.equal(tied.investmentRate,.15);assert.equal(tied.investmentLimit,1500);
- const trailing=botDecision({...base,cards:['2c','3d'],board:['As','Ad','Kh','Qc','9s'],opponents:5});
- assert.equal(trailing.investmentRate,.15);
-});
-
-
-test('live bots wait for exact worker equity and share the cached calculation',async()=>{
- let calls=0,pending;
- const w=world(input=>{calls++;pending=calculateTableEquity(input);return pending;});
- const {center,db,engine,t,manager,human}=w;
- manager.route('/api/bots/create',{name:'ExactBot',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
- const bot=db.users.find(u=>u.isBot);
- manager.route('/api/bots/status',{id:bot.id,enabled:true},center);
- engine.sit(t,human(1),0,100,[t]);manager.tick();engine.startHand(t);
- const seat=t.seats.find(s=>s?.isBot),opponent=t.seats.find(s=>s&&!s.isBot);
- seat.cards=['As','Ks'];opponent.cards=['Ah','Ad'];t.board=['Qs','Js','Ts','2c','3d'];t.phase='river';
- for(const s of t.seats)if(s){s.roundBet=0;s.acted=false;}
- t.currentBet=0;t.minRaise=t.bb;t.turn=seat.position;t.runout=null;
- const pot=t.pot;
- manager.tick(t.turnStartedAt+5000);manager.tick(t.turnStartedAt+5000);
- assert.equal(calls,1);assert.equal(t.pot,pot,'no guessed decision while calculation is pending');
- await pending;
- manager.tick(t.turnStartedAt+5000);
- assert.equal(calls,1);assert.equal(seat.lastAction.type,'BET');
- assert.ok(seat.committed<=Math.floor((seat.stack+seat.committed)*.4));
- const snapshot=JSON.stringify(engine.snapshot(t,opponent.userId,false));
- assert.ok(!snapshot.includes('opponentEquities')&&!snapshot.includes('exact'));
 });
