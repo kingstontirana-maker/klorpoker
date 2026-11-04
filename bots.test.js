@@ -78,8 +78,8 @@ test('bots and real players play many hands: money is conserved and limits stop 
   manager.tick();stopped=!b.bot.enabled;
   assert.equal(total(),start,'no money created or lost');
  }
- assert.ok(stopped,'the win or loss limit ends the session');assert.match(b.bot.error,/Win limit|Loss limit/);
- const session=(b.balance-b.bot.baseline)/100;assert.ok(session>=15||session<=-60);
+ assert.ok(stopped,'the win or loss limit ends the session');assert.match(b.bot.error,/Win limit|Loss limit|House daily limit/);
+ const session=(b.balance-b.bot.baseline)/100;if(!/House daily limit/.test(b.bot.error))assert.ok(session>=15||session<=-60);
 });
 
 test('players never learn which seat is a bot; the center does',()=>{

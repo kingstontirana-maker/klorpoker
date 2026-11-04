@@ -108,7 +108,7 @@ All-in runouts are dealt by the server clock: hands are tabled, then flop, turn 
 
 
 ## Deploying with Coolify (or any container host)
-Accounts and balances live in `data/state.json`, which is **not** in Git. Containers lose their files on every deploy, so give the app persistent storage:
+Accounts, balances, transactions and hands live in the SQLite database `klor.db`, next to `STATE_FILE` (`data/` by default), which is **not** in Git. On the first start it imports an existing `state.json` and `hands.jsonl` and leaves those files untouched. Needs Node 22.13 or newer. Containers lose their files on every deploy, so give the app persistent storage:
 1. Coolify → the application → **Persistent Storage** → add a volume, e.g. name `klorpoker-data`, destination `/data`.
 2. **Environment Variables** → `STATE_FILE=/data/state.json` (and optionally `CENTER_PASSWORD` for a brand-new database).
-3. Redeploy. To restore an existing database, copy `state.json` into the volume (Coolify → Terminal) and restart.
+3. Redeploy. To restore a database, stop the app and copy `klor.db` into the volume (Coolify → Terminal), together with `klor.db-wal` if it exists, then start it.

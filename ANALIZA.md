@@ -516,4 +516,11 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 
 ## Chat në një dritare të vogël
 - Poshtë majtas tani është butoni i chat-it (me numrin e mesazheve të palexuara). Hap një dritare të vogël në të majtë që nuk bllokon tavolinën: butonat Fold/Check/Raise mbeten të përdorshëm. Mbyllet me ✕ ose Esc dhe kur del nga tavolina.
-- Teksti me përshkrimin e letrave (p.sh. "Pair of J", "9-6 offsuit") u hoq nga ai cep. Në telefon horizontal pranë butonit del vetëm "+20s" (koha shtesë) ose paralajmërimi i kohës kur duhen. Dritarja anësore "History" tani ka vetëm historikun.
+- Teksti me përshkrimin e letrave (p.sh. "Pair of J", "9-6 offsuit") u hoq nga ai cep. Në telefon cepi poshtë majtas i përket vetëm butonit të chat-it: kutia me sekondat ("+20s") dhe paralajmërimet nuk shfaqen më atje, dhe butoni qëndron mbi çdo element tjetër. Dritarja anësore "History" tani ka vetëm historikun.
+
+## Kalimi në SQLite
+- **Ku ruhen të dhënat:** në `klor.db`, në të njëjtën dosje me `STATE_FILE` (në server `/data/klor.db`). Tabelat: `users`, `ledger`, `game_tables`, `settings`, `hands`. Kodi është te `store.js`.
+- **Si punon:** loja vazhdon të punojë në memorie, prandaj logjika e parave nuk ndryshoi. Çdo ruajtje shkruan vetëm atë që ka ndryshuar, brenda një transaksioni: ose ruhet e gjitha, ose asgjë. Në nisje të dhënat lexohen të gjitha në memorie.
+- **Importi:** në nisjen e parë serveri lexon `state.json` dhe `hands.jsonl`, krahason numrin e llogarive, shumën e balancave, transaksionet dhe duart, dhe i lë skedarët e vjetër të paprekur. Nëse diçka nuk përputhet, nuk ndryshon asgjë. Një `state.json` i dëmtuar ndal nisjen në vend që të hapë një bazë bosh.
+- **Verifikim në një kopje demo:** 15 llogari, 344 transaksione dhe 129 duar u importuan saktë. Serveri u ndal me forcë në mes të një dore: paratë mbetën të plota dhe chips-at u kthyen në portofol pas rinisjes. Një ruajtje me 200 000 transaksione: nga rreth 318 ms në rreth 6 ms.
+- Kërkon Node 22.13 ose më të ri (`.node-version`). Provuar me Node 24; në server do të përdoret Node 22.

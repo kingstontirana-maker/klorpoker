@@ -1,38 +1,25 @@
 import {rakeReport,revenueReport,pct} from './rake.js';
 import {createBots} from './bots.js';
 import {createPayments} from './payments.js';
+import {openStore} from './store.js';
 import http from 'node:http';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {fileURLToPath} from 'node:url';import {createEngine,LIVE,fail,MAX_TABLES} from './game.js';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));const SAVE=process.env.STATE_FILE||path.join(ROOT,'data','state.json');const PORT=Number(process.env.PORT||3000);const uid=()=>crypto.randomUUID();const money=n=>Math.round(Number(n)*100);const clean=n=>Math.round(n)/100;const secret=()=>crypto.randomBytes(28).toString('hex');const hash=(p,s)=>crypto.scryptSync(p,s,64).toString('hex');const config={minBuyin:2000,maxBuyin:100000};
 // A fresh database never uses a known password: CENTER_PASSWORD, or a random one
 // that is printed once in the server log.
-let db;try{db=JSON.parse(fs.readFileSync(SAVE,'utf8'));}catch{const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBytes(9).toString('base64url');if(!process.env.CENTER_PASSWORD)console.log(`[Klor Poker] New database at ${SAVE}. Temporary "center" password: ${initial}`);else console.log(`[Klor Poker] New database at ${SAVE} ("center" password from CENTER_PASSWORD).`);db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(initial,salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};}
+const DB_FILE=process.env.DB_FILE||path.join(path.dirname(SAVE),'klor.db'),HANDS_FILE=process.env.HANDS_FILE||path.join(path.dirname(SAVE),'hands.jsonl');
+export const store=openStore(DB_FILE);export const currentDb=()=>db;
+let db=store.load();
+if(!db){const moved=store.importFiles(SAVE,HANDS_FILE);if(moved){db=store.load();console.log(`[Klor Poker] Moved to SQLite (${DB_FILE}): ${db.users.length} accounts, ${db.ledger.length} transactions, ${moved.hands} hands${moved.skipped?`, ${moved.skipped} damaged hand lines skipped`:''}. The old files were left untouched.`);}}
+if(!db){const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBytes(9).toString('base64url');if(!process.env.CENTER_PASSWORD)console.log(`[Klor Poker] New database at ${DB_FILE}. Temporary "center" password: ${initial}`);else console.log(`[Klor Poker] New database at ${DB_FILE} ("center" password from CENTER_PASSWORD).`);db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(initial,salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};store.commit(db);}
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];
-export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));fs.mkdirSync(path.dirname(SAVE),{recursive:true});writeState(JSON.stringify(db,null,2));queuePush();};
-// Atomic write: temp file, then rename. On Windows the rename can fail for a moment
-// (an editor, backup or antivirus holding state.json); it is retried and finally
-// written in place, and a failed save is logged instead of stopping the server.
-function writeState(json){const tmp=SAVE+'.tmp';try{fs.writeFileSync(tmp,json);for(let i=0;;i++){try{fs.renameSync(tmp,SAVE);return;}catch(err){if(i>=4){fs.writeFileSync(SAVE,json);try{fs.unlinkSync(tmp);}catch{}return;}const until=Date.now()+25*(i+1);while(Date.now()<until);}}}catch(err){console.error('[Klor Poker] state not saved',err.message);}}
+export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);}catch(err){console.error('[Klor Poker] state not saved',err.message);}queuePush();};
 const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h)});
-// ---- Hand history: every finished hand is appended to its own file (one JSON per
-// line, never rewritten) so it survives restarts and never bloats state.json. ----
-const HANDS_FILE=process.env.HANDS_FILE||path.join(path.dirname(SAVE),'hands.jsonl');
-function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{fs.mkdirSync(path.dirname(HANDS_FILE),{recursive:true});fs.appendFileSync(HANDS_FILE,JSON.stringify(h)+'\n');}catch(err){console.error('[Klor Poker] hand history not saved',err);}}
-// Newest first: the file is read backwards in blocks, so recent hands are found
-// without loading the whole history.
-function* handsNewestFirst(){let fd;try{fd=fs.openSync(HANDS_FILE,'r');}catch{return;}
- try{const size=fs.fstatSync(fd).size,block=256*1024;let pos=size,tail=Buffer.alloc(0);
-  // Lines are cut at byte level, so a character is never split between two blocks.
-  while(pos>0){const len=Math.min(block,pos);pos-=len;const buf=Buffer.alloc(len);fs.readSync(fd,buf,0,len,pos);const chunk=Buffer.concat([buf,tail]);
-   const cut=pos>0?chunk.indexOf(10):-1;if(pos>0&&cut<0){tail=chunk;continue;}
-   tail=cut>=0?chunk.subarray(0,cut):Buffer.alloc(0);const lines=chunk.subarray(cut+1).toString('utf8').split('\n');
-   for(let i=lines.length-1;i>=0;i--)if(lines[i].trim()){try{yield JSON.parse(lines[i]);}catch{}}}
-  }finally{fs.closeSync(fd);}}
+// Hand history: every finished hand is one row of its own, stored as it finishes.
+function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{store.addHand(h);}catch(err){console.error('[Klor Poker] hand history not saved',err);}}
 const handSummary=h=>({id:h.id,at:h.startedAt,table:h.table,tableId:h.tableId,game:h.game,hand:h.hand,sb:h.sb,bb:h.bb,players:h.players.map(p=>p.username),bots:h.players.filter(p=>p.bot).map(p=>p.username),board:h.board,pot:h.pot,rake:h.rake,winners:h.winners,showdown:h.showdown});
-function listHands(body){const table=body.table?String(body.table):'',player=String(body.player||'').trim().toLowerCase(),from=Number(body.from)||0,to=Number(body.to)||Infinity,before=Number(body.before)||Infinity,limit=Math.max(1,Math.min(200,Number(body.limit)||50));const out=[];let more=false;
- for(const h of handsNewestFirst()){if(h.id>=before||h.startedAt>to)continue;if(h.startedAt<from)break;if(table&&h.tableId!==table)continue;if(player&&!h.players.some(p=>p.username.toLowerCase().includes(player)))continue;if(out.length===limit){more=true;break;}out.push(handSummary(h));}
- return {hands:out,more,total:db.handSeq||0};}
+function listHands(body){const filter={table:body.table?String(body.table):'',player:String(body.player||'').trim().toLowerCase(),from:Number(body.from)||0,to:Number(body.to)||Infinity,before:Number(body.before)||Infinity},limit=Math.max(1,Math.min(200,Number(body.limit)||50)),rows=store.listHands(filter,limit+1);return {hands:rows.slice(0,limit).map(handSummary),more:rows.length>limit,total:db.handSeq||0};}
 // Each table has a felt colour (#rrggbb); the whole table design is derived from it.
 const DEFAULT_COLOR='#1f9d6b',validColor=c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c);
 const GAME_TYPES=['holdem','omaha'];
@@ -95,7 +82,7 @@ if(p==='/api/users/share'){roleCheck(u,'CENTER','ADMIN');const child=db.users.fi
 if(p==='/api/transfer'){roleCheck(u,'CENTER','ADMIN','AGENT');const child=db.users.find(x=>x.id===body.userId&&childOf(x,u)&&!x.isBot);if(!child)fail('Direct subordinate not found',404);const amount=money(body.amount);if(!Number.isSafeInteger(amount)||amount<=0)fail('Invalid amount');if(body.direction==='send'){if(u.balance<amount)fail('Insufficient balance');u.balance-=amount;child.balance+=amount;}else if(body.direction==='return'){if(child.balance<amount)fail('Insufficient child balance');child.balance-=amount;u.balance+=amount;}else fail('Direction invalid');db.ledger.push({id:uid(),type:'TRANSFER',from:body.direction==='send'?u.id:child.id,to:body.direction==='send'?child.id:u.id,amount,time:Date.now()});save();return {ok:true};}
 // Revenue report: who generated the rake, how and when, for the viewer's own network.
 if(p==='/api/hands'){roleCheck(u,'CENTER');return listHands(body);}
-if(p==='/api/hands/get'){roleCheck(u,'CENTER');const id=Number(body.id);for(const h of handsNewestFirst()){if(h.id===id)return h;if(h.id<id)break;}fail('Hand not found',404);}
+if(p==='/api/hands/get'){roleCheck(u,'CENTER');const hand=store.getHand(Number(body.id));if(!hand)fail('Hand not found',404);return hand;}
 if(p==='/api/revenue'){roleCheck(u,'CENTER','ADMIN','AGENT');const r=revenueReport(db,u,{from:body.from,to:body.to,scope:body.scope?String(body.scope):undefined,detail:!!body.detail,includeBots:u.role==='CENTER'&&body.includeBots===true});const e=x=>({...x,rake:clean(x.rake)});return {...r,totals:{...r.totals,rake:clean(r.totals.rake),earned:clean(r.totals.earned),paidToNetwork:clean(r.totals.paidToNetwork),...(r.totals.botRake!=null?{botRake:clean(r.totals.botRake)}:{}),avgPerHand:clean(r.totals.avgPerHand)},previous:{...e(r.previous),earned:clean(r.previous.earned)},series:r.series.map(e),hours:r.hours.map(e),byChild:r.byChild.map(x=>({...e(x),earned:clean(x.earned)})),byPlayer:r.byPlayer.map(e),byTable:r.byTable.map(x=>({...e(x),sb:clean(x.sb),bb:clean(x.bb)})),recent:r.recent.map(x=>({...x,amount:clean(x.amount),parts:x.parts.map(q=>({...q,amount:clean(q.amount)}))})),...(r.rows?{rows:r.rows.map(x=>({...x,amount:clean(x.amount)}))}:{})};}
 if(p==='/api/rake/report'){roleCheck(u,'CENTER','ADMIN','AGENT');return staffRakeReport(u);}
 if(p==='/api/rake'){roleCheck(u,'CENTER');const value=Number(body.percent);if(!Number.isFinite(value)||value<0||value>15)fail('Rake must be 0–15%');db.rakePercent=value;save();publishRake();return{ok:true};}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Safe update of the live server (klorpoker.com).
-# Keeps the live accounts and balances (data/state.json), takes the newest code
+# Keeps the live accounts and balances (data/klor.db), takes the newest code
 # from GitHub and restarts the game. Run on the server:  bash deploy.sh
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -15,7 +15,7 @@ elif systemctl list-units --type=service 2>/dev/null | grep -qi klor; then MANAG
 else MANAGER=manual; echo "⚠ Ndalo serverin e lojës (Ctrl+C) para se të vazhdosh, pastaj shtyp Enter."; read -r; fi
 
 # 2. Back up the live data.
-if [ -f data/state.json ]; then cp data/state.json "$BACKUPS/state-$STAMP.json"; echo "✓ Kopje e të dhënave: $BACKUPS/state-$STAMP.json"; fi
+if [ -f data/klor.db ]; then cp data/klor.db* "$BACKUPS/" ; mkdir -p "$BACKUPS/$STAMP"; mv "$BACKUPS"/klor.db* "$BACKUPS/$STAMP/"; echo "✓ Kopje e të dhënave: $BACKUPS/$STAMP"; fi
 
 # 3. Take the newest code exactly as it is on GitHub.
 git fetch origin
@@ -23,7 +23,7 @@ git reset --hard origin/main
 
 # 4. Put the live data back.
 mkdir -p data
-if [ -f "$BACKUPS/state-$STAMP.json" ]; then cp "$BACKUPS/state-$STAMP.json" data/state.json; echo "✓ Llogaritë dhe balancat u rikthyen."; fi
+if [ -d "$BACKUPS/$STAMP" ]; then cp "$BACKUPS/$STAMP"/klor.db* data/; echo "✓ Llogaritë dhe balancat u rikthyen."; fi
 
 # 5. Start the game again.
 case "$MANAGER" in

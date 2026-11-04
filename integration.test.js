@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {openStore} from './store.js';
 
 test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', async () => {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'baron-test-'));
@@ -12,10 +13,11 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const users=['CENTER','ADMIN','AGENT','USER','USER'].map((role,i)=>({id:String(i),username:'test'+i,role,parentId:i?String(i===4?2:i-1):null,salt:'test-salt',passHash:crypto.scryptSync(password,'test-salt',64).toString('hex'),balance:i===0?100000:0}));
   fs.writeFileSync(file,JSON.stringify({users,rakePercent:5,rakeCap:300,ledger:[],tables:[],nextTable:2}));
   process.env.STATE_FILE=file;process.env.PORT='0';
-  const {server,runtime,tickTable}=await import('./server.js');
+  const {server,runtime,tickTable,store,currentDb}=await import('./server.js');
   if(!server.listening)await new Promise(resolve=>server.once('listening',resolve));
   const base='http://127.0.0.1:'+server.address().port;
   const call=async(route,token,body)=>{const r=await fetch(base+'/api/'+route,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+(token||''),'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json()};};
+  const stored=()=>{const s=openStore(path.join(dir,'klor.db')),value=s.load();s.close();return value;};
   const live=[];
   try {
     const tokens=[];
@@ -51,7 +53,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     assert.equal((await call('table/1/sit',tokens[3],{position:0,buyin:20})).status,200);
     assert.equal((await call('table/1/rebuy',tokens[3],{amount:81})).status,400);
     assert.equal((await call('table/1/rebuy',tokens[3],{amount:10})).status,200);
-    assert.equal(JSON.parse(fs.readFileSync(file)).escrow[0].amount,3000);
+    assert.equal(stored().escrow[0].amount,3000);
     assert.equal((await call('ledger',tokens[1])).data.length,2);
     // A broke seat persisted at a finished hand receives exactly 30 seconds.
     // Exercise the real game through an all-in, with no browser driving timers.
@@ -93,7 +95,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
       assert.equal(report.data.rows[0].hand,done.hand);
       assert.ok(!('allocations' in report.data.rows[0]));
     }
-    const saved=JSON.parse(fs.readFileSync(file));assert.equal(saved.users.reduce((n,u)=>n+u.balance,0)+saved.escrow.reduce((n,s)=>n+s.amount,0),100000);
+    const saved=stored();assert.equal(saved.users.reduce((n,u)=>n+u.balance,0)+saved.escrow.reduce((n,s)=>n+s.amount,0),100000);
     const broke=done.seats.find(s=>s&&s.stack===0);
     if(broke){
       const index=broke.id==='3'?3:4;
@@ -231,5 +233,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      for(const t of runtime.values()){const seen=view.tables.find(x=>x.id===t.id);assert.ok(seen);t.seats.forEach((s,i)=>assert.deepEqual(seen.seats[i]?.cards??null,s?s.cards:null));}
      assert.ok((await call('ledger',tokens[0])).data.some(x=>x.type==='INSPECT'),'inspection is logged');}
     const page=await fetch(base+'/');assert.equal(page.headers.get('x-frame-options'),'DENY');assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
-  } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));fs.rmSync(dir,{recursive:true,force:true});}
+    // What is stored is exactly what the game has in memory, after the whole session.
+    store.commit(currentDb());assert.deepEqual(stored(),JSON.parse(JSON.stringify(currentDb())));
+  } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));store.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
