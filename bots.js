@@ -1,17 +1,15 @@
 import crypto from 'node:crypto';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {evaluateHand,compare,ranks,suits} from './poker.js';
+import {analyzeCertainty,certaintyInput,certaintyForPlayer} from './bot-certainty.js';
 
-// ---- Fair table-filling bots ----
-// A bot is an ordinary seated player funded by the center. It decides from a
-// public view of the table plus its OWN hole cards only: it never sees another
-// player's cards, the deck or the outcome, and it never plays to lose on purpose.
-// The center controls the risk: budget, buy-in, loss limit, win limit and style.
+// Experimental virtual-credit bots: the server checks real dealt hands against
+// every possible remaining board. Decisions receive proof/percentages only.
+// No voluntary chips are invested unless every runout is an outright win.
 
 // Bots carry ordinary names; only the center sees which players are bots
 // (isBot on the account and on the seat). Older bots named "Name [BOT]" are renamed.
 const OLD_SUFFIX=' [BOT]';
-const STYLE={low:{call:.5,raise:.8,bluff:.02,size:.5,exposure:.15},medium:{call:.42,raise:.72,bluff:.05,size:.66,exposure:.3},high:{call:.35,raise:.64,bluff:.09,size:.8,exposure:.5}};
 const value=c=>ranks.indexOf(c[0])+2;
 
 // What a bot is allowed to know: its own cards and what every player at the table sees.
@@ -45,33 +43,32 @@ export function equity(v,iterations,random=Math.random){
   for(let o=0;o<opp;o++){const c=compare(evaluateHand(v.game,deck.slice(o*hole,o*hole+hole),board),mine);if(c>0){best=0;break;}if(c===0)ties++;}
   if(best)won+=1/ties;}
  return won/n;}
-// Tight and disciplined: the bot puts money in only when its chance of winning beats
-// the price it has to pay (pot odds) by a safety margin, and bets for value with
-// strong hands. Bluffs are rare and small. "risk" only changes the margins.
-const PLAN={low:{margin:.1,value:.68,bluff:.01,size:.6},medium:{margin:.06,value:.62,bluff:.03,size:.66},high:{margin:.03,value:.56,bluff:.05,size:.75}};
-export function botDecision(v,risk='low',random=Math.random){
- const p=PLAN[risk]||PLAN.low,eq=equity(v,undefined,random),opp=Math.max(1,v.opponents||1);
- // Against more players a hand needs more equity to be strong.
- const strong=Math.max(p.value-(opp-1)*.08,1/(opp+1)+.18);
- const price=v.toCall/Math.max(1,v.pot+v.toCall);
- // Share of its chips the bot has already put into this pot: past a third it is
- // committed and calls whenever the price is right instead of giving the pot away.
- const committed=(v.committed||0)/Math.max(1,(v.committed||0)+v.stack);
- const allInCall=v.toCall>=v.stack||!!v.facingAllIn;
- // Someone who shoves often holds all kinds of hands: then pot odds alone decide.
- const loose=(v.shoveRate||0)>=.25;
- const margin=committed>=.3||loose?0:allInCall?p.margin*.3:p.margin;
- if(v.canRaise){
-  const bluff=eq<strong&&!v.toCall&&random()<p.bluff;
-  if(eq>=strong||bluff){
-   const want=v.currentBet===0?p.size*Math.max(v.pot,v.bb*2):v.currentBet+p.size*(v.pot+v.toCall),target=Math.max(v.minRaiseTo,Math.min(v.maxRaiseTo,Math.round(want))),cost=target-v.roundBet;
-   // A bluff stays small. A value bet only puts in chips the bot will defend:
-   // up to a third of the stack, or everything with a very strong hand.
-   if(target>v.currentBet&&(bluff?cost<=Math.min(v.pot*.5,v.stack*.1):cost<=v.stack*.35||eq>=.75))return {type:'raise',amount:target/100,equity:eq};}}
- if(!v.toCall)return {type:'check',equity:eq};
- return {type:eq>=price+margin?'call':'fold',equity:eq};}
+// Style changes sizing only; it cannot bypass certainty or the hand budget.
+const SIZE={low:.6,medium:.66,high:.75};
+export function botDecision(v,risk='low',random=Math.random,proof){
+ const invested=v.committed||0,startingStack=v.stack+invested;
+ const certified=proof?.exact===true&&proof.safeToInvest===true&&proof.equity===1&&Array.isArray(proof.opponentEquities)&&proof.opponentEquities.length===(v.opponents||0)&&proof.opponentEquities.every(x=>x===0);
+ const investmentRate=certified&&v.board.length===5?.4:.15;
+ const investmentLimit=Math.floor(startingStack*investmentRate),remainingInvestment=Math.max(0,Math.min(v.stack,investmentLimit-invested));
+ const result=action=>({...action,equity:proof?.equity??null,safeToInvest:!!certified,investmentRate,investmentLimit,remainingInvestment});
+ if(!certified)return result({type:v.toCall?'fold':'check'});
+ if(v.canRaise&&remainingInvestment>0){
+  const size=SIZE[risk]||SIZE.low;
+  const want=v.currentBet===0?size*Math.max(v.pot,v.bb*2):v.currentBet+size*(v.pot+v.toCall);
+  const ceiling=Math.min(v.maxRaiseTo,v.roundBet+remainingInvestment),target=Math.min(ceiling,Math.max(v.minRaiseTo,Math.round(want)));
+  if(target>v.currentBet&&(target>=v.minRaiseTo||target===v.roundBet+v.stack))return result({type:'raise',amount:target/100});
+ }
+ if(!v.toCall)return result({type:'check'});
+ return result({type:Math.min(v.toCall,v.stack)<=remainingInvestment?'call':'fold'});
+}
 
 export function createBots({db,runtime,engine,save,olderRake}){
+ const certaintyCache=new WeakMap();
+ function proofFor(t,s){
+  const input=certaintyInput(t),key=JSON.stringify(input);let cached=certaintyCache.get(t);
+  if(!cached||cached.key!==key){cached={key,result:analyzeCertainty(input)};certaintyCache.set(t,cached);}
+  return certaintyForPlayer(cached.result,s.userId);
+ }
  for(const u of db.users)if(u.isBot&&u.username.endsWith(OLD_SUFFIX)){const plain=u.username.slice(0,-OLD_SUFFIX.length);if(!db.users.some(x=>x!==u&&x.username.toLowerCase()===plain.toLowerCase()))u.username=plain;}
  const bots=()=>db.users.filter(u=>u.isBot),center=()=>db.users.find(x=>x.role==='CENTER');
  const seatOf=u=>{for(const t of runtime.values()){const s=t.seats.find(x=>x?.userId===u.id);if(s)return {t,s};}return null;};
@@ -151,7 +148,7 @@ export function createBots({db,runtime,engine,save,olderRake}){
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
      // Think for 1.5–4 seconds like a person would.
      s.botThink??=1500+Math.floor(Math.random()*2500);
-     if(now-t.turnStartedAt>=s.botThink){delete s.botThink;const d=botDecision(botView(t,s,{shoveRate:shoveRate(t)}),b.bot.risk);try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}}}
+     if(now-t.turnStartedAt>=s.botThink){delete s.botThink;const d=botDecision(botView(t,s,{shoveRate:shoveRate(t)}),b.bot.risk,Math.random,proofFor(t,s));try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}}}
    }catch(e){stop(b,e.message,seatOf(b));}
   }
  }

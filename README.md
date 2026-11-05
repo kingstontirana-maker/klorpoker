@@ -2,6 +2,22 @@
 
 **Playable demo with virtual credits, not a production real-money gambling platform.** Node.js 20+, no npm dependencies. The interface recreates the emerald / black / gold feel of the reference design using responsive CSS and includes the original reference PNG in `public/design-reference.png`.
 
+Experimental bots use a strict certainty rule. Server-side analysis uses actual
+dealt hands, excludes folded cards from future boards, and checks every possible
+remaining board rather than reading the shuffled deck order. A bot may voluntarily
+call or raise only if it wins outright in every continuation. A possible loss or
+tie means check when free, otherwise fold; bluffing is disabled. Before the flop,
+an adverse continuation for each player proves uncertainty without computing or
+reporting a guessed percentage. From the flop onward, all continuations are
+counted and equity includes split pots. Decisions receive the proof and percentages,
+not opponents' cards; player snapshots do not expose this analysis.
+
+The total investment per hand, including blinds and previous bets, is capped at
+15% of the starting table stack, rising to 40% on the river for an outright winner.
+Risk styles affect sizing only and cannot bypass either rule. This intentionally
+causes very frequent folds, particularly preflop. Forced blinds, rake, and action
+timeouts can still cost virtual credits; the rule does not promise zero losses.
+
 ## Launch
 
 ```bash

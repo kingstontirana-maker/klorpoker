@@ -51,9 +51,9 @@ test('strong hands play, weak hands give up, pot limit is respected',()=>{
  let seed=7;const rng=()=>(seed=(seed*1103515245+12345)%2147483648)/2147483648;
  const base={game:'holdem',phase:'preflop',board:[],pot:300,currentBet:200,toCall:200,minRaiseTo:400,maxRaiseTo:20000,stack:20000,roundBet:0,bb:200,canRaise:true,opponents:1};
  assert.ok(handStrength({...base,cards:['As','Ad']})>handStrength({...base,cards:['7c','2d']}));
- assert.equal(botDecision({...base,cards:['As','Ad']},'low',rng).type,'raise');
+ assert.equal(botDecision({...base,cards:['As','Ad']},'low',rng).type,'fold','AA alone is not proof of a guaranteed win');
  assert.equal(botDecision({...base,cards:['7c','2d'],toCall:8000,currentBet:8000,pot:8300},'low',rng).type,'fold');
- const plo=botDecision({...base,game:'omaha',cards:['As','Ad','Ks','Kd'],maxRaiseTo:700},'high',rng);assert.equal(plo.type,'raise');assert.ok(plo.amount*100<=700,'never above the pot limit');
+ const plo=botDecision({...base,game:'omaha',cards:['As','Ad','Ks','Kd'],board:['Qs','Js','Ts'],maxRaiseTo:700},'high',rng,{exact:true,safeToInvest:true,equity:1,opponentEquities:[0]});assert.equal(plo.type,'raise');assert.ok(plo.amount*100<=700,'never above the pot limit');
  assert.equal(botDecision({...base,toCall:0,currentBet:0,canRaise:false,cards:['7c','2d']},'low',rng).type,'check');
  // Equity is estimated from the bot's own cards only and matches known values.
  const eq=equity({...base,cards:['As','Ad']},3000,rng);assert.ok(eq>.8&&eq<.9,'AA vs one random hand ≈ 85%: '+eq);
@@ -134,15 +134,33 @@ test('house protection stops every bot when the daily limit is reached',()=>{
  assert.throws(()=>manager.route('/api/bots/settings',{dailyLimit:-1},center),/0 or more/);
 });
 
-test('all-ins: the bot calls when the price is right and defends the chips it has put in',()=>{
+test('all-ins and prior investments cannot bypass certainty',()=>{
  let seed=11;const rng=()=>(seed=(seed*1103515245+12345)%2147483648)/2147483648;
  // A frequent shover puts €100 in; the bot has the big blind with a hand that is a favourite vs random.
  const shove={game:'holdem',phase:'preflop',board:[],pot:10200,currentBet:10000,toCall:9800,minRaiseTo:10000,maxRaiseTo:10000,stack:9800,roundBet:200,bb:200,canRaise:false,opponents:1,committed:200,facingAllIn:true};
- assert.equal(botDecision({...shove,cards:['Kh','9c'],shoveRate:1},'low',rng).type,'call','K9 calls an always-shover');
+ assert.equal(botDecision({...shove,cards:['Kh','9c'],shoveRate:1},'low',rng).type,'fold','shove frequency cannot justify uncertain chips');
  assert.equal(botDecision({...shove,cards:['7c','2d'],shoveRate:1},'low',rng).type,'fold','72 still folds');
  // After betting a third of its stack, the bot does not give the pot away to a shove.
  const committed={game:'holdem',phase:'flop',board:['Qs','8d','3c'],pot:9000,currentBet:9000,toCall:6000,minRaiseTo:9000,maxRaiseTo:9000,stack:6000,roundBet:3000,bb:200,canRaise:false,opponents:1,committed:4000,facingAllIn:true};
- assert.equal(botDecision({...committed,cards:['Qh','Ts']},'low',rng).type,'call','top pair defends after committing');
+ assert.equal(botDecision({...committed,cards:['Qh','Ts']},'low',rng).type,'fold','past investment cannot justify uncertain chips');
  // A bluff never risks more than a tenth of the stack.
  for(let i=0;i<200;i++){const d=botDecision({game:'holdem',phase:'flop',board:['As','Kd','7c'],pot:600,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:20000,stack:20000,roundBet:0,bb:200,canRaise:true,opponents:1,committed:300,cards:['4h','2c']},'high',rng);if(d.type==='raise')assert.ok(d.amount*100<=2000,'small bluff only');}
+});
+
+test('live bot rejects a vulnerable flop and recalculates when actual opponent cards change',()=>{
+ const {center,db,engine,t,manager,human}=world();
+ manager.route('/api/bots/create',{name:'Certain',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
+ const bot=db.users.find(u=>u.isBot);manager.route('/api/bots/status',{id:bot.id,enabled:true},center);
+ engine.sit(t,human(1),0,100,[t]);manager.tick();engine.startHand(t);
+ const s=t.seats.find(x=>x?.isBot),other=t.seats.find(x=>x&&!x.isBot);
+ s.cards=['Ah','2c'];other.cards=['Ks','Qs'];t.board=['As','Ad','Ac'];t.phase='flop';t.currentBet=0;t.minRaise=t.bb;t.runout=null;
+ for(const x of t.seats)if(x){x.roundBet=0;x.acted=false;}
+ t.turn=s.position;
+ const initial=t.pot;manager.tick(t.turnStartedAt+5000);
+ assert.equal(s.lastAction.type,'CHECK');assert.equal(t.pot,initial);
+ // With Kd rather than Ks, this opponent can no longer make a straight flush.
+ other.cards=['Kd','Qs'];s.acted=false;t.turn=s.position;
+ manager.tick(t.turnStartedAt+5000);
+ assert.equal(s.lastAction.type,'BET');assert.ok(t.pot>initial);
+ assert.ok(s.committed<=Math.floor((s.stack+s.committed)*.15));
 });
