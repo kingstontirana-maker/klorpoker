@@ -13,7 +13,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const users=['CENTER','ADMIN','AGENT','USER','USER'].map((role,i)=>({id:String(i),username:'test'+i,role,parentId:i?String(i===4?2:i-1):null,salt:'test-salt',passHash:crypto.scryptSync(password,'test-salt',64).toString('hex'),balance:i===0?100000:0}));
   fs.writeFileSync(file,JSON.stringify({users,rakePercent:5,rakeCap:300,ledger:[],tables:[],nextTable:2}));
   process.env.STATE_FILE=file;process.env.PORT='0';
-  const {server,runtime,tickTable,store,currentDb,shutdown}=await import('./server.js');
+  const {server,runtime,tickTable,store,currentDb,shutdown,refreshAnalysis}=await import('./server.js');
   if(!server.listening)await new Promise(resolve=>server.once('listening',resolve));
   const base='http://127.0.0.1:'+server.address().port;
   const call=async(route,token,body)=>{const r=await fetch(base+'/api/'+route,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+(token||''),'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json()};};
@@ -275,9 +275,24 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      const full=await call('my/hands/get',P,{id:900001});assert.equal(full.status,200);const text=JSON.stringify(full.data);assert.ok(!text.includes('Qs'),'a card that was not shown stays hidden');assert.ok(!text.includes('"bot"')&&!text.includes('userId'));
      assert.equal((await call('my/hands/get',await signIn(4),{id:900001})).status,404,'not your hand');
      const stats=await call('my/stats',P,{});assert.equal(stats.status,200);assert.ok(stats.data.hands>=1);assert.ok(stats.data.vpip>=1);assert.equal((await call('my/stats',C,{})).status,403);}
+    // A table that fails does not stop the server or the other tables.
+    {const C=await signIn(0),bad=runtime.get('1'),good=[...runtime.values()].find(t=>t.id!=='1');const wait=ms=>new Promise(r=>setTimeout(r,ms));
+     const offer=bad.waitOffer;Object.defineProperty(bad,'waitOffer',{configurable:true,get(){throw new Error('boom');},set(){}});good.tickFails=0;await wait(5600);
+     assert.ok(bad.tickFails>=20,'it keeps being retried');assert.equal(good.tickFails,0);assert.equal((await call('health','')).status,200,'the server is up');
+     const alert=(await call('alerts',C,{})).data.alerts.map(a=>a.text).join(' | ');assert.match(alert,/stopped with an error/);assert.match(alert,/boom/);
+     delete bad.waitOffer;bad.waitOffer=offer;await wait(400);assert.equal(bad.tickFails,0,'it recovers by itself');}
+    // Saving fails: staff are told, money actions stop, and everything is saved once it works.
+    {const C=await signIn(0),real=store.commit;const target=(await call('users',C)).data[0].id;store.commit=()=>{throw new Error('disk full');};
+     try{assert.equal((await call('rake',C,{percent:6})).status,200,'the change that met the failure stays in memory');
+      assert.equal((await call('health','')).status,503);const blocked=await call('transfer',C,{userId:target,direction:'send',amount:1});assert.equal(blocked.status,503);assert.match(blocked.data.error,/not done/);
+      assert.equal((await call('login','',{username:'test0',password})).status,200,'staff can still sign in to see why');
+      assert.equal((await call('table/1/sit',await signIn(3),{position:5,buyin:20})).status,503);
+      assert.match((await call('alerts',await signIn(0),{})).data.alerts[0].text,/cannot be saved/);}
+     finally{store.commit=real;}
+     const again=await signIn(0);assert.equal((await call('transfer',again,{userId:target,direction:'send',amount:1})).status,200,'it works again at once');assert.equal((await call('health','')).status,200);assert.equal(stored().rakePercent,6,'the earlier change was saved too');await call('rake',again,{percent:5});}
     // Stopping: running hands may finish, no new hands, no new seats, and the state is saved.
     {await shutdown(1500);const before=[...runtime.values()].map(x=>x.hand);for(const x of runtime.values()){for(const s of x.seats)if(s)s.lastSeen=Date.now();x.lastActionAt=0;tickTable(x);}assert.deepEqual([...runtime.values()].map(x=>x.hand),before,'no new hand is dealt');assert.equal((await call('table/1/sit',await signIn(3),{position:5,buyin:20})).status,503);}
     // What is stored is exactly what the game has in memory, after the whole session.
     store.commit(currentDb());assert.deepEqual({...stored(),handSeq:0},{...JSON.parse(JSON.stringify(currentDb())),handSeq:0});
-  } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));store.close();fs.rmSync(dir,{recursive:true,force:true});}
+  } finally {for(const stream of live)stream.controller.abort();await new Promise(resolve=>server.close(resolve));await refreshAnalysis();store.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 });

@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS chat_reports(id INTEGER PRIMARY KEY AUTOINCREMENT,at 
 const ROWS=new Set(['users','ledger','tables']);
 const handPlayers=h=>(h.players||[]).map(p=>String(p.username).toLowerCase()).join('\n');
 // Only the newest transactions stay in memory; older ones are read when a report needs them.
+export const TOTALS_SQL='SELECT user_id AS id,COUNT(*) AS hands,SUM(result) AS net,MAX(started_at) AS last FROM hand_players WHERE started_at>=? AND started_at<=? GROUP BY user_id';
+export const PAIR_SQL='SELECT a.user_id AS a,b.user_id AS b,COUNT(*) AS hands,SUM(a.result) AS netA,SUM(b.result) AS netB FROM hand_players a JOIN hand_players b ON a.hand_id=b.hand_id AND a.user_id<b.user_id WHERE a.started_at>=? AND a.bot=0 AND b.bot=0 GROUP BY a.user_id,b.user_id HAVING hands>=?';
 export const LEDGER_KEEP=Number(process.env.LEDGER_KEEP||20000);
 const VOLUNTARY=new Set(['CALL','BET','RAISE']);
 
@@ -118,8 +120,7 @@ export function openStore(file){
   playerHands:(userId,before,limit)=>sql.prepare('SELECT h.data FROM hand_players p JOIN hands h ON h.id=p.hand_id WHERE p.user_id=? AND p.hand_id<? ORDER BY p.hand_id DESC LIMIT ?').all(userId,Number.isFinite(before)?before:Number.MAX_SAFE_INTEGER,limit).map(r=>JSON.parse(r.data)),
   playerStats(userId,since=0){const t=sql.prepare('SELECT COUNT(*) AS hands,COALESCE(SUM(won),0) AS won,COALESCE(SUM(vpip),0) AS vpip,COALESCE(SUM(result),0) AS net,COALESCE(MAX(result),0) AS best,COALESCE(MIN(result),0) AS worst FROM hand_players WHERE user_id=? AND started_at>=?').get(userId,since);return {...t,days:sql.prepare("SELECT date(started_at/1000,'unixepoch') AS day,COUNT(*) AS hands,SUM(result) AS net FROM hand_players WHERE user_id=? AND started_at>=? GROUP BY day ORDER BY day").all(userId,since).map(d=>({...d}))};},
   // Totals per player over a period, and pairs of players who shared hands.
-  playerTotals:(since=0,until=Number.MAX_SAFE_INTEGER)=>sql.prepare('SELECT user_id AS id,COUNT(*) AS hands,SUM(result) AS net,MAX(started_at) AS last FROM hand_players WHERE started_at>=? AND started_at<=? GROUP BY user_id').all(since,until).map(r=>({...r})),
-  pairStats:(since=0,minHands=20)=>sql.prepare('SELECT a.user_id AS a,b.user_id AS b,COUNT(*) AS hands,SUM(a.result) AS netA,SUM(b.result) AS netB FROM hand_players a JOIN hand_players b ON a.hand_id=b.hand_id AND a.user_id<b.user_id WHERE a.started_at>=? AND a.bot=0 AND b.bot=0 GROUP BY a.user_id,b.user_id HAVING hands>=?').all(since,minHands).map(r=>({...r})),
+  playerTotals:(since=0,until=Number.MAX_SAFE_INTEGER)=>sql.prepare(TOTALS_SQL).all(since,until).map(r=>({...r})),
   getHand(id){const row=q.getHand.get(id);return row?JSON.parse(row.data):null;},
   lastHandId:()=>sql.prepare('SELECT COALESCE(MAX(id),0) AS id FROM hands').get().id,
   // Newest first; `limit` rows at most.

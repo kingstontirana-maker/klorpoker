@@ -161,7 +161,7 @@ export function seatLayout(portrait=false,phone=false,narrow=false){
  // buttons own the bottom-right corner.
  // Side bets sit beside the cards, above or below the board, never on it; the dealer
  // button sits in the gap next to its seat. (Checked from 568x320 to 932x430.)
- if(phone&&!portrait)return {seats:[[50,-3],[93,24],[93,67],[50,97],[7,67],[7,24]],bets:[[62,20],[76.7,28,'end'],[76.7,70.5,'end'],[40.1,83,'end'],[23.3,70.5,'start'],[23.3,28,'start']],dealer:[[38,18],[82,40],[82,50.5],[63,83],[18,50.5],[18,40]]};
+ if(phone&&!portrait)return {seats:[[50,-3],[93,24],[93,67],[50,97],[7,67],[7,24]],bets:[[62,20],[76.7,27.5,'end'],[76.7,70.5,'end'],[40.1,83,'end'],[23.3,70.5,'start'],[23.3,27.5,'start']],dealer:[[38,18],[82,40],[82,50.5],[63,83],[18,50.5],[18,40]]};
  // Narrow upright windows: the top player's bet sits under the name plate, the side bets
  // grow toward the middle, and the dealer button is beside the seat, never on it.
  if(portrait&&narrow)return {seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[50,25.5],[80.5,25.5,'end'],[85,63,'end'],[50,67.5],[15,63,'start'],[19.5,25.5,'start']],dealer:[[26,12.5],[81,9],[81,75],[76,86],[19,75],[19,9]]};

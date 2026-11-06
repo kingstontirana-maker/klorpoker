@@ -539,3 +539,14 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - Coolify nis serverin e ri para se të ndalë të vjetrin, ndaj për disa sekonda të dy punojnë mbi të njëjtën bazë. Pa mbrojtje, chips-at e tavolinave mund të ktheheshin dy herë.
 - Tani serveri më i ri merr pronësinë e bazës që në nisje. I vjetri nuk shkruan më, ndalon lojën dhe përgjigjet 503; lojtarët rilidhen te i riu me të njëjtin sesion. Provuar me dy serverë realë me chips në tavolinë: shuma e parave mbeti e njëjtë, edhe pas një rinisjeje tjetër.
 - Pasojë: gjatë një rolling update, duart që po luhen ndërpriten dhe chips-at kthehen në portofol. Pritja deri në 25 sekonda vlen vetëm kur serveri ndalet pa një server të ri që e zëvendëson. Veprimet e bëra te serveri i vjetër në ato sekonda pas nisjes së të riut refuzohen.
+
+## Rregullime pas skanimit të rreziqeve
+- **Kripto:** një pagesë kur krediti i qendrës është i ulët nuk shënohet më "e parë": kreditohet sapo qendra ka kredit, dhe sinjalizohet te "Needs attention". Nëse depozita skadon ndërkohë, transferta del te lista për qendrën. Wallet-i kontrollohet çdo 5 minuta edhe pa depozita të hapura, dhe skanimi kthehet deri te skanimi i fundit i suksesshëm, ndaj as një server i ndalur nuk fsheh transferta. Transfertat e hapura nuk fshihen më nga lista.
+- **Bllokimi:** analiza e rëndë për sinjalizimet dhe "Fair play" punon në një thread tjetër. Te 300 000 duar, përgjigjja më e ngadaltë e serverit ishte 44 ms, ndërsa analiza zgjati rreth 25 sekonda. Sinjalizimet përdorin një rezultat deri 5 minuta të vjetër.
+- **Kur ruajtja dështon:** qendra sinjalizohet, `/api/health` kthen 503, ndalohen veprimet e reja me para dhe duart e reja, por duart në lojë mbarojnë. Provohet sërish çdo 5 sekonda dhe, kur punon, ruhet gjithçka. Sinjalizohet edhe kur në disk mbetet më pak se 1 GB.
+- **Gabimet e papritura:** një tavolinë me gabim nuk ndal serverin ose tavolinat e tjera; provohet vazhdimisht dhe rikthehet vetë. Nëse vazhdon, qendra sinjalizohet dhe chips-at kthehen me rinisje.
+
+## Grafika e basteve dhe e statusit në ekrane të vogla
+- Çdo bast tregon tani chips bashkë me shumën edhe në telefon (një stack i vogël). U kontrollua me lojtarë në tavolinë nga 568×320 deri 1280×800: bastet nuk bien mbi letrat, emrat ose butonat. Vetëm në dritare shumë të ngushtë vertikale (nën rreth 520px), tre baste të gjera në rreshtin e sipërm mund të prekin njëri-tjetrin.
+- Etiketa qendrore "ALL-IN" pranë pot-it u hoq. Statusi qëndron te lojtari, edhe te vetja dhe te lojtari lart, ku më parë ishte i fshehur në telefon.
+- Në telefon horizontal statusi zë rreshtin e emrit, ndaj nuk e mbulon më shumën e lojtarit. Për SB/BB mbetet vetëm shenja te avatari, dhe emri duket.

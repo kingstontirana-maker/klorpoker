@@ -23,7 +23,7 @@ export function validTronAddress(a){
 }
 const MICRO=1000000n;
 const usdt=micro=>(Number(micro)/1e6).toFixed(2);
-export const DEPOSIT_TTL_MS=3*3600000,MAX_OPEN_DEPOSITS=3;
+export const DEPOSIT_TTL_MS=3*3600000,MAX_OPEN_DEPOSITS=3,IDLE_SCAN_MS=5*60000;
 
 export function createPayments({db,save,fail,fetchImpl=globalThis.fetch,now=()=>Date.now(),apiUrl=process.env.TRONGRID_URL||'https://api.trongrid.io',apiKey=process.env.TRONGRID_API_KEY||''}){
  db.crypto??={enabled:false,address:'',rateIn:0.9,rateOut:0.9,minDeposit:10,minWithdraw:20,deposits:[],withdrawals:[],unmatched:[],seen:[],lastScan:0};
@@ -40,10 +40,13 @@ export function createPayments({db,save,fail,fetchImpl=globalThis.fetch,now=()=>
  async function scan(force=false){
   if(!validTronAddress(C.address))return {checked:0};
   expire();const open=C.deposits.filter(d=>d.status==='open');
-  if(!force&&!open.length)return {checked:0};
+  // With no deposit open the wallet is still checked every few minutes, so a payment
+  // that comes late is listed for the center instead of being missed.
+  if(!force&&!open.length&&now()-(C.lastScan||0)<IDLE_SCAN_MS)return {checked:0};
   if(scanning)return scanning;
   scanning=(async()=>{try{
-   const since=Math.max(0,Math.min(...open.map(d=>d.createdAt),now()-6*3600000)-10*60000);
+   // Back to the last good scan, so downtime cannot hide a transfer.
+   const since=Math.max(0,Math.min(...open.map(d=>d.createdAt),now()-6*3600000,C.lastScan||Infinity)-10*60000);
    const url=`${apiUrl}/v1/accounts/${C.address}/transactions/trc20?only_confirmed=true&only_to=true&limit=200&contract_address=${USDT_TRC20}&min_timestamp=${since}`;
    // Up to 10 pages of 200 transfers, newest first.
    const rows=[];let next='';for(let page=0;page<10;page++){const r=await fetchImpl(url+(next?'&fingerprint='+encodeURIComponent(next):''),{headers:apiKey?{'TRON-PRO-API-KEY':apiKey}:{}});if(!r.ok)throw Error('TronGrid '+r.status);const b=await r.json();rows.push(...(b.data||[]));next=b.meta?.fingerprint;if(!next||(b.data||[]).length<200)break;}
@@ -53,13 +56,14 @@ export function createPayments({db,save,fail,fetchImpl=globalThis.fetch,now=()=>
     if(x.to!==C.address||x.token_info?.address!==USDT_TRC20||x.type&&x.type!=='Transfer')continue;
     const micro=BigInt(x.value||0),at=Number(x.block_timestamp)||now();
     const d=C.deposits.find(d=>d.status==='open'&&BigInt(d.micro)===micro&&at>=d.createdAt-60000&&at<=d.expiresAt);
-    if(d&&creditDeposit(d,id,at))credited++;else if(!d)C.unmatched.push({tx:id,micro:String(micro),from:x.from,at,status:'open'});
+    // Center credit too low: not marked as seen, so it is credited as soon as it can be.
+    if(d){if(!creditDeposit(d,id,at))continue;credited++;}else C.unmatched.push({tx:id,micro:String(micro),from:x.from,at,status:'open'});
     C.seen.push(id);}
-   C.seen=C.seen.slice(-5000);C.unmatched=C.unmatched.slice(-500);C.lastScan=now();save();return {checked:(body.data||[]).length,credited};
+   C.seen=C.seen.slice(-5000);C.unmatched=[...C.unmatched.filter(x=>x.status!=='open').slice(-300),...C.unmatched.filter(x=>x.status==='open')];C.lastScan=now();save();return {checked:(body.data||[]).length,credited};
   }finally{scanning=null;}})();
   return scanning;}
  function creditDeposit(d,tx,at){const u=db.users.find(x=>x.id===d.userId),c=center();if(!u||!c)return false;const cents=toCents(d.micro,d.rate);if(c.balance<cents){d.note='Center credit is too low';return false;}
-  c.balance-=cents;u.balance+=cents;Object.assign(d,{status:'credited',tx,paidAt:at,cents});ledger('CRYPTO_DEPOSIT',c.id,u.id,cents,{tx,usdt:usdt(d.micro),rate:d.rate});return true;}
+  c.balance-=cents;u.balance+=cents;delete d.note;Object.assign(d,{status:'credited',tx,paidAt:at,cents});ledger('CRYPTO_DEPOSIT',c.id,u.id,cents,{tx,usdt:usdt(d.micro),rate:d.rate});return true;}
 
  // ---- routes ----
  function route(p,body,u){if(!p.startsWith('/api/crypto'))return undefined;

@@ -141,8 +141,6 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .game .sidePots{display:flex;flex-direction:column;gap:1px;line-height:1.25;padding-left:8px;border-left:1px solid #ffffff1a}
 .game .sidePots:empty,.game #potCaption[hidden]{display:none}
 .game .sidePots span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#a8cdb7}.game .sidePots b{color:var(--gold-soft);margin-left:3px}
-.runoutLabel{position:absolute;left:50%;top:18%;transform:translateX(-50%);padding:3px 12px;border-radius:999px;font:800 10px/16px Inter,system-ui,sans-serif;letter-spacing:.2em;color:#fff;background:linear-gradient(90deg,#8d1d2c,#d23b51);box-shadow:0 0 18px #ef5d6b88;z-index:8;animation:urgentPulse .8s ease-in-out infinite alternate}
-.runoutLabel[hidden]{display:none}
 .tableBet{position:absolute;left:var(--bx);top:var(--by);transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;z-index:6;pointer-events:none}
 .tableBet[hidden]{display:none}
 .tableBet[data-align=start]{transform:translate(0,-50%)}.tableBet[data-align=end]{transform:translate(-100%,-50%)}
@@ -313,7 +311,6 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
  .game .community{top:47%;gap:4px}.game .community .card{border-radius:6px}
  .game .pot{top:27%;padding:4px 12px;gap:2px 7px;flex-wrap:wrap;justify-content:center;max-width:58%;border-radius:14px}.game .pot>strong{font-size:17px}.game .pot>span{font-size:9px}#potChips{display:none}
  .game .sidePots{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:2px 8px;padding:0;border:0;width:100%}.game .sidePots span{font-size:9px}
- .runoutLabel{top:17%}
  .tableBet .chipStacks{display:none}.betAmount{font-size:10px;padding:3px 6px}
  .game .winnerBanner{top:28%;max-width:60%}
  .winnerChoice{flex-wrap:wrap;justify-content:center;gap:0 7px;padding:5px 12px;font-size:12px;border-radius:14px;white-space:normal;text-align:center}.winnerChoice strong{font-size:13px}.winnerChoice small{width:100%;font-size:10px;padding:0;border:0}
@@ -648,3 +645,26 @@ body.fitPhone{background:#040806}
 .game.omaha .seat.me .seatCards .card:nth-child(4){transform:rotate(9deg) translateY(5px)}
 
 body.fitPhone .dockInfo{display:none!important}
+
+/* ---------- Bets and status on small screens ----------
+   Every bet shows its chips next to the amount, as on a computer: one small stack in
+   the bet's main colour. A player's status (ALL-IN, CALL...) stays on that player: it
+   takes the name row of their plate, so it never covers the amount or leaves the seat. */
+@media(max-width:900px) and (orientation:portrait),(max-width:520px),(max-height:560px) and (orientation:landscape){
+ .tableBet{gap:2px}
+ .tableBet .chipStacks{display:inline-flex;height:auto;min-width:0;gap:0;transform:none}
+ .tableBet .chipColumn{width:18px;height:calc(14px + var(--chip-count)*2px)}
+ .tableBet .chipColumn:nth-child(n+2){display:none}
+ .tableBet .pokerChip{width:18px;height:14px;bottom:calc(var(--chip-level)*2px)}
+ .tableBet .pokerChip b{display:none}
+ .game .seat.me .seatAction{display:block;top:calc(100% - 12px);z-index:5}
+}
+@media(max-height:560px) and (orientation:landscape){
+ .game .seatAction{top:calc(100% - 10px);z-index:5}
+ .game .seat[data-visual-position="0"]:not(.me) .seatAction{display:block;left:auto;right:calc(100% + 52px);top:calc(50% - 21px);transform:translateX(50%)}
+ .game .seat:not(.me) .blindBadge{top:-6px;bottom:auto;left:-6px}
+}
+/* Blinds already have their badge on the avatar. */
+@media(max-width:900px) and (orientation:portrait),(max-width:520px),(max-height:560px) and (orientation:landscape){.seatAction[data-action=SB],.seatAction[data-action=BB],.seatAction[data-action=POST]{display:none!important}}
+/* Your blind sits beside your avatar, not on your cards. */
+.game .seat.me .blindBadge{left:-28px;top:auto;bottom:10px}

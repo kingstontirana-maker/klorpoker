@@ -3,6 +3,7 @@ import {createBots} from './bots.js';
 import {createPayments} from './payments.js';
 import {openStore} from './store.js';
 import {descendants,recordSeen,sharedGroups,pairSignals,handSummaryFor,handFor,SIGNALS} from './security.js';
+import {Worker} from 'node:worker_threads';
 import http from 'node:http';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {fileURLToPath} from 'node:url';import {createEngine,LIVE,fail,MAX_TABLES} from './game.js';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));const SAVE=process.env.STATE_FILE||path.join(ROOT,'data','state.json');const PORT=Number(process.env.PORT||3000);const uid=()=>crypto.randomUUID();const money=n=>Math.round(Number(n)*100);const clean=n=>Math.round(n)/100;const secret=()=>crypto.randomBytes(28).toString('hex');const hash=(p,s)=>crypto.scryptSync(p,s,64).toString('hex');const config={minBuyin:2000,maxBuyin:100000};
 // A fresh database never uses a known password: CENTER_PASSWORD, or a random one
@@ -15,9 +16,13 @@ if(!db){const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBy
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];
-let saveFailed=false,draining=false,replaced=false;
+let saveFailed=false,draining=false,replaced=false,lastError=null;
+const LOW_DISK=1e9,TICK_FAIL_ALERT=20;
+const noteError=(where,err)=>{lastError={where,message:String(err?.message||err).slice(0,160),at:Date.now()};console.error(`[Klor Poker] ${where}:`,err);};
+// A timer must never stop the server: one failing job is logged and the rest go on.
+const guarded=(where,fn)=>()=>{try{fn();}catch(err){noteError(where,err);}};
 export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{if(replaced)return;db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);saveFailed=false;}catch(err){saveFailed=true;console.error('[Klor Poker] state not saved',err.message);}queuePush();};
-const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h),canDeal:()=>!draining});
+const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h),canDeal:()=>!draining&&!saveFailed});
 // Hand history: every finished hand is one row of its own, stored as it finishes.
 function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{store.addHand(h);}catch(err){console.error('[Klor Poker] hand history not saved',err);}}
 const handSummary=h=>({id:h.id,at:h.startedAt,table:h.table,tableId:h.tableId,game:h.game,hand:h.hand,sb:h.sb,bb:h.bb,players:h.players.map(p=>p.username),bots:h.players.filter(p=>p.bot).map(p=>p.username),board:h.board,pot:h.pot,rake:h.rake,winners:h.winners,showdown:h.showdown});
@@ -48,7 +53,7 @@ function endUserSessions(userId,reason,except){const keep=except&&tokenKey(excep
 for(const [key,s] of store.sessions()){if(Date.now()-s.lastSeen>SESSION_IDLE_MS||Date.now()-s.created>SESSION_MAX_MS)store.delSession(key);else tokens.set(key,s);}
 const sessionUser=key=>{const s=tokens.get(key);if(!s)return null;const now=Date.now();if(now-s.lastSeen>SESSION_IDLE_MS||now-s.created>SESSION_MAX_MS){endKey(key,'Your session has ended. Please sign in again.');return null;}s.lastSeen=now;if(now-(s.storedAt||0)>60000){s.storedAt=now;storeTry(()=>store.putSession(key,s));}const u=db.users.find(u=>u.id===s.userId);if(!u||u.blocked){endKey(key,'This account is blocked.');return null;}return u;};
 const me=token=>sessionUser(tokenKey(token));
-setInterval(()=>{for(const key of [...tokens.keys()])sessionUser(key);},60000).unref();
+setInterval(guarded('sessions',()=>{for(const key of [...tokens.keys()])sessionUser(key);}),60000).unref();
 // Failed sign-ins are limited per address and account: 5 tries, then 15 minutes' wait.
 const loginFails=new Map();const LOGIN_LIMIT=5,LOGIN_LOCK_MS=15*60000;
 // Registration attempts per address: 10 per hour.
@@ -77,14 +82,23 @@ function audit(user,action,body,req,extra={}){try{const details=Object.fromEntri
 function auditBefore(action,body){if(action==='rake')return {before:db.rakePercent};if(action==='users/share')return {before:pct(db.users.find(x=>x.id===body.userId)?.share)};if(action==='tables/update'){const t=db.tables.find(x=>x.id===String(body.id||''));return t?{before:{name:t.name,sb:clean(t.sb),bb:clean(t.bb),game:t.game}}:{};}return {};}
 // ---- Things that need a person's attention ----
 const inView=(u,target)=>u.role==='CENTER'||isUnder(db,target,u.id);
-function securityReport(days=30){const since=Date.now()-days*86400000,totals=new Map(store.playerTotals(since).map(t=>[t.id,t.hands]));return {days,signals:pairSignals(db.users,store.pairStats(since,SIGNALS.minHands),totals),sharedDevices:sharedGroups(db.users,'seenDevices'),sharedIps:sharedGroups(db.users,'seenIps'),limits:SIGNALS};}
+function analyse(days=30){return new Promise((resolve,reject)=>{const now=Date.now(),w=new Worker(new URL('./analysis-worker.js',import.meta.url),{workerData:{file:DB_FILE,since:now-days*86400000,day:now-86400000,minHands:SIGNALS.minHands}});w.unref();w.once('message',resolve);w.once('error',reject);});}
+async function securityReport(days=30){const r=await analyse(days),totals=new Map(r.totals.map(t=>[t.id,t.hands]));return {days,signals:pairSignals(db.users,r.pairs,totals),sharedDevices:sharedGroups(db.users,'seenDevices'),sharedIps:sharedGroups(db.users,'seenIps'),limits:SIGNALS};}
+// The attention list uses a result a few minutes old, refreshed in the background.
+const ANALYSIS_MS=5*60000;let analysis=null,analysing=null;
+export function refreshAnalysis(){if(analysing)return analysing;if(analysis&&Date.now()-analysis.at<ANALYSIS_MS)return Promise.resolve(analysis);analysing=analyse(30).then(r=>analysis={...r,at:Date.now()}).catch(err=>{noteError('analysis',err);return analysis;}).finally(()=>{analysing=null;});return analysing;}
+function diskFree(){try{const s=fs.statfsSync(path.dirname(DB_FILE));return Number(s.bavail)*Number(s.bsize);}catch{return null;}}
 function alertsFor(u){const out=[],add=(level,panel,text)=>out.push({level,panel,text}),day=Date.now()-86400000;
  const open=store.listReports('open').filter(r=>inView(u,r.target_id));if(open.length)add('warn','moderation',open.length+(open.length>1?' chat reports':' chat report')+' to review');
- for(const t of store.playerTotals(day))if(t.net>=SIGNALS.bigWin){const p=db.users.find(x=>x.id===t.id);if(p&&!p.isBot&&inView(u,p.id))add('warn','reports',p.username+' won '+t.net.toFixed(2)+' € in 24 hours ('+t.hands+' hands)');}
+ for(const t of analysis?.today||[])if(t.net>=SIGNALS.bigWin){const p=db.users.find(x=>x.id===t.id);if(p&&!p.isBot&&inView(u,p.id))add('warn','reports',p.username+' won '+t.net.toFixed(2)+' € in 24 hours ('+t.hands+' hands)');}
  if(u.role==='CENTER'){const c=db.crypto||{},pending=(c.withdrawals||[]).filter(w=>w.status==='pending'),big=pending.filter(w=>w.cents/100>=SIGNALS.bigWithdrawal).length,unmatched=(c.unmatched||[]).filter(x=>!x.status||x.status==='open').length;
   if(pending.length)add(big?'high':'warn','crypto',pending.length+(pending.length>1?' withdrawals':' withdrawal')+' waiting'+(big?' · '+big+' large':''));if(unmatched)add('warn','crypto',unmatched+' crypto '+(unmatched>1?'transfers':'transfer')+' without a player');
   for(const b of db.users.filter(x=>x.isBot&&x.bot?.error))add('info','bots',b.username+' stopped: '+b.bot.error);
-  const signals=securityReport().signals;if(signals.length)add(signals.some(s=>s.level==='high')?'high':'warn','security',signals.length+(signals.length>1?' pairs':' pair')+' of players to check');}
+  if(saveFailed)add('high','overview','Changes cannot be saved. Money actions are paused until saving works again. Check the server disk.');const free=diskFree();if(free!==null&&free<LOW_DISK)add('high','overview','Only '+Math.round(free/1e6)+' MB of disk space is left on the server.');
+  for(const t of runtime.values())if((t.tickFails||0)>=TICK_FAIL_ALERT)add('high','inspect',t.name+' stopped with an error. Restart the server: chips return to the wallets.');
+  if(lastError&&Date.now()-lastError.at<86400000)add('warn','overview','The server caught an error ('+lastError.where+'): '+lastError.message);
+  const waiting=(c.deposits||[]).filter(d=>d.status==='open'&&d.note);if(waiting.length)add('high','crypto',waiting.length+(waiting.length>1?' paid deposits wait':' paid deposit waits')+': center credit is too low.');
+  const signals=analysis?pairSignals(db.users,analysis.pairs,new Map(analysis.totals.map(t=>[t.id,t.hands]))):[];if(signals.length)add(signals.some(s=>s.level==='high')?'high':'warn','security',signals.length+(signals.length>1?' pairs':' pair')+' of players to check');}
  const order={high:0,warn:1,info:2};return out.sort((a,b)=>order[a.level]-order[b.level]);}
 async function route(req,res,url,body){const p=url.pathname,token=(req.headers.authorization||'').replace(/^Bearer /,'')||(p.endsWith('/away')&&typeof body.token==='string'?body.token:'');if(p==='/api/login'){const name=String(body.username||'').toLowerCase().slice(0,40),key=clientIp(req)+'|'+name,now=Date.now(),rec=loginFails.get(key);if(rec&&rec.until>now)fail(`Too many failed attempts. Try again in ${Math.ceil((rec.until-now)/60000)} minutes.`,429);const user=db.users.find(x=>x.username.toLowerCase()===name&&!x.isBot);if(!user||!samePassword(user,String(body.password||''))){const r=rec&&now-rec.first<LOGIN_LOCK_MS?rec:{count:0,first:now,until:0};r.count++;if(r.count>=LOGIN_LIMIT)r.until=now+LOGIN_LOCK_MS;loginFails.set(key,r);fail('Wrong username or password',401);}loginFails.delete(key);if(user.blocked)fail('This account is blocked. Contact your manager.',403);endUserSessions(user.id,'You signed in on another device. This session was closed.');const t=openSession(user.id,clientIp(req));user.lastLoginAt=now;user.lastLoginIp=clientIp(req);recordSeen(user,clientIp(req),body.device);save();if(user.role!=='USER')audit(user,'login',{},req);return {token:t,...stateFor(user)};}
 if(p==='/api/register'){const ip=clientIp(req),now=Date.now(),rec=registerTries.get(ip);const r=rec&&now-rec.first<REGISTER_WINDOW_MS?rec:{count:0,first:now};if(r.count>=REGISTER_LIMIT)fail('Too many attempts. Please try again later.',429);r.count++;registerTries.set(ip,r);if(registerTries.size>20000)registerTries.delete(registerTries.keys().next().value);
@@ -95,7 +109,7 @@ if(p==='/api/register'){const ip=clientIp(req),now=Date.now(),rec=registerTries.
  const salt=secret(),user={id:uid(),username,role:'USER',parentId:agent.id,salt,passHash:hash(password,salt),balance:0,registeredAt:now,lastLoginAt:now,lastLoginIp:ip};recordSeen(user,ip,body.device);db.users.push(user);db.ledger.push({id:uid(),type:'REGISTER',from:agent.id,to:user.id,amount:0,time:now});
  const t=openSession(user.id,ip);save();return {token:t,...stateFor(user)};}
 if(p==='/api/public/stats'){const tables=[...runtime.values()];return {tables:tables.length,players:tables.reduce((n,t)=>n+t.seats.filter(Boolean).length,0),live:tables.filter(t=>LIVE.includes(t.phase)).length,featured:tables.slice().sort((a,b)=>b.seats.filter(Boolean).length-a.seats.filter(Boolean).length).slice(0,6).map(t=>({name:t.name,game:t.game,color:t.color,sb:clean(t.sb),bb:clean(t.bb),players:t.seats.filter(Boolean).length,live:LIVE.includes(t.phase)}))};}
-if(p==='/api/health'){let ok=false;try{ok=store.ping();}catch{}if(!ok||saveFailed)fail('unhealthy',503);return {ok:true,uptime:Math.round(process.uptime()),restarting:draining};}
+if(p==='/api/health'){let ok=false;try{ok=store.ping();}catch{}if(!ok||saveFailed)fail('unhealthy',503);const free=diskFree();return {ok:true,uptime:Math.round(process.uptime()),restarting:draining,diskFreeMb:free===null?null:Math.round(free/1e6)};}
 if(p==='/api/logout'){endSession(token);return {ok:true};}const u=me(token);if(!u)fail(endReasons.get(tokenKey(token))||'Sign in to continue.',401);
 if(req.headers['x-klor-visible']==='1'&&u.role==='USER'){const now=Date.now();for(const t of runtime.values())for(const seat of t.seats)if(seat?.userId===u.id&&!seat.sittingOut)seat.lastSeen=now;}
 if(p==='/api/state')return stateFor(u);
@@ -129,7 +143,7 @@ if(p==='/api/moderation/resolve'){roleCheck(u,'CENTER','ADMIN','AGENT');const r=
 // Center: activity log and fair-play signals. Everyone on staff: what needs attention, and a player report.
 if(p==='/api/audit'){roleCheck(u,'CENTER');const limit=Math.max(1,Math.min(200,Number(body.limit)||50)),rows=store.listAudit({before:Number(body.before)||Infinity,actor:String(body.actor||'').trim().toLowerCase(),action:String(body.action||''),limit:limit+1});return {rows:rows.slice(0,limit),more:rows.length>limit};}
 if(p==='/api/security'){roleCheck(u,'CENTER');return securityReport([7,30,90].includes(Number(body.days))?Number(body.days):30);}
-if(p==='/api/alerts'){roleCheck(u,'CENTER','ADMIN','AGENT');return {alerts:alertsFor(u)};}
+if(p==='/api/alerts'){roleCheck(u,'CENTER','ADMIN','AGENT');await Promise.race([refreshAnalysis(),new Promise(r=>setTimeout(r,1500))]);return {alerts:alertsFor(u)};}
 if(p==='/api/reports/players'){roleCheck(u,'CENTER','ADMIN','AGENT');const days=Number(body.days)||0,since=days?Date.now()-days*86400000:0,totals=new Map(store.playerTotals(since).map(t=>[t.id,t])),players=db.users.filter(x=>x.role==='USER'&&!x.isBot&&inView(u,x.id)),byId=new Map(db.users.map(x=>[x.id,x])),rake=new Map();for(const x of withOldRake().ledger)if(x.type==='RAKE'&&x.time>=since)for(const a of x.allocations||[])if(!a.bot)rake.set(a.userId,(rake.get(a.userId)||0)+a.amount);return {days,rows:players.map(x=>{const t=totals.get(x.id);return {id:x.id,username:x.username,agent:byId.get(x.parentId)?.username||'',balance:clean(x.balance),hands:t?.hands||0,net:Math.round((t?.net||0)*100)/100,rake:clean(rake.get(x.id)||0),lastPlayed:t?.last||null,lastLogin:x.lastLoginAt||null,registered:x.registeredAt||null,blocked:!!x.blocked};})};}
 if(p==='/api/hands'){roleCheck(u,'CENTER');return listHands(body);}
 if(p==='/api/hands/get'){roleCheck(u,'CENTER');const hand=store.getHand(Number(body.id));if(!hand)fail('Hand not found',404);return hand;}
@@ -167,10 +181,10 @@ export const tickTable=(t,now=Date.now())=>engine.tickTable(t,now);
 // stream closes the away protection starts at once.
 // Every few seconds, a player with an open table connection (tab visible or not) is
 // present at all of their seats.
-setInterval(()=>{const now=Date.now(),users=new Set([...tableSubs.values()].map(s=>s.userId));if(!users.size)return;for(const t of runtime.values())for(const seat of t.seats)if(seat&&users.has(seat.userId))seat.lastSeen=now;},3000).unref();
+setInterval(guarded('presence',()=>{const now=Date.now(),users=new Set([...tableSubs.values()].map(s=>s.userId));if(!users.size)return;for(const t of runtime.values())for(const seat of t.seats)if(seat&&users.has(seat.userId))seat.lastSeen=now;}),3000).unref();
 function pushTables(){pushQueued=false;pushInspect();for(const [res,sub] of tableSubs){const u=me(sub.token),t=runtime.get(sub.tableId);if(!u||!t||u.role!=='USER'){res.end();tableSubs.delete(res);continue;}try{res.write('data: '+JSON.stringify(engine.snapshot(t,u.id,false))+'\n\n');}catch{tableSubs.delete(res);}}}
-function queuePush(){if(!pushQueued&&(tableSubs.size||inspectSubs.size)){pushQueued=true;setImmediate(pushTables);}}
-setInterval(()=>{if(tableSubs.size||inspectSubs.size)pushTables();},1000).unref();
+function queuePush(){if(!pushQueued&&(tableSubs.size||inspectSubs.size)){pushQueued=true;setImmediate(guarded('live updates',pushTables));}}
+setInterval(guarded('live updates',()=>{if(tableSubs.size||inspectSubs.size)pushTables();}),1000).unref();
 // A connection that drops (tunnel, network change) gets time to come back before the
 // player counts as away. Closing the page on purpose still takes 5 seconds.
 const RECONNECT_GRACE_MS=20000;
@@ -179,18 +193,22 @@ function openTableStream(req,res,tableId){const token=(req.headers.authorization
  tableSubs.set(res,{token,userId:u.id,tableId});res.write('data: '+JSON.stringify(engine.snapshot(t,u.id))+'\n\n');
  const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();
  res.on('close',()=>{clearInterval(beat);tableSubs.delete(res);if(![...tableSubs.values()].some(s=>s.userId===u.id&&s.tableId===tableId))engine.away(t,u,RECONNECT_GRACE_MS);});}
-setInterval(()=>{if(!replaced)for(const t of runtime.values())tickTable(t);},250).unref();
+// A table that fails is logged once and tried again; the others keep playing. Its chips
+// stay safe in the database and return to the wallets on the next start.
+setInterval(()=>{if(replaced)return;for(const t of runtime.values()){try{tickTable(t);t.tickFails=0;}catch(err){t.tickFails=(t.tickFails||0)+1;if(t.tickFails===1)noteError('table '+t.name,err);}}},250).unref();
 // A newer server took over the database (rolling deploy): this one stops playing and
 // answering, and its players reconnect to the new one. It does not exit, or the container
 // could restart and take the database back.
+const PAUSED=/^(register|password|transfer|rake|invite\/reset|moderation\/resolve|tables\/[a-z]+|users\/[a-z]+|bots\/[a-z]+|crypto\/(deposit|withdraw|cancel|settings|assign|ignore|withdrawal)|table\/[^/]+\/(sit|rebuy|start|waitlist))$/;
+setInterval(guarded('save retry',()=>{if(saveFailed&&!replaced)save();}),5000).unref();
 function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner||replaced)return;replaced=true;draining=true;console.log('[Klor Poker] A newer server took over the database. This one has stopped.');for(const res of tableSubs.keys())res.end();tableSubs.clear();for(const res of inspectSubs.keys())res.end();inspectSubs.clear();for(const res of rakeClients.keys())res.end();rakeClients.clear();}
-setInterval(checkOwner,1000).unref();
+setInterval(guarded('owner check',checkOwner),1000).unref();
 // Table-filling bots act from the server; they are never logged in.
 const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake()});
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Klor Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});
-setInterval(()=>{if(replaced)return;payments.scan().catch(err=>console.error('[Klor Poker] crypto scan',err.message));},30000).unref();
+setInterval(()=>{if(replaced||saveFailed)return;payments.scan().catch(err=>console.error('[Klor Poker] crypto scan',err.message));},30000).unref();
 // Center inspection: every table with every hole card, live. Only the center
 // account can open it, it can never sit at a table, and each session is logged.
 // Players at one table who connect from the same address are flagged.
@@ -216,12 +234,18 @@ export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
  rakeClients.set(res,token);res.write('data: '+JSON.stringify(staffRakeReport(u))+'\n\n');
  const heartbeat=setInterval(()=>res.write(': keepalive\n\n'),15000);heartbeat.unref();res.on('close',()=>{clearInterval(heartbeat);rakeClients.delete(res);});return;
- }if(url.pathname.startsWith('/api/')){let input='';for await(const c of req){input+=c;if(input.length>50_000)fail('Body too large',413);}let body={};try{body=input?JSON.parse(input):{};}catch{fail('Invalid JSON');}const action=url.pathname.slice(5),audited=req.method==='POST'&&AUDITED.has(action),actor=audited?me((req.headers.authorization||'').replace(/^Bearer /,'')):null,before=actor?auditBefore(action,body):null;const value=await route(req,res,url,body);if(actor&&actor.role!=='USER')audit(actor,action,body,req,{...before,...(value?.network?{network:value.network}:{})});res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));return;}let name=url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1));let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'public')+path.sep))fail('Forbidden',403);let contents=fs.readFileSync(f);
+ }if(url.pathname.startsWith('/api/')){let input='';for await(const c of req){input+=c;if(input.length>50_000)fail('Body too large',413);}let body={};try{body=input?JSON.parse(input):{};}catch{fail('Invalid JSON');}const action=url.pathname.slice(5);
+ // Saving is failing: nothing new that moves money until it works again. Hands in play finish.
+ if(saveFailed&&req.method==='POST'&&PAUSED.test(action)){save();if(saveFailed)fail('Saving is not working right now, so this was not done. Please try again shortly.',503);}
+ const audited=req.method==='POST'&&AUDITED.has(action),actor=audited?me((req.headers.authorization||'').replace(/^Bearer /,'')):null,before=actor?auditBefore(action,body):null;const value=await route(req,res,url,body);if(actor&&actor.role!=='USER')audit(actor,action,body,req,{...before,...(value?.network?{network:value.network}:{})});res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));return;}let name=url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1));let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'public')+path.sep))fail('Forbidden',403);let contents=fs.readFileSync(f);
  // Stamp stylesheet and script links with their modification time so phones and
  // browsers always fetch the newest version after a change.
  if(name==='index.html')contents=String(contents).replace(/(\/[\w.-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
- res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name==='index.html'?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)console.error(err);}});
+ res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name==='index.html'?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
+server.on('error',err=>{console.error('[Klor Poker] server cannot start:',err.message);process.exit(1);});
 server.listen(PORT,()=>console.log(`Klor Poker http://localhost:${PORT}`));
+// Set after everything started, so a failed start still stops the process.
+process.on('uncaughtException',err=>noteError('unexpected',err));process.on('unhandledRejection',err=>noteError('unexpected',err));
 // Stopping (a deploy sends SIGTERM): no new hands, running hands may finish, then the
 // state is saved. A hand still running at the time limit gets its chips back on the next start.
 const STOP_WAIT_MS=Number(process.env.STOP_WAIT_MS||25000);let stopping=null;

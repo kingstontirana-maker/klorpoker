@@ -45,6 +45,29 @@ test('expired deposits are not credited automatically; the center can assign a t
  assert.throws(()=>pay.route('/api/crypto/assign',{tx,username:'ana'},center),/not found/,'one transfer, one credit');
 });
 
+test('a paid deposit waits while center credit is too low, then is credited; nothing is credited twice',async()=>{
+ const {db,pay,p1,send,tick}=world();const center=db.users.find(u=>u.role==='CENTER'),had=center.balance;center.balance=100;
+ const d=pay.route('/api/crypto/deposit',{amount:50},p1);tick(1000);send(Math.round(Number(d.amount)*1e6));tick(1000);await pay.scan();
+ assert.equal(p1.balance,0);assert.equal(db.crypto.deposits[0].note,'Center credit is too low');assert.equal(db.crypto.seen.length,0,'kept for the next try');
+ center.balance=had;await pay.scan();const paid=Math.floor(Number(d.amount)*0.9*100);assert.equal(p1.balance,paid);assert.equal(db.crypto.deposits[0].status,'credited');assert.equal(db.crypto.deposits[0].note,undefined);
+ await pay.scan(true);assert.equal(p1.balance,paid);
+});
+
+test('still too low when the deposit expires: the transfer is listed for the center',async()=>{
+ const {db,pay,p1,send,tick}=world();db.users.find(u=>u.role==='CENTER').balance=100;
+ const d=pay.route('/api/crypto/deposit',{amount:50},p1);tick(1000);const tx=send(Math.round(Number(d.amount)*1e6));tick(1000);await pay.scan();
+ tick(4*3600000);await pay.scan(true);assert.equal(db.crypto.unmatched.find(x=>x.tx===tx)?.status,'open');assert.equal(p1.balance,0);
+});
+
+test('a late payment is found without any open deposit, even after downtime; open ones are never trimmed away',async()=>{
+ const {db,pay,p1,send,tick}=world();const d=pay.route('/api/crypto/deposit',{amount:50},p1);await pay.scan();
+ tick(4*3600000);const tx=send(Math.round(Number(d.amount)*1e6));tick(6*60000);await pay.scan();
+ assert.equal(db.crypto.unmatched.find(x=>x.tx===tx)?.status,'open','listed by the automatic scan');assert.equal(p1.balance,0);
+ const last=db.crypto.lastScan;tick(60000);await pay.scan();assert.equal(db.crypto.lastScan,last,'no extra requests between idle scans');
+ tick(20*3600000);const late=send(25_000_000);tick(10*3600000);await pay.scan();assert.equal(db.crypto.unmatched.find(x=>x.tx===late)?.status,'open','30 hours of downtime hide nothing');
+ for(let i=0;i<400;i++)db.crypto.unmatched.push({tx:'old'+i,micro:'1',at:1,status:'ignored'});send(26_000_000);tick(6*60000);await pay.scan();assert.ok(db.crypto.unmatched.some(x=>x.tx===tx&&x.status==='open'));
+});
+
 test('withdrawals hold the credit until the center pays or rejects',()=>{
  const {pay,center,p1,total}=world();p1.balance=10000;const start=total();
  assert.throws(()=>pay.route('/api/crypto/withdraw',{amount:50,address:'Tbad'},p1),/valid USDT TRC20/);
