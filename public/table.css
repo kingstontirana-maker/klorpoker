@@ -621,7 +621,7 @@ body.fitDesk .dock{margin-bottom:12px}
  transition:background .6s ease,box-shadow .6s ease}
 .tableStage:after,body[data-view="table"] .tableStage:after{background:radial-gradient(ellipse at center,var(--t-pool,#2bd99018) 0%,transparent 65%)}
 /* The room around the table is a dark tint of the table's colour. */
-body[data-view="table"] .game:before{background:radial-gradient(ellipse 60% 50% at 50% 45%,var(--t-amb,#12382acc) 0%,transparent 70%),radial-gradient(ellipse 120% 90% at 50% 40%,var(--t-room1,#0d2119) 0%,var(--t-room2,#0a1612) 45%,var(--t-room3,#070e0b) 75%,#040806 100%);transition:background .6s ease}
+body[data-view="table"] .game:before{background:radial-gradient(ellipse 60% 50% at 50% 45%,var(--t-amb,#12382acc) 0%,transparent 70%);transition:background .6s ease}
 
 /* Phones: the canvas sits inside the safe area (positioned by app.js), so the
    insets are no longer padded inside it, and the controls use plain offsets. */
@@ -668,3 +668,8 @@ body.fitPhone .dockInfo{display:none!important}
 @media(max-width:900px) and (orientation:portrait),(max-width:520px),(max-height:560px) and (orientation:landscape){.seatAction[data-action=SB],.seatAction[data-action=BB],.seatAction[data-action=POST]{display:none!important}}
 /* Your blind sits beside your avatar, not on your cards. */
 .game .seat.me .blindBadge{left:-28px;top:auto;bottom:10px}
+
+/* ---------- The room around the tables: black marble with warm light ----------
+   A fixed layer behind the page, so the table's scaling never moves or stretches it. */
+body[data-view="table"]{background:transparent}
+body[data-view="table"]::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#000000b8 0,#00000000 20%),url(/table-bg.webp) center/cover no-repeat,#050a08}

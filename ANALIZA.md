@@ -550,3 +550,6 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 - Çdo bast tregon tani chips bashkë me shumën edhe në telefon (një stack i vogël). U kontrollua me lojtarë në tavolinë nga 568×320 deri 1280×800: bastet nuk bien mbi letrat, emrat ose butonat. Vetëm në dritare shumë të ngushtë vertikale (nën rreth 520px), tre baste të gjera në rreshtin e sipërm mund të prekin njëri-tjetrin.
 - Etiketa qendrore "ALL-IN" pranë pot-it u hoq. Statusi qëndron te lojtari, edhe te vetja dhe te lojtari lart, ku më parë ishte i fshehur në telefon.
 - Në telefon horizontal statusi zë rreshtin e emrit, ndaj nuk e mbulon më shumën e lojtarit. Për SB/BB mbetet vetëm shenja te avatari, dhe emri duket.
+
+## Sfondi i tavolinave
+- Rreth tavolinave është tani mermeri i zi me dritë të artë (`public/table-bg.webp`, 178 KB). Është një shtresë fikse pas faqes, e njëjtë për çdo tavolinë dhe çdo madhësi ekrani. Lobby dhe panelet nuk ndryshojnë. Ngjyra e tavolinës mbetet te tapeti dhe te drita e lehtë rreth tij.
