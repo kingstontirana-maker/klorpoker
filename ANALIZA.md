@@ -593,3 +593,6 @@ Lojtarët e vjetër pa email mbeten si më parë, nën kontrollin e agjentit të
 Kur lojtari ulet, shfletuesi dërgon ID-në e pajisjes (`klorDevice`), dhe serveri e refuzon uljen nëse një llogari tjetër nga e njëjta pajisje është tashmë në atë tavolinë. Kontrollohen edhe pajisjet ku janë parë më parë të dyja llogaritë. Një lojtar mund të luajë në tavolina të ndryshme.
 
 Kufizimi: ID-ja jeton në shfletues, ndaj një shfletues tjetër ose dritare private me një llogari të re merr ID të re. Sinjalet te "Fair play" mbeten për këto raste. Adresa IP nuk bllokon, sepse familjet dhe kafenetë e ndajnë.
+
+## Foto profili
+Herën e parë që një lojtar hyn, i del një dritare me 48 figura (`public/avatars.js`): njerëz, mjete, para, kafshë dhe fat. Janë vizatime origjinale, jo personazhe të njohura, ndaj nuk kanë kufizime të drejtash autori. "Later" e mbyll dhe nuk pyet më, ndërsa figura ndryshohet kurdo nga menuja te "Profile picture". Serveri ruan vetëm ID-në e figurës dhe pranon vetëm ID nga lista, ndaj nuk ngarkohet asnjë skedar. Lojtarët e tjerë e shohin figurën te tavolina.

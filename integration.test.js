@@ -341,6 +341,10 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.equal((await call('table/'+one+'/sit',a,{position:0,buyin:20,device:'device-aaaa'})).status,200);
      const same=await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-aaaa'});assert.equal(same.status,400);assert.match(same.data.error,/this device/);assert.ok(!runtime.get(one).seats[1]);
      assert.equal((await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-bbbb'})).status,200);
+     // Profile picture: only from the list, and the table shows it at once.
+     assert.equal((await call('profile/avatar',a,{id:'nope'})).status,400);assert.equal((await call('profile/avatar',a,{id:'<script>'})).status,400);assert.equal((await call('profile/avatar',center,{id:'boss'})).status,403);
+     assert.equal((await call('state',a)).data.user.avatarAsked,false);assert.equal((await call('profile/avatar',a,{skip:true})).status,200);{const me=(await call('state',a)).data.user;assert.equal(me.avatarAsked,true);assert.equal(me.avatar,null);}
+     assert.equal((await call('profile/avatar',a,{id:'boss'})).data.avatar,'boss');assert.equal((await call('state',a)).data.user.avatar,'boss');assert.equal((await call('table/'+one+'/state',b)).data.seats[0].avatar,'boss','the other player sees it');assert.equal((await call('table/'+one+'/state',b)).data.seats[1].avatar,null);
      for(const [id,token] of [[one,a],[one,b]])assert.equal((await call('table/'+id+'/leave',token,{})).status,200);
      assert.equal(runtime.get(two).seats.filter(Boolean).length,0);}
     {await shutdown(1500);const before=[...runtime.values()].map(x=>x.hand);for(const x of runtime.values()){for(const s of x.seats)if(s)s.lastSeen=Date.now();x.lastActionAt=0;tickTable(x);}assert.deepEqual([...runtime.values()].map(x=>x.hand),before,'no new hand is dealt');assert.equal((await call('table/1/sit',await signIn(3),{position:5,buyin:20})).status,503);}
