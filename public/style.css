@@ -387,3 +387,8 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 .mhRows{display:grid;gap:6px}.mhRow{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;text-align:left;border-radius:10px;background:#0d1714;border:1px solid #283c30;color:inherit}.mhRow:hover{border-color:#5ef0a866;filter:none}.mhCards{display:flex;gap:3px;flex:none}.mhInfo{flex:1;min-width:0}.mhInfo b{display:block;font-size:13px}.mhInfo small{display:block;font-size:11px;letter-spacing:0;color:#8eaaa1}
 .myHandsDialog .card{position:relative;display:block;overflow:hidden;flex:none;width:30px;height:42px;border-radius:4px;background:linear-gradient(150deg,#fff,#eef2f4);border:1px solid #d5dde2;color:#14283a}.myHandsDialog .card.red{color:#d02a49}
 @media(max-width:760px){.navGroup{display:none}.mhStats{grid-template-columns:repeat(2,1fr)}}
+
+/* Sitting down: only the wallet on top, then the amount and Confirm. */
+#chipDialog.sitMode #chipDialogTitle{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#chipDialog.sitMode .chipFacts{grid-template-columns:1fr;margin-top:26px}#chipDialog.sitMode .chipFacts div:not(:first-child){display:none}
+#chipDialog.sitMode .chipFacts div:first-child{grid-template-columns:1fr auto;align-items:center;padding:14px 16px}#chipDialog.sitMode .chipFacts strong{font-size:18px}
