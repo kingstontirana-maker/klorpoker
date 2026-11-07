@@ -392,3 +392,7 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 #chipDialog.sitMode #chipDialogTitle{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 #chipDialog.sitMode .chipFacts{grid-template-columns:1fr;margin-top:26px}#chipDialog.sitMode .chipFacts div:not(:first-child){display:none}
 #chipDialog.sitMode .chipFacts div:first-child{grid-template-columns:1fr auto;align-items:center;padding:14px 16px}#chipDialog.sitMode .chipFacts strong{font-size:18px}
+/* Sitting down: no presets, and the whole popup fits the screen without scrolling. */
+#chipDialog.sitMode .chipPresets{display:none}
+#chipDialog.sitMode{max-height:calc(100dvh - 16px);overflow:auto}
+@media(max-height:460px){#chipDialog.sitMode{padding:12px 18px 14px}#chipDialog.sitMode .chipFacts{margin:22px 0 6px}#chipDialog.sitMode .chipFacts div:first-child{padding:8px 12px}#chipDialog.sitMode .chipFacts strong{font-size:15px}#chipDialog.sitMode .depositSelected{font-size:24px;line-height:1.1}#chipDialog.sitMode form{gap:8px}#chipDialog.sitMode #chipSubmit{padding-top:9px;padding-bottom:9px}}
