@@ -155,6 +155,14 @@ export function preActionFor(choice,toCall){if(choice==='checkFold')return toCal
 // player-relative positions 0..5; position 3 is always the local player.
 // A bet entry may carry an alignment: 'start' puts its left edge on the point, 'end' its
 // right edge, so a long amount grows away from the nearest name plate.
+// A table with fewer seats uses the same spots: two players face each other, four sit
+// around the table with the side players halfway along the edge. "slots" names the
+// six-seat position whose styling each seat borrows.
+export function sizedLayout(base,size=6){
+ if(size===2)return {seats:[base.seats[0],base.seats[3]],bets:[base.bets[0],base.bets[3]],dealer:[base.dealer[0],base.dealer[3]],slots:[0,3]};
+ if(size===4){const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2,...a.slice(2)],four=l=>[l[0],mid(l[1],l[2]),l[3],mid(l[4],l[5])];return {seats:four(base.seats),bets:four(base.bets),dealer:four(base.dealer),slots:[0,1,3,5]};}
+ return {...base,slots:[0,1,2,3,4,5]};
+}
 export function seatLayout(portrait=false,phone=false,narrow=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action

@@ -185,6 +185,9 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      // Omaha tables: chosen at creation, listed with their game, four cards each.
      const plo=await call('tables/create',tokens[0],{name:'Omaha One',sb:1,bb:2,game:'omaha'});assert.equal(plo.status,200);assert.equal(plo.data.game,'omaha');
      assert.equal((await call('tables/create',tokens[0],{name:'Bad game',sb:1,bb:2,game:'stud'})).status,400);
+     assert.equal((await call('tables/create',tokens[0],{name:'Three',sb:1,bb:2,size:3})).status,400,'only 2, 4 or 6 seats');
+     {const duel=await call('tables/create',tokens[0],{name:'Duo',sb:1,bb:2,size:2});assert.equal(duel.data.size,2);assert.equal(runtime.get(duel.data.id).seats.length,2);assert.equal((await call('state',tokens[0])).data.tables.find(x=>x.id===duel.data.id).size,2);
+      assert.equal((await call('tables/delete',tokens[0],{id:duel.data.id})).status,200);}
      assert.equal((await call('tables/create',tokens[1],{name:'Not center',sb:1,bb:2,game:'omaha'})).status,403);
      const games=(await call('state',tokens[0])).data.tables;assert.equal(games.find(x=>x.id===plo.data.id).game,'omaha');assert.equal(games.find(x=>x.name==='Plain').game,'holdem');
      assert.equal(runtime.get(plo.data.id).game,'omaha');

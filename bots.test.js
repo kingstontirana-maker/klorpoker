@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test from 'node:test';import {sitDeep} from './test-helpers.js';
 import assert from 'node:assert/strict';
 import {createEngine,LIVE} from './game.js';
 import {createBots,botDecision,botView,handStrength,equity} from './bots.js';
@@ -63,7 +63,7 @@ test('bots and real players play many hands: money is conserved and limits stop 
  const {center,db,engine,t,manager,human,total}=world();
  manager.route('/api/bots/create',{name:'Lucky',budget:300,tableId:'1',buyin:50,stopLoss:60,stopWin:15,risk:'medium'},center);const b=db.users[1];
  manager.route('/api/bots/status',{id:b.id,enabled:true},center);
- const h1=human(1,500000),h2=human(2,500000);engine.sit(t,h1,0,500,[t]);engine.sit(t,h2,3,500,[t]);const start=total();
+ const h1=human(1,500000),h2=human(2,500000);sitDeep(engine,t,h1,0,500);sitDeep(engine,t,h2,3,500);const start=total();
  let stopped=false;
  for(let hand=0;hand<400&&!stopped;hand++){
   manager.tick();if(!engine.startHand(t))break;
@@ -94,8 +94,8 @@ test('bot rake is not revenue: reports count real players only, the house result
  const {center,db,engine,t,manager}=world();db.rakePercent=5;db.tables=[{id:'1',name:'Test',sb:100,bb:200}];
  const admin={id:'ad',username:'admin1',role:'ADMIN',parentId:'center',balance:0,share:40},agent={id:'ag',username:'agent1',role:'AGENT',parentId:'ad',balance:0,share:20};
  const h1={id:'h1',username:'human1',role:'USER',parentId:'ag',balance:500000},h2={id:'h2',username:'human2',role:'USER',parentId:'ag',balance:500000};db.users.push(admin,agent,h1,h2);
- manager.route('/api/bots/create',{name:'Marco',budget:2000,tableId:'1',buyin:500,stopLoss:2000,stopWin:2000},center);const b=db.users.find(u=>u.isBot);
- manager.route('/api/bots/status',{id:b.id,enabled:true},center);engine.sit(t,h1,0,500,[t]);engine.sit(t,h2,3,500,[t]);
+ manager.route('/api/bots/create',{name:'Marco',budget:2000,tableId:'1',buyin:200,stopLoss:2000,stopWin:2000},center);const b=db.users.find(u=>u.isBot);
+ manager.route('/api/bots/status',{id:b.id,enabled:true},center);sitDeep(engine,t,h1,0,500);sitDeep(engine,t,h2,3,500);
  for(let hand=0;hand<120;hand++){manager.tick();if(!engine.startHand(t))break;
   for(let k=0;k<200&&LIVE.includes(t.phase);k++){if(t.runout){engine.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];if(s.userId===b.id){manager.tick(t.turnStartedAt+5000);continue;}engine.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
   for(const s of t.seats)if(s)s.lastSeen=Date.now();t.lastActionAt=0;}
@@ -113,7 +113,7 @@ test('bot rake is not revenue: reports count real players only, the house result
 test('seat-only bots fill a seat and never lose a cent',()=>{
  const {center,db,engine,t,manager,human}=world();
  manager.route('/api/bots/create',{name:'Filler',budget:200,tableId:'1',buyin:50,stopLoss:100,stopWin:100,mode:'seat'},center);const b=db.users.find(u=>u.isBot);
- manager.route('/api/bots/status',{id:b.id,enabled:true},center);const h1=human(1,500000),h2=human(2,500000);engine.sit(t,h1,0,500,[t]);engine.sit(t,h2,3,500,[t]);
+ manager.route('/api/bots/status',{id:b.id,enabled:true},center);const h1=human(1,500000),h2=human(2,500000);sitDeep(engine,t,h1,0,500);sitDeep(engine,t,h2,3,500);
  manager.tick();assert.ok(t.seats.some(s=>s?.userId===b.id),'the bot sits');const start=b.balance+t.seats.find(s=>s?.userId===b.id).stack;
  for(let hand=0;hand<80;hand++){manager.tick();if(!engine.startHand(t))break;assert.ok(!t.seats.find(s=>s?.userId===b.id)?.inHand,'never dealt in');
   for(let k=0;k<200&&LIVE.includes(t.phase);k++){if(t.runout){engine.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];engine.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}

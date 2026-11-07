@@ -140,7 +140,7 @@ export function createBots({db,runtime,engine,save,olderRake}){
      if(b.balance<b.bot.buyin){stop(b,'Wallet smaller than the buy-in');continue;}
      const humans=t.seats.filter(isHuman).length,free=t.seats.filter(s=>!s).length,botsHere=t.seats.filter(s=>s&&!isHuman(s)).length;
      if(!humans||free<2||botsHere>=3)continue;
-     engine.sit(t,b,t.seats.findIndex(s=>!s),b.bot.buyin/100,[...runtime.values()]);
+     engine.sit(t,b,t.seats.findIndex(s=>!s),Math.min(b.bot.buyin,engine.buyinLimits(t).max)/100,[...runtime.values()]);
      // Seat only: sits out at once, before any hand can deal it in, so it never pays a blind.
      if(b.bot.mode==='seat')engine.sitOut(t,b,true);save();continue;}
     if(b.bot.mode==='seat'){if(!at.s.sittingOut)engine.sitOut(at.t,b,true);at.s.sitOutSince=now;if(!(LIVE.includes(at.t.phase)&&at.t.seats[at.t.turn]===at.s))continue;}

@@ -561,3 +561,14 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 Platforma u riemërua nga Klor Poker në **Suprem Poker**. Logoja e re (`public/logo.webp`) është në të gjitha vendet ku shfaqej logoja e vjetër, dhe ikonat e faqes e të aplikacionit (`icon.png`, `icon-512.png`, `apple-touch-icon.png`) u bënë nga e njëjta logo. Mbishkrimi në tavolinë tani është "SUPREM POKER". Skedarët e vjetër `logo.svg`, `logo-header.svg` dhe `icon.svg` u fshinë.
 
 Emrat e brendshëm `klor.db`, çelësat e ruajtjes në shfletues (`klorSound`, `klorDevice` etj.) dhe koka `x-klor-visible` nuk u ndryshuan: lojtarët nuk i shohin, dhe ndryshimi i tyre do të humbiste të dhëna ose cilësime. Domeni klorpoker.com dhe emri i repos në GitHub mbeten si janë.
+
+## Tavolina me 2, 4 ose 6 lojtarë dhe katalogu i tavolinave
+Çdo tavolinë tani ka 2, 4 ose 6 vende (`t.seats.length`), dhe rregullat e lojës, vendet në ekran, lobby dhe paneli e ndjekin këtë numër. Kur krijon tavolinë nga paneli, zgjedh edhe numrin e lojtarëve. Madhësia e një tavoline ekzistuese nuk ndryshohet.
+
+Blerja në tavolinë tani varet vetëm nga blindet: nga 10 deri në 100 big blind. Më parë kishte një minimum fiks €20 dhe një maksimum fiks €1,000, që nuk kishin kuptim në tavolinat e vogla ose të mëdha.
+
+`table-catalog.js` mban 36 tavolina Hold'em: Imperium, Monaco, Black Diamond, Grand Palace, Supreme dhe The Billionaire, me nga 6 tavolina radhazi (I–VI), të gjitha jeshile. Çdo emër ka dy nivele blindesh: I–III dhe IV–VI, secili me 2, 4 dhe 6 vende. Blindet shkojnë nga €0.01/€0.02 deri në €50/€100.
+
+Katalogu hapet automatikisht një herë të vetme për çdo bazë të dhënash (`db.tableCatalog`), ndaj një tavolinë e mbyllur nga qendra nuk kthehet më. Kur hapet, edhe tavolinat që ekzistojnë tashmë bëhen jeshile.
+
+Rake mbetet 5% pa kufi për dorë. Në nivelet e larta kjo del shumë: një pot prej €10,000 paguan €500.

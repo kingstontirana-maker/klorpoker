@@ -1,10 +1,10 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createEngine,LIVE,livePots} from './game.js';
+import test from 'node:test';import {sitDeep} from './test-helpers.js';import assert from 'node:assert/strict';import {createEngine,LIVE,livePots} from './game.js';
 
 // Engine-level Texas Hold'em rule checks with a deterministic deck.
 function setup(stacks,{sb=100,bb=200}={}){
  const db={users:[{id:'c',role:'CENTER',balance:0}],ledger:[],rakePercent:0,rakeCap:0};
  const e=createEngine({db}),t=e.makeTable('1','T',sb,bb),all=[t];
- stacks.forEach((cents,i)=>{if(cents==null)return;const u={id:'p'+i,username:'p'+i,role:'USER',balance:cents};db.users.push(u);e.sit(t,u,i,cents/100,all);});
+ stacks.forEach((cents,i)=>{if(cents==null)return;const u={id:'p'+i,username:'p'+i,role:'USER',balance:cents};db.users.push(u);sitDeep(e,t,u,i,cents/100,all);});
  const who=()=>t.seats[t.turn].userId,owe=()=>t.currentBet-t.seats[t.turn].roundBet;
  const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+t.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0);
  const checkDown=()=>{while(LIVE.includes(t.phase)&&t.turn>=0)e.act(t,who(),owe()?'call':'check');};

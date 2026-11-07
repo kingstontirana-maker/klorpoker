@@ -45,7 +45,8 @@ export const maxRaiseTo=(t,s)=>{const all=s.roundBet+s.stack;return gameOf(t)===
 // TDA: betting reopens for a player who already acted only when the raises
 // made since their action add up to at least one full raise.
 export const canRaise=(t,s)=>actionable(s)&&s.stack>toCall(t,s)&&(!s.acted||t.currentBet-(s.actedAt||0)>=t.minRaise);
-export function nextToAct(t,from=t.turn){for(let k=1;k<=6;k++){const i=((from+k)%6+6)%6,s=t.seats[i];if(actionable(s)&&(!s.acted||s.roundBet!==t.currentBet))return i;}return -1;}
+export const TABLE_SIZES=[2,4,6];
+export function nextToAct(t,from=t.turn){const n=t.seats.length;for(let k=1;k<=n;k++){const i=((from+k)%n+n)%n,s=t.seats[i];if(actionable(s)&&(!s.acted||s.roundBet!==t.currentBet))return i;}return -1;}
 // Pots in the middle (bets of the current street are still in front of the
 // players). Side pots exist only above an all-in player's total contribution.
 export function livePots(t){
@@ -68,7 +69,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
  function visual(t,type,detail={}){const e={seq:++t.visualSeq,hand:t.hand,type,at:Date.now(),...detail};t.visualEvents.push(e);t.visualEvents=t.visualEvents.slice(-100);return e;}
  const seatOf=(t,userId)=>t.seats.findIndex(s=>s?.userId===userId);
 
- function makeTable(id,name,sb,bb,game='holdem'){return {id:String(id),name,sb,bb,game:GAMES[game]?game:'holdem',hand:0,phase:'waiting',button:-1,sbPos:-1,bbPos:-1,turn:-1,lastAggressor:-1,board:[],pot:0,currentBet:0,minRaise:bb,deck:[],seats:Array(6).fill(null),events:[],lastResult:null,lastActionAt:0,turnStartedAt:0,deadline:0,runout:null,visualEvents:[],visualSeq:0,chat:[],chatSeq:0};}
+ function makeTable(id,name,sb,bb,game='holdem',size=6){return {id:String(id),name,sb,bb,game:GAMES[game]?game:'holdem',hand:0,phase:'waiting',button:-1,sbPos:-1,bbPos:-1,turn:-1,lastAggressor:-1,board:[],pot:0,currentBet:0,minRaise:bb,deck:[],seats:Array(TABLE_SIZES.includes(size)?size:6).fill(null),events:[],lastResult:null,lastActionAt:0,turnStartedAt:0,deadline:0,runout:null,visualEvents:[],visualSeq:0,chat:[],chatSeq:0};}
  function setTurn(t,i){t.turn=i;t.lastActionAt=t.turnStartedAt=Date.now();t.deadline=i>=0?t.turnStartedAt+ACTION_MS:0;}
  // Bets in front of the players slide into the middle at the end of a round.
  function collect(t){const bets=Object.fromEntries(t.seats.filter(s=>s?.roundBet>0).map(s=>[s.userId,clean(s.roundBet)]));if(Object.keys(bets).length)visual(t,'collect',{bets});}
@@ -106,10 +107,10 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   t.hand++;t.phase='preflop';t.board=[];t.pot=0;t.currentBet=0;t.minRaise=t.bb;t.deck=deck();t.lastResult=null;t.lastAggressor=-1;
   // The button never moves onto a player who still has to post to enter.
   const canButton=s=>eligible(t,s)&&!s.mustPost,anyButton=t.seats.some(canButton);
-  let x=t.button;for(let k=1;k<=6;k++){x=(x+1+6)%6;if(anyButton?canButton(t.seats[x]):eligible(t,t.seats[x])){t.button=x;break;}}
+  const size=t.seats.length;let x=t.button;for(let k=1;k<=size;k++){x=(x+1+size)%size;if(anyButton?canButton(t.seats[x]):eligible(t,t.seats[x])){t.button=x;break;}}
   t.runout=null;
   for(const s of t.seats)if(s){Object.assign(s,{cards:[],committed:0,roundBet:0,folded:false,allIn:false,acted:false,actedAt:0,lastAction:null,inHand:eligible(t,s)});if(s.inHand)s.timeBank=Math.min(TIME_BANK_MAX,(s.timeBank??TIME_BANK_START)+TIME_BANK_REFILL);}
-  const order=[];for(let i=1;i<=6;i++){const p=(t.button+i)%6;if(t.seats[p]?.inHand)order.push(p);}
+  const order=[];for(let i=1;i<=size;i++){const p=(t.button+i)%size;if(t.seats[p]?.inHand)order.push(p);}
   t.record={tableId:t.id,table:t.name,game:gameOf(t),hand:t.hand,sb:clean(t.sb),bb:clean(t.bb),rakePercent:db.rakePercent,startedAt:Date.now(),button:t.button+1,players:order.map(p=>({seat:p+1,userId:t.seats[p].userId,username:t.seats[p].username,...(t.seats[p].isBot?{bot:true}:{}),stack:clean(t.seats[p].stack)})),actions:[],board:[]};
   for(let c=0;c<GAMES[gameOf(t)].hole;c++)for(const pos of order)t.seats[pos].cards.push(t.deck.pop());
   for(const p of t.record.players)p.cards=[...t.seats[p.seat-1].cards];
@@ -155,15 +156,15 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
  // Online showdown order: the last river aggressor shows first, otherwise the
  // first player left of the button. A losing hand is mucked unless anyone is all-in.
  function showdownOrder(t){
-  const allIn=t.seats.some(s=>inHand(s)&&s.allIn),start=t.lastAggressor>=0&&inHand(t.seats[t.lastAggressor])?t.lastAggressor:(t.button+1)%6,shown=[];let best=null;
-  for(let k=0;k<6;k++){const s=t.seats[(start+k)%6];if(!inHand(s))continue;const score=evaluateHand(gameOf(t),s.cards,t.board);if(allIn||!best||compare(score,best)>=0){shown.push(s.id);if(!best||compare(score,best)>0)best=score;}}
+  const allIn=t.seats.some(s=>inHand(s)&&s.allIn),start=t.lastAggressor>=0&&inHand(t.seats[t.lastAggressor])?t.lastAggressor:(t.button+1)%t.seats.length,shown=[];let best=null;
+  for(let k=0;k<t.seats.length;k++){const s=t.seats[(start+k)%t.seats.length];if(!inHand(s))continue;const score=evaluateHand(gameOf(t),s.cards,t.board);if(allIn||!best||compare(score,best)>=0){shown.push(s.id);if(!best||compare(score,best)>0)best=score;}}
   return shown;
  }
 
  function finish(t,showdown){
   // Odd chips go to the first winner clockwise from the button.
   collect(t);t.runout=null;
-  const players=t.seats.flatMap((s,i)=>s?.inHand?[{...s,position:(i-t.button+5)%6}]:[]);
+  const players=t.seats.flatMap((s,i)=>s?.inHand?[{...s,position:(i-t.button-1+t.seats.length)%t.seats.length}]:[]);
   // Rake is a flat percentage of the contested pot; there is no per-hand cap.
   const game=gameOf(t),result=distribute(players,t.board,db.rakePercent,Infinity,t.board.length>=3,game);
   for(const s of t.seats)if(s&&result.payments[s.id])s.stack+=result.payments[s.id];
@@ -225,7 +226,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   // While a seat is held for the waiting list, the last free seat is kept for that player.
   if(t.waitOffer&&t.waitOffer.until>Date.now()&&t.waitOffer.userId!==u.id&&t.seats.filter(s=>!s).length<=1)fail('This seat is held for the next player on the waiting list');
   const pos=Number(position),amount=money(buyin),limits=buyinLimits(t);
-  if(!Number.isInteger(pos)||pos<0||pos>=6||t.seats[pos])fail('That seat is taken');
+  if(!Number.isInteger(pos)||pos<0||pos>=t.seats.length||t.seats[pos])fail('That seat is taken');
   if(!Number.isSafeInteger(amount)||amount<limits.min||amount>limits.max||u.balance<amount)fail(`Invalid buy-in (${eur(limits.min)}–${eur(limits.max)})`);
   u.balance-=amount;u.tableExit=null;
   // Joining a running game requires a live big blind before the first hand.
@@ -294,7 +295,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   t.chat.push({id:++t.chatSeq,user:u.username,text:message,at:Date.now()});t.chat=t.chat.slice(-CHAT_LIMIT);
  }
 
- function buyinLimits(t){return {min:Math.max(2000,t.bb*10),max:Math.max(100000,t.bb*100)};}
+ function buyinLimits(t){return {min:t.bb*10,max:t.bb*100};}
 
  function snapshot(t,userId,seen=true){
   const present=seen&&t.seats.find(s=>s?.userId===userId);if(present){present.lastSeen=Date.now();if(present.autoSitOut)comeBack(t,present);}

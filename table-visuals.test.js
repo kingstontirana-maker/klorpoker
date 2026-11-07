@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {bestFive,evaluate,distribute} from './poker.js';
-import {splitChips,timerState,winningState,freshEvents,betLimits,renderCard,tableGeometry,payoutFlights} from './public/table-visuals.js';
+import {splitChips,timerState,winningState,freshEvents,betLimits,renderCard,tableGeometry,payoutFlights,seatLayout,sizedLayout} from './public/table-visuals.js';
 
 test('winning five cards identify the wheel and exclude unrelated kickers',()=>{
  const result=bestFive(['As','2h','3d','4c','9d','5s','Kh']);
@@ -93,4 +93,12 @@ test('seat layout, felt sizing and standard bet sizes',async()=>{
  assert.deepEqual(betPresets(flop,me).map(p=>p.value),[10,15,22.5,30]);
  assert.deepEqual(betPresets({...flop,legalActions:{canRaise:false}},me),[]);
  assert.ok(betPresets(flop,{stack:12,bet:0}).every(p=>p.value<=12),'sizes never exceed the stack');
+});
+
+test('tables for 2 and 4 players put one spot on the table for every seat',()=>{
+ for(const base of [seatLayout(),seatLayout(true),seatLayout(true,false,true),seatLayout(false,true)])for(const size of [2,4,6]){const l=sizedLayout(base,size);
+  for(const key of ['seats','bets','dealer','slots'])assert.equal(l[key].length,size,key+' for '+size);
+  assert.deepEqual(l.seats[0],base.seats[0],'the top seat stays');assert.deepEqual(l.seats[size/2],base.seats[3],'the player sits at the bottom');}
+ const four=sizedLayout({seats:[[50,0],[100,10],[100,30],[50,100],[0,30],[0,10]],bets:[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],dealer:[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]},4);
+ assert.deepEqual(four.seats,[[50,0],[100,20],[50,100],[0,20]]);
 });

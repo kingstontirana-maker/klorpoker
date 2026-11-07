@@ -1,10 +1,10 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createEngine,LIVE,maxRaiseTo} from './game.js';import {bestHand,evaluateHand,compare} from './poker.js';
+import test from 'node:test';import {sitDeep} from './test-helpers.js';import assert from 'node:assert/strict';import {createEngine,LIVE,maxRaiseTo} from './game.js';import {bestHand,evaluateHand,compare} from './poker.js';
 
 // Pot-Limit Omaha rule checks with a deterministic deck.
 function setup(stacks,{sb=100,bb=200}={}){
  const db={users:[{id:'c',role:'CENTER',balance:0}],ledger:[],rakePercent:0,rakeCap:0};
  const e=createEngine({db}),t=e.makeTable('1','O',sb,bb,'omaha'),all=[t];
- stacks.forEach((cents,i)=>{if(cents==null)return;const u={id:'p'+i,username:'p'+i,role:'USER',balance:cents};db.users.push(u);e.sit(t,u,i,cents/100,all);});
+ stacks.forEach((cents,i)=>{if(cents==null)return;const u={id:'p'+i,username:'p'+i,role:'USER',balance:cents};db.users.push(u);sitDeep(e,t,u,i,cents/100,all);});
  const who=()=>t.seats[t.turn].userId,owe=()=>t.currentBet-t.seats[t.turn].roundBet;
  const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+t.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0);
  const checkDown=()=>{while(LIVE.includes(t.phase)&&t.turn>=0)e.act(t,who(),owe()?'call':'check');};
@@ -72,6 +72,6 @@ test('omaha: showdown uses the two-plus-three rule and conserves every cent',()=
 
 test('omaha: hold\'em tables keep no-limit sizing and two cards',()=>{
  const db={users:[{id:'c',role:'CENTER',balance:0}],ledger:[],rakePercent:0};const e=createEngine({db}),t=e.makeTable('2','H',100,200);
- for(const i of [0,1]){const u={id:'h'+i,username:'h'+i,role:'USER',balance:100000};db.users.push(u);e.sit(t,u,i,1000,[t]);}
+ for(const i of [0,1]){const u={id:'h'+i,username:'h'+i,role:'USER',balance:100000};db.users.push(u);sitDeep(e,t,u,i,1000);}
  e.startHand(t);assert.equal(t.game,'holdem');assert.equal(t.seats[0].cards.length,2);assert.equal(maxRaiseTo(t,t.seats[t.turn]),100000);
 });

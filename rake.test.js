@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test from 'node:test';import {sitDeep} from './test-helpers.js';
 import assert from 'node:assert/strict';
 import {distribute} from './poker.js';
 import {rakeReport,revenueReport,rakeShares} from './rake.js';
@@ -95,7 +95,7 @@ test('a hand with rake credits the agent, the admin and the centre at once',()=>
  const users=[{id:'c',username:'center',role:'CENTER',balance:0},{id:'a',username:'adm',role:'ADMIN',parentId:'c',share:20,balance:0},{id:'g',username:'agt',role:'AGENT',parentId:'a',share:10,balance:0},
   {id:'p0',username:'p0',role:'USER',parentId:'g',balance:100000},{id:'p1',username:'p1',role:'USER',parentId:'g',balance:100000}];
  const db={users,ledger:[],rakePercent:5,tables:[]};const e=createEngine({db}),t=e.makeTable('1','T',100,200);
- e.sit(t,users[3],0,500,[t]);e.sit(t,users[4],1,500,[t]);
+ sitDeep(e,t,users[3],0,500);sitDeep(e,t,users[4],1,500);
  const money=()=>users.reduce((n,u)=>n+u.balance,0)+t.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0);const before=money();
  e.startHand(t);const who=()=>t.seats[t.turn].userId,owe=()=>t.currentBet-t.seats[t.turn].roundBet;
  e.act(t,who(),'call');e.act(t,who(),'check');assert.equal(t.phase,'flop');

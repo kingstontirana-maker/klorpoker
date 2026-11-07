@@ -396,3 +396,9 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 #chipDialog.sitMode .chipPresets{display:none}
 #chipDialog.sitMode{max-height:calc(100dvh - 16px);overflow:auto}
 @media(max-height:460px){#chipDialog.sitMode{padding:12px 18px 14px}#chipDialog.sitMode .chipFacts{margin:22px 0 6px}#chipDialog.sitMode .chipFacts div:first-child{padding:8px 12px}#chipDialog.sitMode .chipFacts strong{font-size:15px}#chipDialog.sitMode .depositSelected{font-size:24px;line-height:1.1}#chipDialog.sitMode form{gap:8px}#chipDialog.sitMode #chipSubmit{padding-top:9px;padding-bottom:9px}}
+.lobbySelect{min-height:38px;padding:0 10px;border-radius:10px;border:1px solid var(--line,#2c4133);background:#0c1713;color:inherit;font:inherit;font-size:13px}
+.gameTag.sizeTag{background:#ffffff12;color:#cfe3d9;border-color:#ffffff26}
+.llName .gameTag{flex:none}
+@media(min-width:1101px){.llHead,.llRow{grid-template-columns:62px minmax(290px,2.8fr) minmax(104px,1fr) minmax(130px,1.2fr) minmax(120px,1fr) minmax(90px,.8fr) 120px}}
+@media(max-width:1100px){.llName{flex-wrap:wrap;row-gap:4px}}
+.llRow.seated .llName{flex-wrap:wrap;row-gap:4px}.llRow.seated .llName b:first-of-type{flex:none}
