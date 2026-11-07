@@ -1,4 +1,4 @@
-/* Klor Poker table. One stylesheet for the game view: felt, seats, cards,
+/* Suprem Poker table. One stylesheet for the game view: felt, seats, cards,
    chips, action dock and drawer. The felt is sized by app.js (--felt-*);
    cards, text and buttons keep their native sizes on every screen. */
 :root{

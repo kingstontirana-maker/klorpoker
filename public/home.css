@@ -1,4 +1,4 @@
-/* ---------- Klor Poker home page: black marble, champagne gold, emerald ---------- */
+/* ---------- Suprem Poker home page: black marble, champagne gold, emerald ---------- */
 :root{--x-gold:#e6c88f;--x-gold2:#b8935a;--x-gold3:#f7e7c1;--x-mint:#4ff0a8;--x-bg:#050806;--x-text:#f3f1ea;--x-muted:#a7b0aa;--x-line:#ffffff14;
  --x-display:"SF Pro Display","Segoe UI Variable Display","Segoe UI",Inter,system-ui,sans-serif;--x-serif:"Didot","Bodoni 72","Bodoni MT","Playfair Display",Georgia,"Times New Roman",serif}
 .home{position:relative;min-height:100vh;color:var(--x-text);background:var(--x-bg);overflow:hidden;font-family:var(--x-display)}
@@ -11,7 +11,7 @@ body:has(#login:not([hidden])){background:var(--x-bg)}
 /* ---------- Navigation ---------- */
 .xNav{position:fixed;inset:0 0 auto;z-index:30;display:flex;align-items:center;gap:28px;padding:18px max(40px,env(safe-area-inset-left));padding-top:max(18px,env(safe-area-inset-top));transition:background .35s,padding .35s,box-shadow .35s}
 .xNav.scrolled{padding-top:max(10px,env(safe-area-inset-top));padding-bottom:10px;background:#050806d9;backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);box-shadow:0 1px 0 #d9bb8326}
-.xBrand img{display:block;height:44px;width:auto;filter:drop-shadow(0 4px 14px #000)}
+.xBrand img{display:block;height:54px;width:auto;filter:drop-shadow(0 4px 14px #000)}
 .xLinks{display:flex;gap:34px;margin:0 auto}
 .xLinks a{position:relative;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#d8d4c8cc;transition:color .25s}
 .xLinks a::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:1px;background:var(--x-gold);transform:scaleX(0);transition:transform .3s}
@@ -227,7 +227,7 @@ body:has(#login:not([hidden])){background:var(--x-bg)}
  .xPin b{font-size:11px;padding:6px 10px}
 }
 @media(max-width:640px){
- .xNav{padding:12px 16px;gap:8px}.xNav.scrolled{padding:8px 16px}.xBrand img{height:32px}
+ .xNav{padding:12px 16px;gap:8px}.xNav.scrolled{padding:8px 16px}.xBrand img{height:40px}
  .xNavCta{gap:6px}.xNavCta .xBtn{padding:10px 14px;font-size:11px}
  .xHero{padding:78px 18px 30px}
  .xHeroMedia img{top:0;height:62%;object-position:50% 30%}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {bestFive,evaluate,distribute} from './poker.js';
-import {splitChips,timerState,winningState,freshEvents,betLimits,renderCard,tableGeometry} from './public/table-visuals.js';
+import {splitChips,timerState,winningState,freshEvents,betLimits,renderCard,tableGeometry,payoutFlights} from './public/table-visuals.js';
 
 test('winning five cards identify the wheel and exclude unrelated kickers',()=>{
  const result=bestFive(['As','2h','3d','4c','9d','5s','Kh']);
@@ -64,6 +64,14 @@ test('all 52 cards use matching SVG suits and one large rank index',()=>{
  for(const suit of 'cdhs')for(const rank of '23456789TJQKA'){
   const html=renderCard(rank+suit);assert.match(html,new RegExp('data-suit="'+suit+'"'));assert.equal((html.match(/class="cornerArtwork"/g)||[]).length,1);assert.equal((html.match(/class="centerSuit"/g)||[]).length,1);assert.equal((html.match(/<text /g)||[]).length,1);assert.equal(html.includes('face red'),suit==='h'||suit==='d');assert.equal((html.match(/>10<\/text>/g)||[]).length,rank==='T'?1:0);
  }
+});
+
+test('every player is paid once for a hand, however many pots they share',()=>{
+ const e={payments:{a:150,b:40,c:10},pots:[{amount:90,winners:['a','b'],share:[50,40]},{amount:100,winners:['a'],share:[100]},{amount:10,winners:['c'],share:[10],refunded:true}]};
+ assert.deepEqual(payoutFlights(e),[{id:'a',amount:150,won:true},{id:'b',amount:40,won:true},{id:'c',amount:10,won:false}]);
+ assert.deepEqual(payoutFlights({payments:{a:0}}),[],'nothing to pay, no flight');
+ assert.deepEqual(payoutFlights({payments:{a:5}}),[{id:'a',amount:5,won:true}]);
+ assert.deepEqual(payoutFlights({payments:{a:30,b:5},pots:[{winners:['a'],refunded:false},{winners:['a'],refunded:true},{winners:['b'],refunded:true}]}).map(f=>f.won),[true,false],'a refund on top of a win is still one win');
 });
 
 test('hand descriptions, starting hands and pre-actions',async()=>{

@@ -20,6 +20,8 @@ export function renderCard(code,{winning=false,dim=false,index=0}={}){
  const rank=code[0]==='T'?'10':code[0],suit=code[1];
  return `<div class="card face ${'hd'.includes(suit)?'red':''} ${winning?'winningCard':''} ${dim?'dimCard':''}" data-card="${escape(code)}" data-suit="${suit}" style="--deal-index:${index}" aria-label="${escape(rank+symbols[suit])}${winning?' · winning hand':''}">${cardIndex(rank,suit)}${suitIcon(suit)}</div>`;
 }
+// One payment per player for a hand. A player who only got an uncalled bet back did not win.
+export function payoutFlights(e){const pots=e.pots||[],wins=new Set(pots.filter(p=>!p.refunded).flatMap(p=>p.winners));return Object.entries(e.payments||{}).filter(([,amount])=>amount>0).map(([id,amount])=>({id,amount,won:!pots.length||wins.has(id)}));}
 export const denominations=[{cents:100000,color:'gold'},{cents:50000,color:'violet'},{cents:10000,color:'black'},{cents:2500,color:'green'},{cents:500,color:'red'},{cents:100,color:'blue'},{cents:25,color:'white'},{cents:5,color:'red'},{cents:1,color:'white'}];
 export function splitChips(amount){let remaining=Math.max(0,Math.round(Number(amount)*100));if(!Number.isSafeInteger(remaining))return [];const result=[];for(const d of denominations){const count=Math.floor(remaining/d.cents);if(count){result.push({...d,count});remaining%=d.cents;}}return result;}
 export function chipStack(amount,{compact=false}={}){const parts=splitChips(amount);if(!parts.length)return '';return `<span class="chipStacks ${compact?'compactChips':''}" aria-hidden="true">${parts.slice(0,compact?2:4).map(d=>`<span class="chipColumn" style="--chip-count:${Math.min(d.count,6)}">${Array.from({length:Math.min(d.count,6)},(_,i)=>`<i class="pokerChip chip-${d.color}" style="--chip-level:${i}"><b>${d.cents>=100?d.cents/100:d.cents===25?'¼':d.cents/100}</b></i>`).join('')}</span>`).join('')}</span>`;}
@@ -49,17 +51,15 @@ export class TableVisuals {
     else if(e.type==='collect'){this.beep('chip');potBox?.classList.add('incoming');await Promise.all(Object.entries(e.bets||{}).map(([id,amount],i)=>{const from=this.betSpot(seatNode(id));return from?this.fly(from,pot,amount,i*60,480):Promise.resolve();}));potBox?.classList.remove('incoming');this.animate(pot,[{transform:'scale(.8)'},{transform:'scale(1.12)',offset:.6},{transform:'scale(1)'}],{duration:320});}
     else if(e.type==='reveal'){this.beep('card');await Promise.all((e.ids||[]).map((id,i)=>Promise.all([...(seatNode(id)?.querySelectorAll('.seatCards .card')||[])].map((card,k)=>this.animate(card,[{opacity:0},{opacity:1}],{duration:260,delay:i*160+k*90,easing:'ease-out'})))));}
     else if(e.type==='award'){
-      // Refunds first, then the main pot and each side pot in turn.
-      const pots=e.pots?.length?[...e.pots].sort((a,b)=>Number(b.refunded)-Number(a.refunded)):[{winners:Object.keys(e.payments),share:Object.values(e.payments)}];
-      const start={};for(const [id,amount] of Object.entries(e.payments||{})){const plate=seatNode(id)?.querySelector('.seatName strong');if(plate){const now=Number(plate.textContent.replace(/[^\d.-]/g,''));if(Number.isFinite(now)){start[id]=now-amount;plate.textContent=fmtChips(start[id]);}}}
+      // Each player is paid once, with everything they get from this hand: refund, main
+      // pot and side pots together. Those are one sum, however many pots there were.
+      const flights=payoutFlights(e);
+      const start={};for(const {id,amount} of flights){const plate=seatNode(id)?.querySelector('.seatName strong');if(plate){const now=Number(plate.textContent.replace(/[^\d.-]/g,''));if(Number.isFinite(now)){start[id]=now-amount;plate.textContent=fmtChips(start[id]);}}}
       if(this.state?.lastResult?.showdown)await wait(750);
+      if(generation!==this.generation)return;
       potBox?.classList.add('paying');
-      for(const [index,p] of pots.entries()){
-        if(generation!==this.generation)return;
-        if(!p.refunded)this.beep('win');
-        await Promise.all(p.winners.map((id,i)=>{const node=seatNode(id),target=node?.querySelector('.avatarWrap');if(!target)return Promise.resolve();return this.fly(pot,target,p.share?.[i]??0,i*120,820,true).then(()=>{start[id]=(start[id]??0)+(p.share?.[i]??0);this.land(node,start[id],p.share?.[i]??0,!p.refunded);});}));
-        if(index<pots.length-1)await wait(260);
-      }
+      if(flights.some(f=>f.won))this.beep('win');
+      await Promise.all(flights.map(({id,amount,won},i)=>{const node=seatNode(id),target=node?.querySelector('.avatarWrap');if(!target)return Promise.resolve();return this.fly(pot,target,amount,i*120,820,true).then(()=>{this.land(node,Math.round(((start[id]??0)+amount)*100)/100,amount,won);});}));
       potBox?.classList.remove('paying');
     }else if(e.type==='deal'){
       const deck=this.root.querySelector('#dealOrigin');const cards=[...this.root.querySelectorAll('.seatCards .card')];this.beep('card');await Promise.all(cards.map((node,i)=>this.dealCard(deck,node,i*65)));

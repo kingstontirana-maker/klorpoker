@@ -1,4 +1,4 @@
-# Analiza funksionale e Klor Poker
+# Analiza funksionale e Suprem Poker
 
 Platforma është një prototip i luajtshëm Texas Hold’em me kredit virtual. Baza e lojës ekzistonte, por hyrja e përbashkët në tavolinë dhe mungesa e afateve e bënin rrjedhën të paqartë. Tani hyrja ndahet sipas rolit.
 
@@ -553,3 +553,11 @@ Në telefon horizontal tavolina ka pak hapësirë anash (5% e gjerësisë). Fold
 
 ## Sfondi i tavolinave
 - Rreth tavolinave është tani mermeri i zi me dritë të artë (`public/table-bg.webp`, 178 KB). Është një shtresë fikse pas faqes, e njëjtë për çdo tavolinë dhe çdo madhësi ekrani. Lobby dhe panelet nuk ndryshojnë. Ngjyra e tavolinës mbetet te tapeti dhe te drita e lehtë rreth tij.
+
+## Pagesa e fituesve
+- Animacioni fluturonte veç për çdo pot (rikthim basti, pot kryesor, pot anësor), ndaj një lojtar dukej sikur paguhej 2–3 herë. Paratë kanë qenë gjithmonë të sakta: 400 duar me all-in të shumëfishtë pa asnjë gabim. Tani secili lojtar merr një pagesë të vetme me shumën e plotë të dorës, dhe tingulli i fitores bie një herë.
+
+## Emri Suprem Poker dhe logoja e re
+Platforma u riemërua nga Klor Poker në **Suprem Poker**. Logoja e re (`public/logo.webp`) është në të gjitha vendet ku shfaqej logoja e vjetër, dhe ikonat e faqes e të aplikacionit (`icon.png`, `icon-512.png`, `apple-touch-icon.png`) u bënë nga e njëjta logo. Mbishkrimi në tavolinë tani është "SUPREM POKER". Skedarët e vjetër `logo.svg`, `logo-header.svg` dhe `icon.svg` u fshinë.
+
+Emrat e brendshëm `klor.db`, çelësat e ruajtjes në shfletues (`klorSound`, `klorDevice` etj.) dhe koka `x-klor-visible` nuk u ndryshuan: lojtarët nuk i shohin, dhe ndryshimi i tyre do të humbiste të dhëna ose cilësime. Domeni klorpoker.com dhe emri i repos në GitHub mbeten si janë.

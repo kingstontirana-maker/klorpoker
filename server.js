@@ -11,20 +11,20 @@ const ROOT=path.dirname(fileURLToPath(import.meta.url));const SAVE=process.env.S
 const DB_FILE=process.env.DB_FILE||path.join(path.dirname(SAVE),'klor.db'),HANDS_FILE=process.env.HANDS_FILE||path.join(path.dirname(SAVE),'hands.jsonl');
 export const store=openStore(DB_FILE);export const currentDb=()=>db;store.claim();
 let db=store.load();
-if(!db){const moved=store.importFiles(SAVE,HANDS_FILE);if(moved){db=store.load();console.log(`[Klor Poker] Moved to SQLite (${DB_FILE}): ${db.users.length} accounts, ${db.ledger.length} transactions, ${moved.hands} hands${moved.skipped?`, ${moved.skipped} damaged hand lines skipped`:''}. The old files were left untouched.`);}}
-if(!db){const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBytes(9).toString('base64url');if(!process.env.CENTER_PASSWORD)console.log(`[Klor Poker] New database at ${DB_FILE}. Temporary "center" password: ${initial}`);else console.log(`[Klor Poker] New database at ${DB_FILE} ("center" password from CENTER_PASSWORD).`);db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(initial,salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};store.commit(db);}
+if(!db){const moved=store.importFiles(SAVE,HANDS_FILE);if(moved){db=store.load();console.log(`[Suprem Poker] Moved to SQLite (${DB_FILE}): ${db.users.length} accounts, ${db.ledger.length} transactions, ${moved.hands} hands${moved.skipped?`, ${moved.skipped} damaged hand lines skipped`:''}. The old files were left untouched.`);}}
+if(!db){const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBytes(9).toString('base64url');if(!process.env.CENTER_PASSWORD)console.log(`[Suprem Poker] New database at ${DB_FILE}. Temporary "center" password: ${initial}`);else console.log(`[Suprem Poker] New database at ${DB_FILE} ("center" password from CENTER_PASSWORD).`);db={users:[{id:'center',username:'center',role:'CENTER',parentId:null,salt,passHash:hash(initial,salt),balance:1000000*100}],rakePercent:5,ledger:[],tables:[],nextTable:2};store.commit(db);}
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];
 let saveFailed=false,draining=false,replaced=false,lastError=null;
 const LOW_DISK=1e9,TICK_FAIL_ALERT=20;
-const noteError=(where,err)=>{lastError={where,message:String(err?.message||err).slice(0,160),at:Date.now()};console.error(`[Klor Poker] ${where}:`,err);};
+const noteError=(where,err)=>{lastError={where,message:String(err?.message||err).slice(0,160),at:Date.now()};console.error(`[Suprem Poker] ${where}:`,err);};
 // A timer must never stop the server: one failing job is logged and the rest go on.
 const guarded=(where,fn)=>()=>{try{fn();}catch(err){noteError(where,err);}};
-export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{if(replaced)return;db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);saveFailed=false;}catch(err){saveFailed=true;console.error('[Klor Poker] state not saved',err.message);}queuePush();};
+export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{if(replaced)return;db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);saveFailed=false;}catch(err){saveFailed=true;console.error('[Suprem Poker] state not saved',err.message);}queuePush();};
 const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h),canDeal:()=>!draining&&!saveFailed});
 // Hand history: every finished hand is one row of its own, stored as it finishes.
-function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{store.addHand(h);}catch(err){console.error('[Klor Poker] hand history not saved',err);}}
+function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{store.addHand(h);}catch(err){console.error('[Suprem Poker] hand history not saved',err);}}
 const handSummary=h=>({id:h.id,at:h.startedAt,table:h.table,tableId:h.tableId,game:h.game,hand:h.hand,sb:h.sb,bb:h.bb,players:h.players.map(p=>p.username),bots:h.players.filter(p=>p.bot).map(p=>p.username),board:h.board,pot:h.pot,rake:h.rake,winners:h.winners,showdown:h.showdown});
 function listHands(body){const filter={table:body.table?String(body.table):'',player:String(body.player||'').trim().toLowerCase(),from:Number(body.from)||0,to:Number(body.to)||Infinity,before:Number(body.before)||Infinity},limit=Math.max(1,Math.min(200,Number(body.limit)||50)),rows=store.listHands(filter,limit+1);return {hands:rows.slice(0,limit).map(handSummary),more:rows.length>limit,total:db.handSeq||0};}
 // Each table has a felt colour (#rrggbb); the whole table design is derived from it.
@@ -45,7 +45,7 @@ const endReasons=new Map();
 // Sessions are kept by a hash of the token, in memory and in the database, so a restart
 // signs nobody out and the database cannot be used to sign in.
 const tokenKey=token=>crypto.createHash('sha256').update(String(token)).digest('hex');
-const storeTry=fn=>{try{return fn();}catch(err){console.error('[Klor Poker] session not saved',err.message);}};
+const storeTry=fn=>{try{return fn();}catch(err){console.error('[Suprem Poker] session not saved',err.message);}};
 function openSession(userId,ip){const token=secret(),now=Date.now(),s={userId,created:now,lastSeen:now,storedAt:now,ip};tokens.set(tokenKey(token),s);storeTry(()=>store.putSession(tokenKey(token),s));return token;}
 function endKey(key,reason){const s=tokens.get(key);if(!s)return;tokens.delete(key);storeTry(()=>store.delSession(key));if(reason){endReasons.set(key,reason);if(endReasons.size>5000)endReasons.delete(endReasons.keys().next().value);}for(const [client,t] of rakeClients)if(tokenKey(t)===key){client.end();rakeClients.delete(client);}}
 const endSession=(token,reason)=>endKey(tokenKey(token),reason);
@@ -77,7 +77,7 @@ function ledgerFor(u){const view=x=>{if(u.role==='CENTER')return [x];if(x.type==
 // ---- Activity log: every change staff make, written after it succeeded ----
 const AUDITED=new Set(['rake','tables/create','tables/update','tables/delete','tables/color','users/create','users/password','users/status','users/share','users/mute','transfer','invite/reset','moderation/resolve','bots/create','bots/configure','bots/status','bots/delete','bots/guard','bots/settings','crypto/settings','crypto/assign','crypto/ignore','crypto/withdrawal']);
 const SECRET_FIELDS=new Set(['password','current','next','token','device']);
-function audit(user,action,body,req,extra={}){try{const details=Object.fromEntries(Object.entries(body||{}).filter(([k])=>!SECRET_FIELDS.has(k)));const target=db.users.find(x=>x.id===body?.userId)?.username||runtime.get(String(body?.id??''))?.name||body?.username||body?.name||null;store.addAudit({at:Date.now(),actorId:user.id,actor:user.username,role:user.role,action,target,details:{...details,...extra},ip:clientIp(req)});}catch(err){console.error('[Klor Poker] activity not logged',err.message);}}
+function audit(user,action,body,req,extra={}){try{const details=Object.fromEntries(Object.entries(body||{}).filter(([k])=>!SECRET_FIELDS.has(k)));const target=db.users.find(x=>x.id===body?.userId)?.username||runtime.get(String(body?.id??''))?.name||body?.username||body?.name||null;store.addAudit({at:Date.now(),actorId:user.id,actor:user.username,role:user.role,action,target,details:{...details,...extra},ip:clientIp(req)});}catch(err){console.error('[Suprem Poker] activity not logged',err.message);}}
 // The value before the change, where it is worth showing.
 function auditBefore(action,body){if(action==='rake')return {before:db.rakePercent};if(action==='users/share')return {before:pct(db.users.find(x=>x.id===body.userId)?.share)};if(action==='tables/update'){const t=db.tables.find(x=>x.id===String(body.id||''));return t?{before:{name:t.name,sb:clean(t.sb),bb:clean(t.bb),game:t.game}}:{};}return {};}
 // ---- Things that need a person's attention ----
@@ -201,14 +201,14 @@ setInterval(()=>{if(replaced)return;for(const t of runtime.values()){try{tickTab
 // could restart and take the database back.
 const PAUSED=/^(register|password|transfer|rake|invite\/reset|moderation\/resolve|tables\/[a-z]+|users\/[a-z]+|bots\/[a-z]+|crypto\/(deposit|withdraw|cancel|settings|assign|ignore|withdrawal)|table\/[^/]+\/(sit|rebuy|start|waitlist))$/;
 setInterval(guarded('save retry',()=>{if(saveFailed&&!replaced)save();}),5000).unref();
-function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner||replaced)return;replaced=true;draining=true;console.log('[Klor Poker] A newer server took over the database. This one has stopped.');for(const res of tableSubs.keys())res.end();tableSubs.clear();for(const res of inspectSubs.keys())res.end();inspectSubs.clear();for(const res of rakeClients.keys())res.end();rakeClients.clear();}
+function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner||replaced)return;replaced=true;draining=true;console.log('[Suprem Poker] A newer server took over the database. This one has stopped.');for(const res of tableSubs.keys())res.end();tableSubs.clear();for(const res of inspectSubs.keys())res.end();inspectSubs.clear();for(const res of rakeClients.keys())res.end();rakeClients.clear();}
 setInterval(guarded('owner check',checkOwner),1000).unref();
 // Table-filling bots act from the server; they are never logged in.
 const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake()});
-setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Klor Poker] bots',err);}},500).unref();
+setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});
-setInterval(()=>{if(replaced||saveFailed)return;payments.scan().catch(err=>console.error('[Klor Poker] crypto scan',err.message));},30000).unref();
+setInterval(()=>{if(replaced||saveFailed)return;payments.scan().catch(err=>console.error('[Suprem Poker] crypto scan',err.message));},30000).unref();
 // Center inspection: every table with every hole card, live. Only the center
 // account can open it, it can never sit at a table, and each session is logged.
 // Players at one table who connect from the same address are flagged.
@@ -242,12 +242,12 @@ export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object
  // browsers always fetch the newest version after a change.
  if(name==='index.html')contents=String(contents).replace(/(\/[\w.-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
  res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name==='index.html'?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
-server.on('error',err=>{console.error('[Klor Poker] server cannot start:',err.message);process.exit(1);});
-server.listen(PORT,()=>console.log(`Klor Poker http://localhost:${PORT}`));
+server.on('error',err=>{console.error('[Suprem Poker] server cannot start:',err.message);process.exit(1);});
+server.listen(PORT,()=>console.log(`Suprem Poker http://localhost:${PORT}`));
 // Set after everything started, so a failed start still stops the process.
 process.on('uncaughtException',err=>noteError('unexpected',err));process.on('unhandledRejection',err=>noteError('unexpected',err));
 // Stopping (a deploy sends SIGTERM): no new hands, running hands may finish, then the
 // state is saved. A hand still running at the time limit gets its chips back on the next start.
 const STOP_WAIT_MS=Number(process.env.STOP_WAIT_MS||25000);let stopping=null;
-export function shutdown(wait=STOP_WAIT_MS){return stopping??=new Promise(resolve=>{if(replaced)return resolve();draining=true;const until=Date.now()+wait,busy=()=>[...runtime.values()].filter(t=>LIVE.includes(t.phase)).length;console.log(`[Klor Poker] Stopping: waiting for ${busy()} running hand(s).`);queuePush();const check=setInterval(()=>{if(busy()&&Date.now()<until)return;clearInterval(check);console.log(`[Klor Poker] Stopped with ${busy()} hand(s) unfinished.`);save();resolve();},200);});}
+export function shutdown(wait=STOP_WAIT_MS){return stopping??=new Promise(resolve=>{if(replaced)return resolve();draining=true;const until=Date.now()+wait,busy=()=>[...runtime.values()].filter(t=>LIVE.includes(t.phase)).length;console.log(`[Suprem Poker] Stopping: waiting for ${busy()} running hand(s).`);queuePush();const check=setInterval(()=>{if(busy()&&Date.now()<until)return;clearInterval(check);console.log(`[Suprem Poker] Stopped with ${busy()} hand(s) unfinished.`);save();resolve();},200);});}
 for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{if(stopping)process.exit(0);shutdown().then(()=>{try{store.close();}catch{}process.exit(0);});});

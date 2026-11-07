@@ -1,4 +1,4 @@
-# KLOR POKER — Multiplayer Texas Hold'em Prototype
+# SUPREM POKER — Multiplayer Texas Hold'em Prototype
 
 **Playable demo with virtual credits, not a production real-money gambling platform.** Node.js 20+, no npm dependencies. The interface recreates the emerald / black / gold feel of the reference design using responsive CSS and includes the original reference PNG in `public/design-reference.png`.
 
