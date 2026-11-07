@@ -2,7 +2,7 @@ import {rakeReport,revenueReport,pct,isUnder} from './rake.js';
 import {createBots} from './bots.js';
 import {createPayments} from './payments.js';
 import {openStore} from './store.js';
-import {descendants,recordSeen,sharedGroups,pairSignals,handSummaryFor,handFor,SIGNALS} from './security.js';
+import {seatedFromSameDevice,descendants,recordSeen,sharedGroups,pairSignals,handSummaryFor,handFor,SIGNALS} from './security.js';
 import {Worker} from 'node:worker_threads';
 import http from 'node:http';import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {fileURLToPath} from 'node:url';import {TABLE_SIZES,createEngine,LIVE,fail,MAX_TABLES} from './game.js';
 import {seedCatalog} from './table-catalog.js';
@@ -196,7 +196,7 @@ if(p.startsWith('/api/table/')){let parts=p.split('/'),t=runtime.get(parts[3]);i
 if(parts[4]==='state')return engine.snapshot(t,u.id,url.searchParams.get('bg')!=='1');
 if(parts[4]==='rebuy'){engine.rebuy(t,u,body.amount);return {ok:true};}
 if(['sit','start','rebuy'].includes(parts[4])&&draining)fail('The server is restarting. Please try again in a moment.',503);
-if(parts[4]==='sit'){engine.sit(t,u,body.position,body.buyin,[...runtime.values()]);return {ok:true};}
+if(parts[4]==='sit'){if(seatedFromSameDevice(t,u,body.device,id=>db.users.find(x=>x.id===id)))fail('Another account from this device is already at this table.');engine.sit(t,u,body.position,body.buyin,[...runtime.values()]);const seat=t.seats.find(s=>s?.userId===u.id);if(/^[\w-]{8,64}$/.test(body.device||'')){seat.device=body.device;recordSeen(u,clientIp(req),body.device);save();}return {ok:true};}
 if(parts[4]==='leave')return engine.leave(t,u);
 if(parts[4]==='sitout'){engine.sitOut(t,u,!!body.value);return {ok:true};}
 if(parts[4]==='show'){engine.show(t,u);return {ok:true};}

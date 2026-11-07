@@ -588,3 +588,8 @@ Lojtari me email depoziton dhe tërheq me crypto direkt me qendrën. Agjenti i c
 Fitimin lojtari mund ta tërheqë cash te agjenti. Agjenti dërgon një kërkesë me shumën ("Cash-out"), lojtarit i del një kartë lart në ekran, dhe paratë kalojnë nga portofoli i tij te portofoli i agjentit vetëm kur lojtari klikon Confirm. Kërkesa skadon pas 15 minutash, dhe çdo lojtar ka vetëm një kërkesë të hapur. Çipat në tavolinë nuk llogariten. Kalimi shënohet në historik. Edhe bllokimi i një agjenti bashkë me rrjetin e tij nuk i prek këta lojtarë.
 
 Lojtarët e vjetër pa email mbeten si më parë, nën kontrollin e agjentit të tyre.
+
+## Një pajisje, një llogari në tavolinë
+Kur lojtari ulet, shfletuesi dërgon ID-në e pajisjes (`klorDevice`), dhe serveri e refuzon uljen nëse një llogari tjetër nga e njëjta pajisje është tashmë në atë tavolinë. Kontrollohen edhe pajisjet ku janë parë më parë të dyja llogaritë. Një lojtar mund të luajë në tavolina të ndryshme.
+
+Kufizimi: ID-ja jeton në shfletues, ndaj një shfletues tjetër ose dritare private me një llogari të re merr ID të re. Sinjalet te "Fair play" mbeten për këto raste. Adresa IP nuk bllokon, sepse familjet dhe kafenetë e ndajnë.

@@ -8,6 +8,14 @@ export function descendants(users,id){const out=[],seen=new Set([id]);for(let ad
 // The last few addresses and devices an account signed in from.
 export function recordSeen(user,ip,device,keep=5){const add=(key,value)=>{if(!value)return;const list=(user[key]||[]).filter(x=>x!==value);list.unshift(value);user[key]=list.slice(0,keep);};add('seenIps',ip);if(typeof device==='string'&&/^[\w-]{8,64}$/.test(device))add('seenDevices',device);}
 
+// Two accounts from one device do not sit at one table. It compares the device of this
+// request and of each seat, and the devices each account was seen on before.
+export function seatedFromSameDevice(t,user,device,findUser){
+ const mine=/^[\w-]{8,64}$/.test(device||'')?device:'';
+ return t.seats.some(s=>{if(!s||s.userId===user.id||s.isBot)return false;const other=findUser(s.userId);
+  return (!!mine&&(s.device===mine||(other?.seenDevices||[]).includes(mine)))||(!!s.device&&(user.seenDevices||[]).includes(s.device));});
+}
+
 // Players who share an address or a device. Family or a café can share an address, so
 // a device is the stronger sign.
 export function sharedGroups(users,key){const groups=new Map();for(const u of users){if(u.role!=='USER'||u.isBot)continue;for(const value of u[key]||[]){if(!groups.has(value))groups.set(value,[]);groups.get(value).push(u);}}return [...groups.entries()].filter(([,list])=>list.length>1).map(([value,list])=>({value,users:list.map(u=>u.username)}));}

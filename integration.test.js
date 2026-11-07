@@ -335,7 +335,14 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
       assert.match((await call('alerts',await signIn(0),{})).data.alerts[0].text,/cannot be saved/);}
      finally{store.commit=real;}
      const again=await signIn(0);assert.equal((await call('transfer',again,{userId:target,direction:'send',amount:1})).status,200,'it works again at once');assert.equal((await call('health','')).status,200);assert.equal(stored().rakePercent,6,'the earlier change was saved too');await call('rake',again,{percent:5});}
-    // Stopping: running hands may finish, no new hands, no new seats, and the state is saved.
+    // One device, one account at a table; another table is fine.
+    {const center=await signIn(0),a=await signIn(3),b=await signIn(4),one=(await call('tables/create',center,{name:'Devices',sb:1,bb:2})).data.id,two=(await call('tables/create',center,{name:'Devices two',sb:1,bb:2})).data.id;
+     for(const i of ['3','4'])currentDb().users.find(x=>x.id===i).balance+=10000;
+     assert.equal((await call('table/'+one+'/sit',a,{position:0,buyin:20,device:'device-aaaa'})).status,200);
+     const same=await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-aaaa'});assert.equal(same.status,400);assert.match(same.data.error,/this device/);assert.ok(!runtime.get(one).seats[1]);
+     assert.equal((await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-bbbb'})).status,200);
+     for(const [id,token] of [[one,a],[one,b]])assert.equal((await call('table/'+id+'/leave',token,{})).status,200);
+     assert.equal(runtime.get(two).seats.filter(Boolean).length,0);}
     {await shutdown(1500);const before=[...runtime.values()].map(x=>x.hand);for(const x of runtime.values()){for(const s of x.seats)if(s)s.lastSeen=Date.now();x.lastActionAt=0;tickTable(x);}assert.deepEqual([...runtime.values()].map(x=>x.hand),before,'no new hand is dealt');assert.equal((await call('table/1/sit',await signIn(3),{position:5,buyin:20})).status,503);}
     // What is stored is exactly what the game has in memory, after the whole session.
     store.commit(currentDb());assert.deepEqual({...stored(),handSeq:0},{...JSON.parse(JSON.stringify(currentDb())),handSeq:0});

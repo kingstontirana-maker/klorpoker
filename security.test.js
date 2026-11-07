@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {descendants,recordSeen,sharedGroups,pairSignals,handFor,handSummaryFor} from './security.js';
+import {seatedFromSameDevice,descendants,recordSeen,sharedGroups,pairSignals,handFor,handSummaryFor} from './security.js';
 
 test('descendants reach every level and stop at the account',()=>{
  const users=[{id:'c'},{id:'a',parentId:'c'},{id:'g',parentId:'a'},{id:'p',parentId:'g'},{id:'x',parentId:'c'}];
@@ -10,6 +10,19 @@ test('addresses and devices: newest first, limited, and junk devices ignored',()
  const u={};for(const ip of ['1','2','1','3','4','5','6'])recordSeen(u,ip,'device-abc-123');assert.deepEqual(u.seenIps,['6','5','4','3','1']);assert.deepEqual(u.seenDevices,['device-abc-123']);
  recordSeen(u,'','<script>');assert.equal(u.seenDevices.length,1);
 });
+test('one device, one account at a table',()=>{
+ const users={a:{id:'a',seenDevices:['device-aaaa']},b:{id:'b'},c:{id:'c',seenDevices:['device-aaaa']},bot:{id:'bot'}},find=id=>users[id];
+ const t={seats:[{userId:'a',device:'device-aaaa'},null,{userId:'bot',isBot:true,device:'device-bbbb'}]};
+ assert.equal(seatedFromSameDevice(t,users.b,'device-aaaa',find),true,'the device of a seat');
+ assert.equal(seatedFromSameDevice(t,users.b,'device-cccc',find),false,'another device');
+ assert.equal(seatedFromSameDevice(t,users.a,'device-aaaa',find),false,'the same account is not a second account');
+ assert.equal(seatedFromSameDevice(t,users.c,'device-new1',find),true,'a new browser, but this account was seen on the device of the seat');
+ assert.equal(seatedFromSameDevice({seats:[{userId:'c'}]},users.b,'device-aaaa',find),true,'a seated account was seen on this device');
+ assert.equal(seatedFromSameDevice(t,users.b,'device-bbbb',find),false,'bots are left out');
+ assert.equal(seatedFromSameDevice(t,users.b,undefined,find),false,'no device sent, nothing to compare');
+ assert.equal(seatedFromSameDevice(t,users.b,'no',find),false,'junk is ignored');
+});
+
 test('shared groups cover players only',()=>{
  const users=[{id:'1',role:'USER',username:'a',seenIps:['9']},{id:'2',role:'USER',username:'b',seenIps:['9']},{id:'3',role:'AGENT',username:'c',seenIps:['9']},{id:'4',role:'USER',username:'d',seenIps:['8']}];
  assert.deepEqual(sharedGroups(users,'seenIps'),[{value:'9',users:['a','b']}]);
