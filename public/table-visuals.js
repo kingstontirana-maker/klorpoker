@@ -161,12 +161,12 @@ export function seatLayout(portrait=false,phone=false,narrow=false){
  // buttons own the bottom-right corner.
  // Side bets sit beside the cards, above or below the board, never on it; the dealer
  // button sits in the gap next to its seat. (Checked from 568x320 to 932x430.)
- if(phone&&!portrait)return {seats:[[50,4],[93,24],[93,67],[50,97],[7,67],[7,24]],bets:[[62,21.5],[76.7,27.5,'end'],[76.7,70.5,'end'],[40.1,83,'end'],[23.3,70.5,'start'],[23.3,27.5,'start']],dealer:[[38,21],[82,40],[82,50.5],[63,83],[18,50.5],[18,40]]};
+ if(phone&&!portrait)return {seats:[[50,4],[96.5,24],[96.5,67],[50,97],[3.5,67],[3.5,24]],bets:[[64,21.5],[80,27.5,'end'],[80,70.5,'end'],[40.1,83,'end'],[20,70.5,'start'],[20,27.5,'start']],dealer:[[38,21],[85.5,40],[85.5,50.5],[63,83],[14.5,50.5],[14.5,40]]};
  // Narrow upright windows: the top player's bet sits under the name plate, the side bets
  // grow toward the middle, and the dealer button is beside the seat, never on it.
  if(portrait&&narrow)return {seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[50,25.5],[80.5,25.5,'end'],[85,63,'end'],[50,67.5],[15,63,'start'],[19.5,25.5,'start']],dealer:[[26,12.5],[81,9],[81,75],[76,86],[19,75],[19,9]]};
  return portrait?{seats:[[50,0],[100,18],[100,75],[50,100],[0,75],[0,18]],bets:[[66,17],[70,36],[76,63],[50,63],[24,63],[30,36]],dealer:[[34,12],[84,9],[84,86],[74,86],[16,86],[16,9]]}
-  :{seats:[[50,0],[92,15],[92,85],[50,100],[8,85],[8,15]],bets:[[64,26],[77,32],[77,68],[36,74],[23,68],[23,32]],dealer:[[40,19],[82,21],[83,79],[63,82],[17,79],[18,21]]};
+  :{seats:[[50,0],[96,15],[96,85],[50,100],[4,85],[4,15]],bets:[[64,26],[80,32],[80,68],[36,74],[20,68],[20,32]],dealer:[[40,19],[86,21],[87,79],[63,82],[13,79],[14,21]]};
 }
 // Felt size from the free stage area; text and cards never scale with it.
 export function feltBox(width,height,portrait=false,phone=false){
