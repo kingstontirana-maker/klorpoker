@@ -3,9 +3,8 @@ import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {evaluateHand,compare,ranks,suits} from './poker.js';
 import {analyzeCertainty,certaintyInput,certaintyForPlayer} from './bot-certainty.js';
 
-// Experimental virtual-credit bots: the server checks real dealt hands against
-// every possible remaining board. Decisions receive proof/percentages only.
-// Exact postflop runouts and sampled preflop equity guide investment.
+// Server decisions use the actual future board and dealt hands. Hidden cards
+// stay on the server; the public table reveals each street normally.
 
 // Bots carry ordinary names; only the center sees which players are bots
 // (isBot on the account and on the seat). Older bots named "Name [BOT]" are renamed.
@@ -57,7 +56,9 @@ export function botDecision(v,risk='low',random=Math.random,proof){
  if(v.toCall&&(!profitable||callCost>remainingInvestment))return result({type:'fold'});
  if(v.canRaise&&remainingInvestment>v.toCall&&(certified||chance>=.6)){
   const size=SIZE[risk]||SIZE.low;
-  const want=certified&&v.board.length===4?v.roundBet+remainingInvestment:v.currentBet===0?size*Math.max(v.pot,v.bb*2):v.currentBet+size*(v.pot+v.toCall);
+  let want=certified&&v.board.length===4?v.roundBet+remainingInvestment:v.currentBet===0?size*Math.max(v.pot,v.bb*2):v.currentBet+size*(v.pot+v.toCall);
+  if(certified&&v.board.length===3)want=Math.max(want,v.roundBet+Math.ceil(startingStack*.3));
+  if(certified&&v.winningFlopAnswered)want=v.roundBet+v.stack;
   const ceiling=Math.min(v.maxRaiseTo,v.roundBet+remainingInvestment),target=Math.min(ceiling,Math.max(v.minRaiseTo,Math.round(want)));
   if(target>v.currentBet&&(target>=v.minRaiseTo||target===v.roundBet+v.stack))return result({type:'raise',amount:target/100});
  }
@@ -67,6 +68,7 @@ export function botDecision(v,risk='low',random=Math.random,proof){
 
 export function createBots({db,runtime,engine,save,olderRake}){
  const certaintyCache=new WeakMap();
+ const flopPlans=new WeakMap();
  function proofFor(t,s){
   const input=certaintyInput(t),key=JSON.stringify(input);let cached=certaintyCache.get(t);
   if(!cached||cached.key!==key){cached={key,result:analyzeCertainty(input)};certaintyCache.set(t,cached);}
@@ -151,7 +153,14 @@ export function createBots({db,runtime,engine,save,olderRake}){
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
      // Think for 1.5–4 seconds like a person would.
      s.botThink??=1500+Math.floor(Math.random()*2500);
-     if(now-t.turnStartedAt>=s.botThink){delete s.botThink;const d=botDecision(botView(t,s,{shoveRate:shoveRate(t)}),b.bot.risk,Math.random,proofFor(t,s));try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}}}
+     if(now-t.turnStartedAt>=s.botThink){
+      delete s.botThink;
+      const plan=flopPlans.get(s),sameHand=plan?.hand===t.hand;
+      const winningFlopAnswered=!!sameHand&&plan.targets.some(p=>t.seats.some(o=>o?.userId===p.id&&o.inHand&&!o.folded&&o.committed>=p.target));
+      const d=botDecision(botView(t,s,{shoveRate:shoveRate(t),winningFlopAnswered}),b.bot.risk,Math.random,proofFor(t,s));
+      const nextPlan=!sameHand&&t.board.length===3&&d.safeToInvest&&d.type==='raise'?{hand:t.hand,targets:t.seats.filter(o=>o&&o!==s&&o.inHand&&!o.folded&&o.stack>0&&d.amount*100>o.roundBet).map(o=>({id:o.userId,target:o.committed+Math.min(o.stack,d.amount*100-o.roundBet)}))}:null;
+      try{engine.act(t,b.id,d.type,d.amount);if(nextPlan)flopPlans.set(s,nextPlan);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
+     }}
    }catch(e){stop(b,e.message,seatOf(b));}
   }
  }

@@ -1,9 +1,20 @@
 import {ranks,suits,evaluateHand,compare} from './poker.js';
 
-// Server-only analysis for the virtual-credit experiment. Inspect dealt hands,
-// never the shuffled deck order. Folded cards cannot appear on a future board.
+// Server-only analysis. Preview the real runout without consuming the deck;
+// each street burns one card before dealing, exactly as game.js does.
+export function futureBoard(t){
+ const board=[...t.board],remaining=[...t.deck];
+ while(board.length<5){
+  const count=board.length===0?3:1;
+  if(remaining.length<count+1)throw Error('Insufficient cards for future board');
+  remaining.pop();
+  for(let i=0;i<count;i++)board.push(remaining.pop());
+ }
+ return board;
+}
+
 export function certaintyInput(t){
- return {game:t.game||'holdem',board:[...t.board],players:t.seats.filter(s=>s?.inHand&&!s.folded).map(s=>({id:s.userId,cards:[...s.cards]})),dead:t.seats.filter(s=>s?.inHand&&s.folded).flatMap(s=>s.cards)};
+ return {game:t.game||'holdem',board:futureBoard(t),players:t.seats.filter(s=>s?.inHand&&!s.folded).map(s=>({id:s.userId,cards:[...s.cards]})),dead:t.seats.filter(s=>s?.inHand&&s.folded).flatMap(s=>s.cards)};
 }
 
 export function analyzeCertainty({game='holdem',board,players,dead=[]}){

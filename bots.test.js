@@ -99,7 +99,8 @@ test('bot rake is not revenue: reports count real players only, the house result
  for(let hand=0;hand<120;hand++){manager.tick();if(!engine.startHand(t))break;
   for(let k=0;k<200&&LIVE.includes(t.phase);k++){if(t.runout){engine.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];if(s.userId===b.id){manager.tick(t.turnStartedAt+5000);continue;}engine.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
   for(const s of t.seats)if(s)s.lastSeen=Date.now();t.lastActionAt=0;}
- const rakes=db.ledger.filter(x=>x.type==='RAKE');assert.ok(rakes.length>20);
+ // A bot that knows the runout can empty a human stack in very few hands.
+ const rakes=db.ledger.filter(x=>x.type==='RAKE');assert.ok(rakes.length>0);
  const botPaid=rakes.flatMap(x=>x.allocations).filter(a=>a.userId===b.id).reduce((n,a)=>n+a.amount,0),humanPaid=rakes.flatMap(x=>x.allocations).filter(a=>a.userId!==b.id).reduce((n,a)=>n+a.amount,0);
  assert.ok(botPaid>0&&humanPaid>0);assert.ok(rakes.flatMap(x=>x.allocations).filter(a=>a.userId===b.id).every(a=>a.bot),'bot allocations are flagged');
  const rev=revenueReport(db,center,{from:'all'});assert.equal(rev.totals.rake,humanPaid,'revenue = rake of real players');assert.equal(rev.totals.botRake,botPaid,'bot rake shown apart');{const all=revenueReport(db,center,{from:'all',includeBots:true});assert.equal(all.totals.rake,humanPaid+botPaid,'switch on: bot rake included');assert.ok(all.byChild.some(c=>c.username==='Bots (house)'&&c.rake===botPaid));assert.ok(all.byPlayer.some(p=>p.bot));assert.equal(revenueReport(db,admin,{from:'all',includeBots:true}).totals.rake,humanPaid,'only the center can include bots');}
@@ -147,6 +148,29 @@ test('all-ins and prior investments cannot bypass certainty',()=>{
  for(let i=0;i<200;i++){const d=botDecision({game:'holdem',phase:'flop',board:['As','Kd','7c'],pot:600,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:20000,stack:20000,roundBet:0,bb:200,canRaise:true,opponents:1,committed:300,cards:['4h','2c']},'high',rng);if(d.type==='raise')assert.ok(d.amount*100<=2000,'small bluff only');}
 });
 
+test('live bot remembers a flop call and goes all in on its next turn',()=>{
+ const {center,db,engine,t,manager,human}=world();
+ manager.route('/api/bots/create',{name:'FlopWinner',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
+ const bot=db.users.find(u=>u.isBot);
+ manager.route('/api/bots/status',{id:bot.id,enabled:true},center);
+ engine.sit(t,human(1),0,100,[t]);manager.tick();engine.startHand(t);
+ const s=t.seats.find(x=>x?.isBot),other=t.seats.find(x=>x&&!x.isBot);
+ s.cards=['Ah','2c'];other.cards=['Kd','Qs'];
+ t.board=['As','Ad','Ac'];t.deck=['3d','4c','2d','4h'];t.phase='flop';t.currentBet=0;t.minRaise=t.bb;t.runout=null;
+ for(const x of t.seats)if(x){x.roundBet=0;x.acted=false;}
+ t.turn=s.position;
+ const capital=s.stack+s.committed;
+ manager.tick(t.turnStartedAt+5000);
+ assert.equal(s.lastAction.type,'BET');assert.ok(s.roundBet>=Math.ceil(capital*.3));
+ assert.equal(t.seats[t.turn],other);
+ engine.act(t,other.userId,'call');
+ assert.equal(t.phase,'turn');
+ if(t.seats[t.turn]===other)engine.act(t,other.userId,'check');
+ assert.equal(t.seats[t.turn],s);
+ manager.tick(t.turnStartedAt+5000);
+ assert.equal(s.lastAction.type,'ALL-IN');assert.equal(s.stack,0);
+});
+
 test('live bot plays strong equity and recalculates when opponent cards change',()=>{
  const {center,db,engine,t,manager,human}=world();
  manager.route('/api/bots/create',{name:'Certain',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
@@ -154,6 +178,7 @@ test('live bot plays strong equity and recalculates when opponent cards change',
  engine.sit(t,human(1),0,100,[t]);manager.tick();engine.startHand(t);
  const s=t.seats.find(x=>x?.isBot),other=t.seats.find(x=>x&&!x.isBot);
  s.cards=['Ah','2c'];other.cards=['Ks','Qs'];t.board=['As','Ad','Ac'];t.phase='flop';t.currentBet=0;t.minRaise=t.bb;t.runout=null;
+ t.deck=['3d','4c','2d','4h'];
  for(const x of t.seats)if(x){x.roundBet=0;x.acted=false;}
  t.turn=s.position;
  const initial=t.pot;manager.tick(t.turnStartedAt+5000);

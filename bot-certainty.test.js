@@ -1,10 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyzeCertainty,certaintyInput,certaintyForPlayer} from './bot-certainty.js';
+import {analyzeCertainty,certaintyInput,certaintyForPlayer,futureBoard} from './bot-certainty.js';
 import {botDecision} from './bots.js';
 
 const base={game:'holdem',cards:['Ah','2c'],board:['As','Ad','Ac'],opponents:1,pot:10000,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:10000,stack:9000,committed:1000,roundBet:0,bb:200,canRaise:true};
 const input={game:'holdem',board:base.board,players:[{id:'bot',cards:base.cards},{id:'opponent',cards:['Ks','Qs']}]};
+
+test('future board follows pop order and burn cards on every street without mutation',()=>{
+ const full=['Qs','Js','Ts','2d','3d'];
+ const deck=['3d','5c','2d','6c','Ts','Js','Qs','7c'];
+ for(const [board,remaining] of [[[],deck],[full.slice(0,3),deck.slice(0,4)],[full.slice(0,4),deck.slice(0,2)],[full,[]]]){
+  const t={board:[...board],deck:[...remaining]},before=structuredClone(t);
+  assert.deepEqual(futureBoard(t),full);assert.deepEqual(t,before);
+ }
+});
+
+test('live preflop proof uses the actual five future cards and invalidates when they change',()=>{
+ const t={game:'holdem',board:[],deck:['3d','5c','2d','6c','Ts','Js','Qs','7c'],seats:[
+  {userId:'bot',inHand:true,cards:['As','Ks']},
+  {userId:'other',inHand:true,cards:['Ah','Ad']}
+ ]};
+ const input=certaintyInput(t),proof=certaintyForPlayer(analyzeCertainty(input),'bot');
+ assert.deepEqual(t.board,[]);assert.equal(proof.exact,true);assert.equal(proof.outcomes,1);
+ assert.equal(proof.equity,1);assert.equal(proof.safeToInvest,true);
+ const d=botDecision({...base,board:[],cards:t.seats[0].cards,canRaise:false,toCall:9000},'low',()=>0,proof);
+ assert.equal(d.type,'call');assert.equal(d.investmentRate,1);
+ t.deck=['3d','5c','2d','6c','Ac','Jc','Qc','7c'];
+ const changed=certaintyInput(t);
+ assert.notDeepEqual(changed,input);
+ assert.equal(certaintyForPlayer(analyzeCertainty(changed),'bot').equity,0);
+});
 
 test('strong equity plays while a losing river folds',()=>{
  const result=analyzeCertainty(input),proof=certaintyForPlayer(result,'bot');
@@ -51,6 +76,25 @@ test('free checks never fold, including worthless and tied hands',()=>{
   const d=botDecision({...base,canRaise:false},'low',()=>.5,{exact:true,equity:chance,safeToInvest:false});
   assert.equal(d.type,'check');
  }
+});
+
+test('verified flop bets at least 30 percent and shoves after an opponent responds',()=>{
+ const proof={exact:true,equity:1,safeToInvest:true,opponentEquities:[0]};
+ const view={...base,pot:600};
+ for(const risk of ['low','medium','high']){
+  const opening=botDecision(view,risk,()=>0,proof);
+  assert.equal(opening.type,'raise');assert.ok(opening.amount*100>=3000);
+  for(const board of [view.board,[...view.board,'2d'],[...view.board,'2d','3d']]){
+   const follow=botDecision({...view,board,stack:6000,committed:4000,winningFlopAnswered:true},risk,()=>0,proof);
+   assert.equal(follow.type,'raise');assert.equal(follow.amount,60);
+  }
+ }
+ const capped=botDecision({...view,maxRaiseTo:800},'low',()=>0,proof);
+ assert.equal(capped.amount,8);
+ const short=botDecision({...view,stack:1000,committed:9000},'low',()=>0,proof);
+ assert.equal(short.amount,10);
+ const closed=botDecision({...view,winningFlopAnswered:true,canRaise:false,toCall:9000},'low',()=>0,proof);
+ assert.equal(closed.type,'call');
 });
 
 test('sampled 100 percent and incomplete proofs cannot unlock the stack',()=>{
