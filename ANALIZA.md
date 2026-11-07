@@ -572,3 +572,19 @@ Blerja në tavolinë tani varet vetëm nga blindet: nga 10 deri në 100 big blin
 Katalogu hapet automatikisht një herë të vetme për çdo bazë të dhënash (`db.tableCatalog`), ndaj një tavolinë e mbyllur nga qendra nuk kthehet më. Kur hapet, edhe tavolinat që ekzistojnë tashmë bëhen jeshile.
 
 Rake mbetet 5% pa kufi për dorë. Në nivelet e larta kjo del shumë: një pot prej €10,000 paguan €500.
+
+## Regjistrimi me email OTP
+Linket dhe kodet e ftesës u hoqën. Lojtari jep emrin, email-in dhe fjalëkalimin, merr një kod me 6 shifra me email dhe llogaria krijohet vetëm pasi e fut saktë.
+
+Qendra zgjedh te karta "New players" në panel agjentin që merr të gjithë lojtarët e rinj (`db.signupAgentId`). Pa agjent të caktuar, ose nëse ai agjent bllokohet, regjistrimi mbetet i mbyllur. Lojtarët ekzistues nuk preken dhe hyjnë si më parë me emër dhe fjalëkalim.
+
+Kodi vlen 10 minuta dhe mbahet vetëm si hash në memorie. Ka 5 prova për kod, një kod të ri në minutë, 5 kode në orë për email dhe 10 kërkesa në orë për adresë IP. Një email që është në përdorim merr vetëm një njoftim, dhe përgjigjja e serverit është e njëjtë, që të mos zbulohet kush ka llogari.
+
+Email-et dërgohen nga `mailer.js` me Resend. Te serveri duhen `RESEND_API_KEY` dhe `EMAIL_FROM`.
+
+## Lojtarët që regjistrohen vetë nuk varen nga agjenti
+Lojtari me email depoziton dhe tërheq me crypto direkt me qendrën. Agjenti i caktuar merr pjesën e rake-ut, e sheh lojtarin dhe mund ta heshtë në chat, por nuk i dërgon para, nuk i ndryshon fjalëkalimin dhe nuk e bllokon. Këto i bën vetëm qendra, që i sheh këta lojtarë te lista e llogarive.
+
+Fitimin lojtari mund ta tërheqë cash te agjenti. Agjenti dërgon një kërkesë me shumën ("Cash-out"), lojtarit i del një kartë lart në ekran, dhe paratë kalojnë nga portofoli i tij te portofoli i agjentit vetëm kur lojtari klikon Confirm. Kërkesa skadon pas 15 minutash, dhe çdo lojtar ka vetëm një kërkesë të hapur. Çipat në tavolinë nuk llogariten. Kalimi shënohet në historik. Edhe bllokimi i një agjenti bashkë me rrjetin e tij nuk i prek këta lojtarë.
+
+Lojtarët e vjetër pa email mbeten si më parë, nën kontrollin e agjentit të tyre.

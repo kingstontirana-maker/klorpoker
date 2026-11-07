@@ -206,7 +206,10 @@ body:has(#login:not([hidden])){background:var(--x-bg)}
 .authForm{display:grid;gap:14px}
 .authForm label{display:grid;gap:7px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#b9c2bc}
 .authDialog .authForm input:not([type=checkbox]){max-width:none;width:100%;padding:15px 16px;border-radius:14px;border:1px solid #26302b;background:#030605;color:#fff;font-size:16px;letter-spacing:normal;text-transform:none;transition:border-color .2s,box-shadow .2s}
-.authDialog .authForm #regCode{text-transform:uppercase;letter-spacing:.12em}
+.authDialog .authForm #regOtp{letter-spacing:.3em;text-align:center;font-size:20px}
+.regFields{display:contents;border:0;margin:0;padding:0}.regFields[hidden]{display:none}
+.regSent{margin:0;font-size:14px;line-height:1.5;color:#b9c2bc}.regSent b{color:#fff;overflow-wrap:anywhere}
+.regLinks{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.authForm button.regLink{background:none;border:0;padding:0;color:var(--x-gold);font:inherit;font-size:13px;cursor:pointer}.authForm button.regLink:disabled{color:#7c8a83;cursor:default}
 .authDialog .authForm input:focus{border-color:var(--x-gold);outline:none;box-shadow:0 0 0 4px #e6c88f22}
 .authForm .authCheck{display:flex;align-items:flex-start;gap:10px;font-weight:500;line-height:1.45;text-transform:none;letter-spacing:normal;font-size:13px}
 .authForm .authCheck input{margin-top:1px;accent-color:var(--x-gold);width:18px;height:18px;flex:none}

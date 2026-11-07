@@ -13,7 +13,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const users=['CENTER','ADMIN','AGENT','USER','USER'].map((role,i)=>({id:String(i),username:'test'+i,role,parentId:i?String(i===4?2:i-1):null,salt:'test-salt',passHash:crypto.scryptSync(password,'test-salt',64).toString('hex'),balance:i===0?100000:0}));
   fs.writeFileSync(file,JSON.stringify({users,rakePercent:5,rakeCap:300,ledger:[],tables:[],nextTable:2}));
   process.env.STATE_FILE=file;process.env.PORT='0';
-  const {server,runtime,tickTable,store,currentDb,shutdown,refreshAnalysis}=await import('./server.js');
+  const {server,runtime,tickTable,store,currentDb,shutdown,refreshAnalysis,mailer}=await import('./server.js');
   if(!server.listening)await new Promise(resolve=>server.once('listening',resolve));
   const base='http://127.0.0.1:'+server.address().port;
   const call=async(route,token,body)=>{const r=await fetch(base+'/api/'+route,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+(token||''),'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json()};};
@@ -24,18 +24,60 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     for(let i=0;i<5;i++)tokens.push((await call('login','',{username:'test'+i,password})).data.token);
     assert.equal((await call('rake/events',tokens[3])).status,403);
     assert.equal((await call('rake/events','')).status,401);
-    // Registration through an agent's invite link lands the player under that agent.
-    const invite=(await call('state',tokens[2])).data.user.invite;assert.match(invite,/^[0-9A-F]{10}$/);
-    assert.equal((await call('state',tokens[3])).data.user.invite,undefined);
-    assert.equal((await call('register','',{username:'newbie',password:'Newbie12345',code:'0000000000',adult:true})).status,400);
-    assert.equal((await call('register','',{username:'newbie',password:'Newbie12345',code:invite,adult:false})).status,400);
-    assert.equal((await call('register','',{username:'newbie',password:'short',code:invite,adult:true})).status,400);
-    const reg=await call('register','',{username:'newbie',password:'Newbie12345',code:invite.toLowerCase(),adult:true});
+    // Registration: a code by email, and every new player lands under the agent the centre chose.
+    const outbox=[];mailer.send=async m=>{outbox.push(m);};
+    const details=(over={})=>({username:'newbie',email:'New.Bie@Example.com',password:'Newbie12345',adult:true,...over}),codeIn=m=>m.text.match(/\b\d{6}\b/)?.[0];
+    assert.equal((await call('register/start','',details())).status,503,'closed until the centre chooses an agent');assert.equal(outbox.length,0);
+    assert.equal((await call('signup/agents',tokens[2])).status,403);assert.equal((await call('signup/agent',tokens[2],{id:'2'})).status,403);
+    assert.equal((await call('signup/agent',tokens[0],{id:'3'})).status,400,'only an agent');
+    assert.equal((await call('signup/agent',tokens[0],{id:'2'})).status,200);assert.deepEqual((await call('signup/agents',tokens[0])).data.agents.map(a=>a.username),['test2']);
+    assert.equal((await call('register/start','',details({adult:false}))).status,400);assert.equal((await call('register/start','',details({email:'nope'}))).status,400);assert.equal(outbox.length,0);
+    assert.equal((await call('register/start','',details())).status,200);assert.equal(outbox.length,1);assert.equal(outbox[0].to,'new.bie@example.com');const code=codeIn(outbox[0]);assert.match(code,/^\d{6}$/);
+    assert.equal((await call('register/start','',details())).status,429,'one code a minute');assert.equal(outbox.length,1);
+    assert.ok(!JSON.stringify(currentDb()).includes(code),'the code is not stored');
+    const wrong=code==='000000'?'000001':'000000';
+    assert.equal((await call('register/verify','',details({code:wrong}))).status,400);assert.equal((await call('register/verify','',details({code,email:'other@example.com'}))).status,400);
+    const reg=await call('register/verify','',details({code,email:'NEW.BIE@example.com'}));
     assert.equal(reg.status,200);assert.equal(reg.data.user.role,'USER');assert.equal(reg.data.user.parentId,'2');assert.equal(reg.data.user.balance,0);assert.equal((await call('state',reg.data.token)).status,200);
-    assert.equal((await call('register','',{username:'NEWBIE',password:'Newbie12345',code:invite,adult:true})).status,400);
-    assert.ok((await call('users',tokens[2])).data.some(x=>x.username==='newbie'));
-    const newInvite=(await call('invite/reset',tokens[2],{})).data.invite;assert.notEqual(newInvite,invite);assert.equal((await call('invite/reset',tokens[3],{})).status,403);
-    assert.equal((await call('register','',{username:'newbie2',password:'Newbie12345',code:invite,adult:true})).status,400);
+    assert.equal(reg.data.user.email,undefined,'the email is not sent back');assert.equal(currentDb().users.find(x=>x.username==='newbie').email,'new.bie@example.com');
+    assert.equal((await call('register/verify','',details({code,username:'again'}))).status,400,'a code works once');
+    // A player who registered alone: the agent sees them, but only the centre touches wallet and login.
+    {const id=reg.data.user.id,seen=(await call('users',tokens[2])).data.find(x=>x.username==='newbie');assert.equal(seen.direct,true);
+     assert.equal((await call('transfer',tokens[0],{userId:id,amount:10,direction:'send'})).status,200,'the centre can');
+     for(const [path,payload] of [['transfer',{userId:id,amount:5,direction:'return'}],['transfer',{userId:id,amount:5,direction:'send'}],['users/password',{userId:id,password:'Stolen12345'}],['users/status',{userId:id,blocked:true}]])assert.equal((await call(path,tokens[2],payload)).status,404,'the agent cannot: '+path);
+     assert.equal(currentDb().users.find(x=>x.id===id).balance,1000,'the wallet is untouched');assert.equal((await call('state',reg.data.token)).status,200,'still signed in');
+     assert.equal((await call('state',reg.data.token)).data.user.direct,true);assert.ok((await call('users',tokens[0])).data.some(x=>x.id===id),'the centre lists them');assert.ok(!(await call('users',tokens[1])).data.some(x=>x.id===id));
+     // Cash-out: the agent asks, and only the player's confirmation moves the money.
+     const wallet=i=>currentDb().users.find(x=>x.id===i).balance,agentStart=wallet('2'),ask=amount=>call('cashout/request',tokens[2],{userId:id,amount}),open=async()=>(await call('state',reg.data.token)).data.user.cashout;
+     assert.equal((await ask(11)).status,400,'not more than the wallet');assert.equal((await ask(-1)).status,400);assert.equal((await call('cashout/request',tokens[3],{userId:id,amount:1})).status,403);assert.equal((await call('cashout/request',tokens[2],{userId:'3',amount:1})).status,404,'an old player keeps the old way');
+     assert.equal((await ask(4)).status,200);assert.equal((await ask(1)).status,400,'one request at a time');assert.equal(wallet(id),1000,'asking moves nothing');
+     let c=await open();assert.equal(c.amount,4);assert.equal(c.agent,'test2');assert.equal((await call('state',tokens[2])).data.user.pendingCashouts,1);assert.equal((await call('users',tokens[2])).data.find(x=>x.id===id).cashout.amount,4);
+     assert.equal((await call('cashout/respond',tokens[3],{id:c.id,accept:true})).status,404,'not their request');assert.equal((await call('cashout/respond',tokens[2],{id:c.id,accept:true})).status,403);
+     assert.equal((await call('cashout/respond',reg.data.token,{id:c.id,accept:false})).status,200);assert.equal(await open(),null);assert.equal(wallet(id),1000,'declined');assert.equal(wallet('2'),agentStart);
+     assert.equal((await ask(4)).status,200);assert.equal((await call('cashout/cancel',tokens[2],{userId:id})).status,200);assert.equal(await open(),null,'cancelled');
+     assert.equal((await ask(4)).status,200);c=await open();currentDb().cashouts.find(x=>x.id===c.id).expires=Date.now()-1;assert.equal(await open(),null,'it runs out');assert.equal((await call('cashout/respond',reg.data.token,{id:c.id,accept:true})).status,404);assert.equal(wallet(id),1000);
+     assert.equal((await ask(4)).status,200);c=await open();currentDb().users.find(x=>x.id===id).balance=100;assert.equal((await call('cashout/respond',reg.data.token,{id:c.id,accept:true})).status,400,'the wallet shrank');assert.equal(wallet('2'),agentStart);currentDb().users.find(x=>x.id===id).balance=1000;
+     assert.equal((await call('cashout/respond',reg.data.token,{id:c.id,accept:true})).status,200);assert.equal(wallet(id),600);assert.equal(wallet('2'),agentStart+400,'the money moved once');assert.equal((await call('cashout/respond',reg.data.token,{id:c.id,accept:true})).status,404,'it cannot run twice');
+     assert.ok(currentDb().ledger.some(x=>x.cash&&x.from===id&&x.to==='2'&&x.amount===400));
+     assert.equal((await call('transfer',tokens[2],{userId:id,amount:1,direction:'return'})).status,404,'Return stays closed for the agent');
+     // Back to where the rest of this test expects the agent and the player.
+     currentDb().users.find(x=>x.id==='2').balance=agentStart;currentDb().users.find(x=>x.id===id).balance=1000;
+     assert.equal((await call('transfer',tokens[0],{userId:id,amount:10,direction:'return'})).status,200);assert.equal(currentDb().users.find(x=>x.id===id).balance,0);
+     // Blocking an agent with their network leaves such a player playing.
+     assert.equal((await call('users/create',tokens[1],{username:'agentx',password:'Agentx12345'})).status,200);const ax=(await call('users',tokens[1])).data.find(x=>x.username==='agentx').id;
+     currentDb().users.push({id:'direct1',username:'direct1',email:'direct1@example.com',role:'USER',parentId:ax,salt:'s',passHash:'h',balance:0},{id:'old1',username:'old1',role:'USER',parentId:ax,salt:'s',passHash:'h',balance:0});
+     assert.equal((await call('users/status',tokens[1],{userId:ax,blocked:true,network:true})).status,200);assert.ok(currentDb().users.find(x=>x.id==='old1').blocked);assert.ok(!currentDb().users.find(x=>x.id==='direct1').blocked);}
+    assert.equal((await call('register/start','',details({email:'second@example.com'}))).status,400,'that username is taken');
+    // An email already in use gets the same answer, but a notice and no code.
+    outbox.length=0;const taken=await call('register/start','',details({username:'newbie2'}));assert.equal(taken.status,200);assert.deepEqual(taken.data,{sent:true});assert.equal(outbox.length,1);assert.equal(codeIn(outbox[0]),undefined,'no code');assert.match(outbox[0].subject,/already have/);
+    assert.equal((await call('register/verify','',details({username:'newbie2',code:'123456'}))).status,400);
+    // Five wrong codes end a code, even the right one after that.
+    outbox.length=0;assert.equal((await call('register/start','',details({username:'tries',email:'tries@example.com'}))).status,200);const triesCode=codeIn(outbox[0]),bad=triesCode==='111111'?'222222':'111111';
+    for(let i=0;i<5;i++)assert.equal((await call('register/verify','',details({username:'tries',email:'tries@example.com',code:bad}))).status,400);
+    assert.equal((await call('register/verify','',details({username:'tries',email:'tries@example.com',code:triesCode}))).status,400);
+    // A failed email is reported, and the address can try again at once.
+    mailer.send=async()=>{throw Error('down');};assert.equal((await call('register/start','',details({username:'mailfail',email:'mailfail@example.com'}))).status,502);
+    mailer.send=async m=>{outbox.push(m);};outbox.length=0;assert.equal((await call('register/start','',details({username:'mailfail',email:'mailfail@example.com'}))).status,200);assert.equal(outbox.length,1);
     const stats=(await call('public/stats','')).data;assert.equal(typeof stats.tables,'number');assert.ok(!/test\d|passHash|salt/.test(JSON.stringify(stats)));
     for(const index of [0,1,2]){
       const controller=new AbortController();
@@ -54,7 +96,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     assert.equal((await call('table/1/rebuy',tokens[3],{amount:81})).status,400);
     assert.equal((await call('table/1/rebuy',tokens[3],{amount:10})).status,200);
     assert.equal(stored().escrow[0].amount,3000);
-    assert.equal((await call('ledger',tokens[1])).data.length,2);
+    assert.equal((await call('ledger',tokens[1])).data.length,4,'two transfers, and the block of agentx with its old player');
     // A broke seat persisted at a finished hand receives exactly 30 seconds.
     // Exercise the real game through an all-in, with no browser driving timers.
     await call('table/1/leave',tokens[3],{});
