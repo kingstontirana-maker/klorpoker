@@ -22,20 +22,28 @@ export function analyzeCertainty({game='holdem',board,players,dead=[]}){
     if((!winners.includes(i)||winners.length>1)&&!s.witness)s.witness=[...completed];
    }
    outcomes++;
-   // Before the flop, one adverse runout per player is sufficient proof that
-   // none may invest. Do not label partially counted probabilities as exact.
-   return board.length===0&&stats.every(s=>s.witness);
+   // Every completed board contributes its win or split-pot share.
+   return false;
   }
   for(let i=start;i<=unseen.length-(missing-depth);i++){
    completed[board.length+depth]=unseen[i];if(visit(i+1,depth+1))return true;
   }
   return false;
  }
- if(visit(0,0))complete=false;
- return {exact:complete,outcomes,players:stats.map(s=>({id:s.id,equity:complete?s.share/outcomes:null,safeToInvest:complete&&s.wins===outcomes,witness:s.witness}))};
+ if(board.length===0){
+  // Sample full runouts before the flop; never present a sample as a guarantee.
+  complete=false;
+  for(let n=0;n<600;n++){
+   const pool=[...unseen];
+   for(let k=0;k<missing;k++){const j=k+Math.floor(Math.random()*(pool.length-k));[pool[k],pool[j]]=[pool[j],pool[k]];completed[k]=pool[k];}
+   visit(0,missing);
+  }
+ }else visit(0,0);
+ const current=board.length>=3?players.map(p=>evaluateHand(game,p.cards,board)):null;
+ return {exact:complete,outcomes,players:stats.map((s,i)=>({id:s.id,equity:s.share/outcomes,safeToInvest:complete&&s.wins===outcomes,ahead:!!current&&current.every((score,j)=>j===i||compare(current[i],score)>0),witness:s.witness}))};
 }
 
 export function certaintyForPlayer(result,id){
  const mine=result.players.find(p=>p.id===id);if(!mine)throw Error('Missing certainty player');
- return {exact:result.exact,equity:mine.equity,safeToInvest:mine.safeToInvest,opponentEquities:result.players.filter(p=>p.id!==id).map(p=>p.equity),outcomes:result.outcomes};
+ return {exact:result.exact,equity:mine.equity,safeToInvest:mine.safeToInvest,ahead:mine.ahead,opponentEquities:result.players.filter(p=>p.id!==id).map(p=>p.equity),outcomes:result.outcomes};
 }

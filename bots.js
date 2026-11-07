@@ -5,7 +5,7 @@ import {analyzeCertainty,certaintyInput,certaintyForPlayer} from './bot-certaint
 
 // Experimental virtual-credit bots: the server checks real dealt hands against
 // every possible remaining board. Decisions receive proof/percentages only.
-// No voluntary chips are invested unless every runout is an outright win.
+// Exact postflop runouts and sampled preflop equity guide investment.
 
 // Bots carry ordinary names; only the center sees which players are bots
 // (isBot on the account and on the seat). Older bots named "Name [BOT]" are renamed.
@@ -43,18 +43,21 @@ export function equity(v,iterations,random=Math.random){
   for(let o=0;o<opp;o++){const c=compare(evaluateHand(v.game,deck.slice(o*hole,o*hole+hole),board),mine);if(c>0){best=0;break;}if(c===0)ties++;}
   if(best)won+=1/ties;}
  return won/n;}
-// Style changes sizing only; it cannot bypass certainty or the hand budget.
+// Style changes sizing within a cumulative hand budget.
 const SIZE={low:.6,medium:.66,high:.75};
 export function botDecision(v,risk='low',random=Math.random,proof){
  const invested=v.committed||0,startingStack=v.stack+invested;
  const certified=proof?.exact===true&&proof.safeToInvest===true&&proof.equity===1&&Array.isArray(proof.opponentEquities)&&proof.opponentEquities.length===(v.opponents||0)&&proof.opponentEquities.every(x=>x===0);
- const investmentRate=certified&&v.board.length===5?.4:.15;
+ const chance=Number.isFinite(proof?.equity)?proof.equity:equity(v,undefined,random);
+ const investmentRate=certified?1:v.board.length===4&&proof?.ahead===true&&chance>.5?.3:.15;
  const investmentLimit=Math.floor(startingStack*investmentRate),remainingInvestment=Math.max(0,Math.min(v.stack,investmentLimit-invested));
- const result=action=>({...action,equity:proof?.equity??null,safeToInvest:!!certified,investmentRate,investmentLimit,remainingInvestment});
- if(!certified)return result({type:v.toCall?'fold':'check'});
- if(v.canRaise&&remainingInvestment>0){
+ const result=action=>({...action,equity:chance,safeToInvest:!!certified,investmentRate,investmentLimit,remainingInvestment});
+ const callCost=Math.min(v.toCall,v.stack),potOdds=callCost/(v.pot+callCost||1);
+ const profitable=certified||chance>potOdds+.04;
+ if(v.toCall&&(!profitable||callCost>remainingInvestment))return result({type:'fold'});
+ if(v.canRaise&&remainingInvestment>v.toCall&&(certified||chance>=.6)){
   const size=SIZE[risk]||SIZE.low;
-  const want=v.currentBet===0?size*Math.max(v.pot,v.bb*2):v.currentBet+size*(v.pot+v.toCall);
+  const want=certified&&v.board.length===4?v.roundBet+remainingInvestment:v.currentBet===0?size*Math.max(v.pot,v.bb*2):v.currentBet+size*(v.pot+v.toCall);
   const ceiling=Math.min(v.maxRaiseTo,v.roundBet+remainingInvestment),target=Math.min(ceiling,Math.max(v.minRaiseTo,Math.round(want)));
   if(target>v.currentBet&&(target>=v.minRaiseTo||target===v.roundBet+v.stack))return result({type:'raise',amount:target/100});
  }
