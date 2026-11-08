@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Safe update of the live server (klorpoker.com).
+# Safe update of the live server (suprempoker.com).
 # Keeps the live accounts and balances (data/klor.db), takes the newest code
 # from GitHub and restarts the game. Run on the server:  bash deploy.sh
 set -euo pipefail

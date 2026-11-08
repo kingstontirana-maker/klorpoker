@@ -29,9 +29,9 @@
 .opLabel{display:block;margin-top:clamp(6px,1vw,12px);font-size:clamp(9px,1.05vw,12px);font-weight:700;letter-spacing:.34em;text-transform:uppercase;color:#a99f88;padding-left:.34em}
 .opLead{margin:0;max-width:600px;font-size:clamp(14px,1.6vw,17px);line-height:1.6;color:#c9c3b3;animation:opIn 1.4s .75s cubic-bezier(.2,.8,.2,1) both}
 .opSuits{display:flex;gap:22px;font-size:18px;color:#e9c97a99;animation:opIn 1.4s .9s both}.opSuits span:nth-child(even){color:#1f9d6b}
-.opStaff{margin-top:4px;padding:6px 10px;border:0;background:none;color:#8f877466;font:inherit;font-size:11px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}
-.opStaff:hover,.opStaff:focus-visible{color:#e9c97a}
-@media(max-height:520px) and (orientation:landscape){#opening{padding:10px 20px}.opLogo{width:min(210px,32vw)}.opTitle{font-size:clamp(28px,5vw,48px)}.opTitle em{display:inline;margin-left:.25em}.opNum{font-size:clamp(28px,5.2vw,54px)}.opUnit{padding:10px 4px 8px}.opClock{margin:0;width:min(640px,100%)}.opLead,.opSuits{display:none}.opInner{gap:8px}.opStaff{margin-top:0}}
+.opStaff{margin-top:6px;padding:11px 26px 11px calc(26px + .24em);border:1px solid #e9c97a;border-radius:999px;background:linear-gradient(180deg,#e9c97a26,#e9c97a0d);color:#f1d48e;font:inherit;font-size:13px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;cursor:pointer;box-shadow:0 0 0 1px #000,0 8px 24px #0009,0 0 18px #e9c97a33;transition:background .2s,color .2s,box-shadow .2s}
+.opStaff:hover,.opStaff:focus-visible{background:linear-gradient(180deg,#f8e6b0,#c9a052);color:#1a1205;box-shadow:0 0 0 1px #000,0 8px 24px #0009,0 0 26px #e9c97a66;outline:none}
+@media(max-height:520px) and (orientation:landscape){#opening{padding:10px 20px}.opLogo{width:min(210px,32vw)}.opTitle{font-size:clamp(28px,5vw,48px)}.opTitle em{display:inline;margin-left:.25em}.opNum{font-size:clamp(28px,5.2vw,54px)}.opUnit{padding:10px 4px 8px}.opClock{margin:0;width:min(640px,100%)}.opLead,.opSuits{display:none}.opInner{gap:8px}.opStaff{margin-top:0;padding:8px 20px 8px calc(20px + .24em);font-size:12px}}
 @keyframes opIn{from{opacity:0;transform:translateY(18px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
 @keyframes opShine{to{background-position:-220% 0}}
 @keyframes opSweep{0%,55%{transform:translateX(-120%)}85%,100%{transform:translateX(120%)}}
@@ -40,3 +40,5 @@
 @keyframes opDrift{to{transform:scale(1.12) translate(-1.5%,-1%)}}
 @keyframes opRise{0%{opacity:0;transform:translateY(0) scale(.6)}12%{opacity:.9}80%{opacity:.7}100%{opacity:0;transform:translateY(-105vh) translateX(var(--x)) scale(1.1)}}
 @media(prefers-reduced-motion:reduce){#opening *,#opening *::before{animation:none!important}.opSparks{display:none}}
+/* Shorter desktop screens: everything, the staff button included, fits without scrolling. */
+@media(min-width:701px) and (max-height:900px) and (min-height:521px){.opTitle{font-size:min(clamp(40px,8.4vw,104px),10.5vh)}.opNum{font-size:min(clamp(40px,8.8vw,108px),9.5vh)}.opLogo{width:min(400px,72vw,40vh)}.opInner{gap:clamp(10px,1.8vh,20px)}.opUnit{padding:clamp(12px,2vh,24px) 4px clamp(10px,1.6vh,18px)}}
