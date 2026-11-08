@@ -28,7 +28,7 @@ export function chipStack(amount,{compact=false}={}){const parts=splitChips(amou
 export function timerState(deadline,now,duration=30000){const remaining=Math.max(0,(deadline||0)-now);return {remaining,seconds:Math.ceil(remaining/1000),fraction:Math.max(0,Math.min(1,remaining/duration)),urgent:remaining<=5000,warning:remaining<=10000};}
 export function winningState(t,focusId){const result=t.phase==='finished'?t.lastResult:null;const ids=result?.winnerIds||[];const selected=ids.includes(focusId)?focusId:ids[0];const hand=result?.showdown?result.winningHands?.[selected]:null;return {ids,selected,hand,board:new Set(hand?.cards.filter(c=>t.board.includes(c))||[]),cards:new Set(hand?.cards||[])};}
 export function freshEvents(events,lastSeq,hand){return events.filter(e=>e.seq>lastSeq&&e.hand===hand);}
-export const GAME_INFO={holdem:{short:'NLH',name:"No Limit Hold'em",hole:2},omaha:{short:'PLO',name:'Pot Limit Omaha',hole:4}};
+export const GAME_INFO={holdem:{short:'',name:"No Limit Hold'em",hole:2},omaha:{short:'PLO',name:'Pot Limit Omaha',hole:4}};
 export const gameInfo=g=>GAME_INFO[g]||GAME_INFO.holdem;
 export function betLimits(t,mine){const stack=Math.round(((mine?.stack||0)+(mine?.bet||0))*100)/100,cap=t.legalActions?.maxRaiseTo,max=mine&&Number.isFinite(cap)&&cap>0?Math.min(stack,cap):stack;return {min:Math.min(t.currentBet+t.minRaise,max),max,canRaise:!!mine&&max>t.currentBet&&(t.legalActions?.canRaise??true)};}
 

@@ -224,7 +224,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .inviteRow{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 10px}
 .inviteRow input{flex:1 1 280px;min-width:0;padding:12px 14px;border-radius:10px;border:1px solid #2a3c37;background:#091011;color:#e8f3ee;font-family:ui-monospace,Consolas,monospace;font-size:14px}
 
-/* Game tags: NLH (Hold'em) and PLO (Omaha) */
+/* Game tags: PLO (Omaha). Hold'em has no tag, so its empty tag is hidden. */
+.gameTag:empty{display:none}
 .gameTag{display:inline-block;flex:none;margin:0 6px;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:.08em;background:#1b2e27;border:1px solid #5ef0a844;color:#9ff3cb;vertical-align:middle}
 .gameTag.omaha{background:#2b220e;border-color:#d8b46a66;color:#f1d58e}
 .lobbyGame{padding:9px 12px;border-radius:10px;border:1px solid #2a3c37;background:#091011;color:#e8f3ee}
