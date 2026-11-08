@@ -596,3 +596,15 @@ Kufizimi: ID-ja jeton në shfletues, ndaj një shfletues tjetër ose dritare pri
 
 ## Foto profili
 Herën e parë që një lojtar hyn, i del një dritare me 48 figura (`public/avatars.js`): njerëz, mjete, para, kafshë dhe fat. Janë vizatime origjinale, jo personazhe të njohura, ndaj nuk kanë kufizime të drejtash autori. "Later" e mbyll dhe nuk pyet më, ndërsa figura ndryshohet kurdo nga menuja te "Profile picture". Serveri ruan vetëm ID-në e figurës dhe pranon vetëm ID nga lista, ndaj nuk ngarkohet asnjë skedar. Lojtarët e tjerë e shohin figurën te tavolina.
+
+## Siguria e parave dhe përditësimet
+- **Kontrolli i parave:** paratë vetëm lëvizin, nuk krijohen e nuk humbasin. Çdo minutë, dhe në çdo nisje të serverit, mblidhen portofolet, çipat në tavolina, poti i duarve në lojë dhe tërheqjet në pritje. Nëse shuma ndryshon edhe një cent nga ajo e ruajtur (`db.moneyTotal`), qendra merr paralajmërim të kuq. Paralajmërimi mbetet derisa qendra ta pranojë te karta "Server", edhe pas rinisjes.
+- **Para një përditësimi:** te karta "Server" qendra ndalon duart e reja dhe pret derisa të shkruajë "Safe to Redeploy now". Kështu Redeploy-i nuk pret asnjë dorë. Ky modalitet nuk ruhet, ndaj pas rinisjes duart nisin vetë.
+- **Ndalimi:** serveri pret të shumtën 8 sekonda për duart që janë në lojë (`STOP_WAIT_MS`), më pak se 10 sekondat pas të cilave Docker zakonisht e mbyll me forcë, që ruajtja e fundit të bëhet gjithmonë.
+- **Node:** Docker përdor `node:22.20.0-alpine`, një version i saktë.
+- **Depozitat crypto:** çdo transferim kontrollohet edhe një herë te blockchain-i i konfirmuar (`gettransactioninfobyid`) para se të numërohet: duhet të ketë dalë me sukses, me kontratën zyrtare USDT, drejt portofolit të qendrës dhe me shumën e saktë. Transferimet e rreme injorohen. Ato që ende nuk janë konfirmuar provohen sërish në kontrollin e radhës.
+
+## Katalogu i ri: 164 tavolina, edhe me 9 lojtarë
+Të gjitha tavolinat e vjetra mbyllen një herë në nisjen e parë të serverit (`CATALOG_VERSION=2`), dhe hapen 164 tavolina Texas Hold'em, të gjitha jeshile: 25 me 9 vende (Porto–Monaco), 73 me 6 (Lisbon–Abu Dhabi), 36 me 4 (Alicante–New York) dhe 30 kokë më kokë (Oxford–Boston). Çdo qytet është një nivel blindesh, me tavolinat e numëruara I, II, III… ID-të vazhdojnë nga më e madhja e mëparshme, që historiku i duarve të tavolinave të mbyllura të mos përzihet me të rejat.
+
+Tavolinat me 9 vende kanë dy lojtarë lart dhe nga një në secilën anë të lojtarit poshtë. Vendet e tjera janë pak më të vogla.

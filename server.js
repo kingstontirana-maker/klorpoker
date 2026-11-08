@@ -19,13 +19,13 @@ if(!db){const salt=secret(),initial=process.env.CENTER_PASSWORD||crypto.randomBy
 // Recover escrowed table stacks after a process restart.
 delete db.rakeCap;
 for(const seat of db.escrow||[]){const user=db.users.find(u=>u.id===seat.userId);if(user)user.balance+=seat.amount;}db.escrow=[];
-let saveFailed=false,draining=false,replaced=false,lastError=null;
+let saveFailed=false,draining=false,replaced=false,lastError=null,maintenance=false;
 const LOW_DISK=1e9,TICK_FAIL_ALERT=20;
 const noteError=(where,err)=>{lastError={where,message:String(err?.message||err).slice(0,160),at:Date.now()};console.error(`[Suprem Poker] ${where}:`,err);};
 // A timer must never stop the server: one failing job is logged and the rest go on.
 const guarded=(where,fn)=>()=>{try{fn();}catch(err){noteError(where,err);}};
 export const runtime=new Map();const tokens=new Map();const rakeClients=new Map();const tableSubs=new Map(),inspectSubs=new Map();let pushQueued=false;const save=()=>{if(replaced)return;db.escrow=[...runtime.values()].flatMap(t=>t.seats.filter(Boolean).map(s=>({userId:s.userId,amount:s.stack+(LIVE.includes(t.phase)?s.committed:0)})));try{store.commit(db);saveFailed=false;}catch(err){saveFailed=true;console.error('[Suprem Poker] state not saved',err.message);}queuePush();};
-const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h),canDeal:()=>!draining&&!saveFailed});
+const engine=createEngine({db,save,onSettle:()=>publishRake(),onEquity:()=>queuePush(),onHand:h=>recordHand(h),canDeal:()=>!draining&&!saveFailed&&!maintenance});
 // Hand history: every finished hand is one row of its own, stored as it finishes.
 function recordHand(h){h.id=db.handSeq=(db.handSeq||0)+1;try{store.addHand(h);}catch(err){console.error('[Suprem Poker] hand history not saved',err);}}
 const handSummary=h=>({id:h.id,at:h.startedAt,table:h.table,tableId:h.tableId,game:h.game,hand:h.hand,sb:h.sb,bb:h.bb,players:h.players.map(p=>p.username),bots:h.players.filter(p=>p.bot).map(p=>p.username),board:h.board,pot:h.pot,rake:h.rake,winners:h.winners,showdown:h.showdown});
@@ -37,7 +37,8 @@ const GAME_TYPES=['holdem','omaha'];
 const tableIdle=t=>!t.seats.some(Boolean)&&['waiting','finished'].includes(t.phase)&&!t.waitlist?.length&&!t.waitOffer&&!db.users.some(x=>x.isBot&&x.bot?.enabled&&x.bot.tableId===t.id);
 const makeTable=(id,name,sb,bb,color,game,size)=>{const t=engine.makeTable(id,name,sb,bb,GAME_TYPES.includes(game)?game:'holdem',size);t.color=validColor(color)?color.toLowerCase():DEFAULT_COLOR;runtime.set(t.id,t);return t;};
 if(!db.tables.length)db.tables=[{id:'1',name:'Emerald One',sb:100,bb:200}];
-const seeded=seedCatalog(db);if(seeded){console.log(`[Suprem Poker] Opened ${seeded} tables from the catalog.`);try{store.commit(db);}catch(err){console.error('[Suprem Poker] tables not saved yet',err.message);}}
+// TABLE_CATALOG=off keeps the tables as they are (used by the tests).
+const seeded=process.env.TABLE_CATALOG==='off'?0:seedCatalog(db);if(seeded){console.log(`[Suprem Poker] Table catalog: the old tables were closed and ${seeded} tables opened.`);try{store.commit(db);}catch(err){console.error('[Suprem Poker] tables not saved yet',err.message);}}
 for(const t of db.tables)makeTable(t.id,t.name,t.sb,t.bb,t.color,t.game,t.size);
 // New players register by email and land under the one agent the centre chose.
 for(const a of db.users)delete a.inviteCode;save();
@@ -94,7 +95,7 @@ function withOldRake(){if(!oldRake)oldRake=store.olderRake();clearTimeout(oldRak
 // Newest 100 entries a viewer may see; older ones are read in pages only if needed.
 function ledgerFor(u){const view=x=>{if(u.role==='CENTER')return [x];if(x.type==='RAKE'){const s=x.shares?.find(s=>s.userId===u.id);return s?[{id:x.id,type:'COMMISSION',to:u.id,tableId:x.tableId,hand:x.hand,amount:s.amount,time:x.time}]:[];}return x.from===u.id||x.to===u.id?[x]:[];};let out=db.ledger.flatMap(view).slice(-100),before=Infinity;for(let page=0;out.length<100&&page<50;page++){const older=store.olderLedger(before);if(!older.rows.length)break;out=[...older.rows.flatMap(view),...out].slice(-100);before=older.seq;}return out.reverse().map(x=>({...x,amount:clean(x.amount)}));}
 // ---- Activity log: every change staff make, written after it succeeded ----
-const AUDITED=new Set(['rake','tables/create','tables/update','tables/delete','tables/color','users/create','users/password','users/status','users/share','users/mute','transfer','signup/agent','cashout/request','cashout/cancel','cashout/respond','moderation/resolve','bots/create','bots/configure','bots/status','bots/delete','bots/guard','bots/settings','crypto/settings','crypto/assign','crypto/ignore','crypto/withdrawal']);
+const AUDITED=new Set(['rake','tables/create','tables/update','tables/delete','tables/color','users/create','users/password','users/status','users/share','users/mute','transfer','signup/agent','cashout/request','cashout/cancel','cashout/respond','maintenance','money/accept','moderation/resolve','bots/create','bots/configure','bots/status','bots/delete','bots/guard','bots/settings','crypto/settings','crypto/assign','crypto/ignore','crypto/withdrawal']);
 const SECRET_FIELDS=new Set(['password','current','next','token','device']);
 function audit(user,action,body,req,extra={}){try{const details=Object.fromEntries(Object.entries(body||{}).filter(([k])=>!SECRET_FIELDS.has(k)));const target=db.users.find(x=>x.id===body?.userId)?.username||runtime.get(String(body?.id??''))?.name||body?.username||body?.name||null;store.addAudit({at:Date.now(),actorId:user.id,actor:user.username,role:user.role,action,target,details:{...details,...extra},ip:clientIp(req)});}catch(err){console.error('[Suprem Poker] activity not logged',err.message);}}
 // The value before the change, where it is worth showing.
@@ -116,6 +117,7 @@ function alertsFor(u){const out=[],add=(level,panel,text)=>out.push({level,panel
   if(saveFailed)add('high','overview','Changes cannot be saved. Money actions are paused until saving works again. Check the server disk.');const free=diskFree();if(free!==null&&free<LOW_DISK)add('high','overview','Only '+Math.round(free/1e6)+' MB of disk space is left on the server.');
   for(const t of runtime.values())if((t.tickFails||0)>=TICK_FAIL_ALERT)add('high','inspect',t.name+' stopped with an error. Restart the server: chips return to the wallets.');
   if(lastError&&Date.now()-lastError.at<86400000)add('warn','overview','The server caught an error ('+lastError.where+'): '+lastError.message);
+  if(db.moneyMismatch)add('high','overview','Money check: the total changed by '+clean(db.moneyMismatch.actual-db.moneyMismatch.expected).toFixed(2)+' €. See the Server card on the overview.');
   const waiting=(c.deposits||[]).filter(d=>d.status==='open'&&d.note);if(waiting.length)add('high','crypto',waiting.length+(waiting.length>1?' paid deposits wait':' paid deposit waits')+': center credit is too low.');
   const signals=analysis?pairSignals(db.users,analysis.pairs,new Map(analysis.totals.map(t=>[t.id,t.hands]))):[];if(signals.length)add(signals.some(s=>s.level==='high')?'high':'warn','security',signals.length+(signals.length>1?' pairs':' pair')+' of players to check');}
  const order={high:0,warn:1,info:2};return out.sort((a,b)=>order[a.level]-order[b.level]);}
@@ -160,6 +162,10 @@ if(p==='/api/users/create'){roleCheck(u,'CENTER','ADMIN','AGENT');const expected
 // Change a direct admin's or agent's percentage. Lowering an admin below its agents
 // brings those agents down to the new limit. Applies to the following hands only.
 if(p==='/api/users/share'){roleCheck(u,'CENTER','ADMIN');const child=db.users.find(x=>x.id===body.userId&&childOf(x,u));if(!child||!['ADMIN','AGENT'].includes(child.role))fail('Direct subordinate not found',404);const share=shareFor(u,child.role,body.share,true);const old=pct(child.share);child.share=share;const capped=[];if(child.role==='ADMIN')for(const a of db.users.filter(x=>x.parentId===child.id&&x.role==='AGENT'&&pct(x.share)>share)){capped.push(a.username);db.ledger.push({id:uid(),type:'SHARE',from:child.id,to:a.id,amount:0,share,oldShare:pct(a.share),reason:'CAPPED',time:Date.now()});a.share=share;}db.ledger.push({id:uid(),type:'SHARE',from:u.id,to:child.id,amount:0,share,oldShare:old,time:Date.now()});save();return {ok:true,share,capped};}
+// The centre stops new hands before an update; the hands in play finish normally.
+if(p==='/api/maintenance/status'){roleCheck(u,'CENTER');return serverStatus();}
+if(p==='/api/maintenance'){roleCheck(u,'CENTER');maintenance=body.on===true;queuePush();return serverStatus();}
+if(p==='/api/money/accept'){roleCheck(u,'CENTER');db.moneyTotal=moneyNow();delete db.moneyMismatch;save();return serverStatus();}
 if(p==='/api/profile/avatar'){roleCheck(u,'USER');if(body.skip!==true){if(!avatarExists(body.id))fail('Choose a picture from the list');u.avatar=body.id;for(const t of runtime.values())for(const s of t.seats)if(s?.userId===u.id)s.avatar=u.avatar;}u.avatarAsked=true;save();queuePush();return {ok:true,avatar:u.avatar||null};}
 if(p==='/api/cashout/request'){roleCheck(u,'AGENT');const child=db.users.find(x=>x.id===body.userId&&x.parentId===u.id&&x.email&&!x.blocked);if(!child)fail('Player not found in your network',404);const cents=money(body.amount);if(!Number.isSafeInteger(cents)||cents<=0)fail('Invalid amount');if(pendingCashouts().some(c=>c.userId===child.id))fail('This player already has a request waiting');if(child.balance<cents)fail('The wallet of this player has only '+clean(child.balance).toFixed(2)+'. Chips on a table do not count.');db.cashouts=[...pendingCashouts(),{id:uid(),agentId:u.id,userId:child.id,cents,expires:Date.now()+CASHOUT_MS}];save();return {ok:true};}
 if(p==='/api/cashout/cancel'){roleCheck(u,'AGENT');db.cashouts=pendingCashouts().filter(c=>!(c.agentId===u.id&&c.userId===body.userId));save();return {ok:true};}
@@ -186,7 +192,7 @@ if(p==='/api/hands/get'){roleCheck(u,'CENTER');const hand=store.getHand(Number(b
 if(p==='/api/revenue'){roleCheck(u,'CENTER','ADMIN','AGENT');const r=revenueReport(withOldRake(),u,{from:body.from,to:body.to,scope:body.scope?String(body.scope):undefined,detail:!!body.detail,includeBots:u.role==='CENTER'&&body.includeBots===true});const e=x=>({...x,rake:clean(x.rake)});return {...r,totals:{...r.totals,rake:clean(r.totals.rake),earned:clean(r.totals.earned),paidToNetwork:clean(r.totals.paidToNetwork),...(r.totals.botRake!=null?{botRake:clean(r.totals.botRake)}:{}),avgPerHand:clean(r.totals.avgPerHand)},previous:{...e(r.previous),earned:clean(r.previous.earned)},series:r.series.map(e),hours:r.hours.map(e),byChild:r.byChild.map(x=>({...e(x),earned:clean(x.earned)})),byPlayer:r.byPlayer.map(e),byTable:r.byTable.map(x=>({...e(x),sb:clean(x.sb),bb:clean(x.bb)})),recent:r.recent.map(x=>({...x,amount:clean(x.amount),parts:x.parts.map(q=>({...q,amount:clean(q.amount)}))})),...(r.rows?{rows:r.rows.map(x=>({...x,amount:clean(x.amount)}))}:{})};}
 if(p==='/api/rake/report'){roleCheck(u,'CENTER','ADMIN','AGENT');return staffRakeReport(u);}
 if(p==='/api/rake'){roleCheck(u,'CENTER');const value=Number(body.percent);if(!Number.isFinite(value)||value<0||value>15)fail('Rake must be 0–15%');db.rakePercent=value;save();publishRake();return{ok:true};}
-if(p==='/api/tables/create'){roleCheck(u,'CENTER');const name=String(body.name||'').trim().slice(0,40),sb=money(body.sb),bb=money(body.bb);if(!name||!Number.isSafeInteger(sb)||!Number.isSafeInteger(bb)||sb<=0||bb<sb*2)fail('Invalid table configuration');if(body.color!==undefined&&!validColor(body.color))fail('Invalid table colour');const game=body.game===undefined?'holdem':String(body.game);if(!GAME_TYPES.includes(game))fail('Invalid game type');const size=body.size===undefined?6:Number(body.size);if(!TABLE_SIZES.includes(size))fail('A table has 2, 4 or 6 seats');const color=validColor(body.color)?body.color.toLowerCase():DEFAULT_COLOR;const id=String(db.nextTable++);db.tables.push({id,name,sb,bb,color,game,size});makeTable(id,name,sb,bb,color,game,size);save();return {id,color,game,size};}
+if(p==='/api/tables/create'){roleCheck(u,'CENTER');const name=String(body.name||'').trim().slice(0,40),sb=money(body.sb),bb=money(body.bb);if(!name||!Number.isSafeInteger(sb)||!Number.isSafeInteger(bb)||sb<=0||bb<sb*2)fail('Invalid table configuration');if(body.color!==undefined&&!validColor(body.color))fail('Invalid table colour');const game=body.game===undefined?'holdem':String(body.game);if(!GAME_TYPES.includes(game))fail('Invalid game type');const size=body.size===undefined?6:Number(body.size);if(!TABLE_SIZES.includes(size))fail('A table has 2, 4, 6 or 9 seats');const color=validColor(body.color)?body.color.toLowerCase():DEFAULT_COLOR;const id=String(db.nextTable++);db.tables.push({id,name,sb,bb,color,game,size});makeTable(id,name,sb,bb,color,game,size);save();return {id,color,game,size};}
 // The centre can recolour an existing table; players see it on the next update.
 // Edit a table: the name at any time; blinds and game only while it is empty.
 if(p==='/api/tables/update'){roleCheck(u,'CENTER');const id=String(body.id||''),t=runtime.get(id),rec=db.tables.find(x=>x.id===id);if(!t||!rec)fail('Table not found',404);const name=body.name===undefined?rec.name:String(body.name).trim().slice(0,40);if(!name)fail('Enter a table name');const sb=body.sb===undefined?rec.sb:money(body.sb),bb=body.bb===undefined?rec.bb:money(body.bb),game=body.game===undefined?(t.game||'holdem'):String(body.game);if(!Number.isSafeInteger(sb)||!Number.isSafeInteger(bb)||sb<=0||bb<sb*2)fail('Invalid table configuration');if(!GAME_TYPES.includes(game))fail('Invalid game type');if(sb!==rec.sb||bb!==rec.bb||game!==(t.game||'holdem')){if(!tableIdle(t))fail('Blinds and game can change only while the table is empty');rec.sb=t.sb=sb;rec.bb=t.bb=t.minRaise=bb;rec.game=t.game=game;}rec.name=t.name=name;save();return {ok:true};}
@@ -197,7 +203,7 @@ if(p==='/api/ledger'){roleCheck(u,'CENTER','ADMIN','AGENT','USER');return ledger
 if(p.startsWith('/api/table/')){let parts=p.split('/'),t=runtime.get(parts[3]);if(!t)fail('Table not found',404);const seated=t.seats.some(s=>s?.userId===u.id);if(u.role!=='USER')fail('Use your management panel',403);if(!seated&&u.balance<=0)fail(noCredit(u),403);
 if(parts[4]==='state')return engine.snapshot(t,u.id,url.searchParams.get('bg')!=='1');
 if(parts[4]==='rebuy'){engine.rebuy(t,u,body.amount);return {ok:true};}
-if(['sit','start','rebuy'].includes(parts[4])&&draining)fail('The server is restarting. Please try again in a moment.',503);
+if(['sit','start','rebuy'].includes(parts[4])&&draining)fail('The server is restarting. Please try again in a moment.',503);if(['sit','start'].includes(parts[4])&&maintenance)fail('An update is about to start. Please try again in a few minutes.',503);
 if(parts[4]==='sit'){if(seatedFromSameDevice(t,u,body.device,id=>db.users.find(x=>x.id===id)))fail('Another account from this device is already at this table.');engine.sit(t,u,body.position,body.buyin,[...runtime.values()]);const seat=t.seats.find(s=>s?.userId===u.id);if(u.avatar)seat.avatar=u.avatar;if(/^[\w-]{8,64}$/.test(body.device||'')){seat.device=body.device;recordSeen(u,clientIp(req),body.device);save();}return {ok:true};}
 if(parts[4]==='leave')return engine.leave(t,u);
 if(parts[4]==='sitout'){engine.sitOut(t,u,!!body.value);return {ok:true};}
@@ -244,6 +250,13 @@ const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRak
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});
+// Money only moves between accounts, it is never made or lost: wallets, chips on the tables
+// (stacks, and the pot of a running hand) and withdrawals waiting must always add up the same.
+const moneyNow=()=>db.users.reduce((n,u)=>n+u.balance,0)+[...runtime.values()].reduce((n,t)=>n+t.seats.reduce((m,s)=>m+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0),0)+payments.held();
+export function checkMoney(){const now=moneyNow();if(db.moneyTotal==null){db.moneyTotal=now;save();return true;}if(now===db.moneyTotal)return !db.moneyMismatch;
+ if(!db.moneyMismatch){db.moneyMismatch={expected:db.moneyTotal,actual:now,at:Date.now()};noteError('money check',Error('the total changed by '+clean(now-db.moneyTotal).toFixed(2)+' €'));save();}return false;}
+const serverStatus=()=>{const ts=[...runtime.values()];return {on:maintenance,live:ts.filter(t=>LIVE.includes(t.phase)).length,seated:ts.reduce((n,t)=>n+t.seats.filter(Boolean).length,0),money:{total:clean(moneyNow()),ok:!db.moneyMismatch,mismatch:db.moneyMismatch?{difference:clean(db.moneyMismatch.actual-db.moneyMismatch.expected),at:db.moneyMismatch.at}:null}};};
+guarded('money check',checkMoney)();setInterval(guarded('money check',checkMoney),60000).unref();
 setInterval(()=>{if(replaced||saveFailed)return;payments.scan().catch(err=>console.error('[Suprem Poker] crypto scan',err.message));},30000).unref();
 // Center inspection: every table with every hole card, live. Only the center
 // account can open it, it can never sit at a table, and each session is logged.
@@ -284,6 +297,7 @@ server.listen(PORT,()=>console.log(`Suprem Poker http://localhost:${PORT}`));
 process.on('uncaughtException',err=>noteError('unexpected',err));process.on('unhandledRejection',err=>noteError('unexpected',err));
 // Stopping (a deploy sends SIGTERM): no new hands, running hands may finish, then the
 // state is saved. A hand still running at the time limit gets its chips back on the next start.
-const STOP_WAIT_MS=Number(process.env.STOP_WAIT_MS||25000);let stopping=null;
+// Below Docker's usual 10 s stop timeout, so the last save always happens before the process is killed.
+const STOP_WAIT_MS=Number(process.env.STOP_WAIT_MS||8000);let stopping=null;
 export function shutdown(wait=STOP_WAIT_MS){return stopping??=new Promise(resolve=>{if(replaced)return resolve();draining=true;const until=Date.now()+wait,busy=()=>[...runtime.values()].filter(t=>LIVE.includes(t.phase)).length;console.log(`[Suprem Poker] Stopping: waiting for ${busy()} running hand(s).`);queuePush();const check=setInterval(()=>{if(busy()&&Date.now()<until)return;clearInterval(check);console.log(`[Suprem Poker] Stopped with ${busy()} hand(s) unfinished.`);save();resolve();},200);});}
 for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{if(stopping)process.exit(0);shutdown().then(()=>{try{store.close();}catch{}process.exit(0);});});

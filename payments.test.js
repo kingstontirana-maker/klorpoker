@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPayments,validTronAddress,USDT_TRC20} from './payments.js';
+import {createPayments,validTronAddress,USDT_TRC20,tronHex} from './payments.js';
 
 const WALLET='TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',PLAYER_ADDR='TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 const fail=(m,code=400)=>{const e=Error(m);e.status=code;throw e;};
@@ -8,15 +8,32 @@ function world(){
  let clock=1_800_000_000_000,chain=[];
  const center={id:'c',username:'center',role:'CENTER',balance:10_000_000},p1={id:'p1',username:'ana',role:'USER',balance:0},p2={id:'p2',username:'besi',role:'USER',balance:0},agent={id:'a',username:'ag',role:'AGENT',balance:0};
  const db={users:[center,p1,p2,agent],ledger:[]};
- const fetchImpl=async url=>{assert.match(url,new RegExp('/v1/accounts/'+WALLET+'/transactions/trc20'));assert.match(url,/only_confirmed=true/);return {ok:true,json:async()=>({data:chain,success:true})};};
+ const TOPIC='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+ const info=x=>x.missing?{}:{id:x.transaction_id,blockNumber:1,receipt:{result:x.result||'SUCCESS'},log:[{address:tronHex(x.logToken||x.token_info.address),topics:[TOPIC,'0'.repeat(64),'0'.repeat(24)+tronHex(x.logTo||x.to)],data:BigInt(x.logValue??x.value).toString(16).padStart(64,'0')}]};
+ const fetchImpl=async(url,opt)=>{if(url.endsWith('/walletsolidity/gettransactioninfobyid')){const id=JSON.parse(opt.body).value,x=chain.find(c=>c.transaction_id===id);return {ok:true,json:async()=>x?info(x):{}};}assert.match(url,new RegExp('/v1/accounts/'+WALLET+'/transactions/trc20'));assert.match(url,/only_confirmed=true/);return {ok:true,json:async()=>({data:chain,success:true})};};
  const pay=createPayments({db,save:()=>{},fail,fetchImpl,now:()=>clock,apiUrl:'https://stub'});
- const send=(micro,{to=WALLET,token=USDT_TRC20,tx=String(chain.length+1).padStart(64,'a')}={})=>{chain.unshift({transaction_id:tx,token_info:{address:token,decimals:6},block_timestamp:clock,from:'TXyz',to,type:'Transfer',value:String(micro)});return tx;};
+ const send=(micro,{to=WALLET,token=USDT_TRC20,tx=String(chain.length+1).padStart(64,'a'),...extra}={})=>{chain.unshift({transaction_id:tx,token_info:{address:token,decimals:6},block_timestamp:clock,from:'TXyz',to,type:'Transfer',value:String(micro),...extra});return tx;};
+ const find=tx=>chain.find(c=>c.transaction_id===tx);
  const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+pay.held();
  pay.route('/api/crypto/settings',{address:WALLET,enabled:true,rateIn:0.9,rateOut:0.9,minDeposit:10,minWithdraw:20},center);
- return {db,pay,center,p1,p2,agent,send,total,tick:ms=>{clock+=ms;}};
+ return {db,pay,center,p1,p2,agent,send,find,total,tick:ms=>{clock+=ms;}};
 }
 
+test('a transfer counts only when the chain itself confirms it',async()=>{
+ const {pay,center,p1,send,find,total}=world();const start=total();
+ const amount=d=>Math.round(Number(d.amount)*1e6);
+ // A failed transfer, a fake token behind the real name, another wallet, or another amount in the log: never credited.
+ for(const extra of [{result:'REVERT'},{logToken:'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7'},{logTo:'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'},{logValue:'1'}]){
+  const d=pay.route('/api/crypto/deposit',{amount:20},p1);send(amount(d),extra);await pay.scan(true);assert.equal(p1.balance,0,JSON.stringify(extra));
+  pay.route('/api/crypto/cancel',{id:d.id},p1);}
+ assert.equal(pay.route('/api/crypto/admin',{},center).unmatched.length,0,'a fake is not even listed for the centre');
+ // Not confirmed yet: it waits, and counts once the chain confirms it.
+ const d=pay.route('/api/crypto/deposit',{amount:20},p1),tx=send(amount(d),{missing:true});await pay.scan(true);assert.equal(p1.balance,0);
+ find(tx).missing=false;await pay.scan(true);assert.ok(p1.balance>0,'credited after confirmation');assert.equal(total(),start);
+});
+
 test('tron addresses are checked with their checksum',()=>{
+ assert.equal(tronHex('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'),'a614f803b6fd780986a42c78ec9c7f77e6ded13c','the official USDT contract');assert.equal(tronHex('nope'),'');
  assert.ok(validTronAddress(WALLET));assert.ok(validTronAddress(PLAYER_ADDR));
  assert.ok(!validTronAddress('TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU8'),'one wrong character');assert.ok(!validTronAddress('0x1234'));assert.ok(!validTronAddress(''));
 });

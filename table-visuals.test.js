@@ -96,9 +96,9 @@ test('seat layout, felt sizing and standard bet sizes',async()=>{
 });
 
 test('tables for 2 and 4 players put one spot on the table for every seat',()=>{
- for(const base of [seatLayout(),seatLayout(true),seatLayout(true,false,true),seatLayout(false,true)])for(const size of [2,4,6]){const l=sizedLayout(base,size);
+ for(const base of [seatLayout(),seatLayout(true),seatLayout(true,false,true),seatLayout(false,true)])for(const size of [2,4,6,9]){const l=sizedLayout(base,size);
   for(const key of ['seats','bets','dealer','slots'])assert.equal(l[key].length,size,key+' for '+size);
-  assert.deepEqual(l.seats[0],base.seats[0],'the top seat stays');assert.deepEqual(l.seats[size/2],base.seats[3],'the player sits at the bottom');}
+  if(size!==9)assert.deepEqual(l.seats[0],base.seats[0],'the top seat stays');assert.deepEqual(l.seats[l.hero],base.seats[3],'the player sits at the bottom');for(const [x,y] of l.seats)assert.ok(x>=-1&&x<=101&&y>=-1&&y<=101,'on the table');}
  const four=sizedLayout({seats:[[50,0],[100,10],[100,30],[50,100],[0,30],[0,10]],bets:[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],dealer:[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]},4);
  assert.deepEqual(four.seats,[[50,0],[100,20],[50,100],[0,20]]);
 });

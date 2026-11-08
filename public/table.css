@@ -673,3 +673,5 @@ body.fitPhone .dockInfo{display:none!important}
    A fixed layer behind the page, so the table's scaling never moves or stretches it. */
 body[data-view="table"]{background:transparent}
 body[data-view="table"]::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#000000b8 0,#00000000 20%),url(/table-bg.webp) center/cover no-repeat,#050a08}
+/* Nine seats share the same felt: slightly smaller seats. */
+.game.nineMax .seat:not(.me){scale:.86}

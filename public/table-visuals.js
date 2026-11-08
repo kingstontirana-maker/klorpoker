@@ -155,13 +155,20 @@ export function preActionFor(choice,toCall){if(choice==='checkFold')return toCal
 // player-relative positions 0..5; position 3 is always the local player.
 // A bet entry may carry an alignment: 'start' puts its left edge on the point, 'end' its
 // right edge, so a long amount grows away from the nearest name plate.
-// A table with fewer seats uses the same spots: two players face each other, four sit
-// around the table with the side players halfway along the edge. "slots" names the
-// six-seat position whose styling each seat borrows.
+// Other table sizes use the six-seat spots: two players face each other, four sit around
+// the table with the side players halfway along the edge, and nine add a second player at
+// the top and one on each side of the bottom player. "slots" names the six-seat position
+// whose styling each seat borrows; "hero" is where the player sitting at the table appears.
 export function sizedLayout(base,size=6){
- if(size===2)return {seats:[base.seats[0],base.seats[3]],bets:[base.bets[0],base.bets[3]],dealer:[base.dealer[0],base.dealer[3]],slots:[0,3]};
- if(size===4){const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2,...a.slice(2)],four=l=>[l[0],mid(l[1],l[2]),l[3],mid(l[4],l[5])];return {seats:four(base.seats),bets:four(base.bets),dealer:four(base.dealer),slots:[0,1,3,5]};}
- return {...base,slots:[0,1,2,3,4,5]};
+ if(size===2)return {seats:[base.seats[0],base.seats[3]],bets:[base.bets[0],base.bets[3]],dealer:[base.dealer[0],base.dealer[3]],slots:[0,3],hero:1};
+ if(size===4){const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2,...a.slice(2)],four=l=>[l[0],mid(l[1],l[2]),l[3],mid(l[4],l[5])];return {seats:four(base.seats),bets:four(base.bets),dealer:four(base.dealer),slots:[0,1,3,5],hero:2};}
+ if(size===9){const [top,r1,r2,bottom,l2,l1]=base.seats,dx=v=>Math.max(13,Math.min(24,v));
+  const tl=[top[0]-dx(17),top[1]],tr=[top[0]+dx(17),top[1]],bl=[bottom[0]-dx(23),bottom[1]-1.5],br=[bottom[0]+dx(23),bottom[1]-1.5];
+  const toward=([x,y],kx,ky,align)=>[x+(50-x)*kx,y+(50-y)*ky,...(align?[align]:[])];
+  const bets=[toward(tl,.12,.46),toward(tr,.12,.46),base.bets[1],base.bets[2],toward(br,.1,.62,'end'),base.bets[3],toward(bl,.1,.62,'start'),base.bets[4],base.bets[5]];
+  const dealer=[[tl[0]-8,tl[1]+15],[tr[0]+8,tr[1]+15],base.dealer[1],base.dealer[2],[br[0]+9,br[1]-13],base.dealer[3],[bl[0]-9,bl[1]-13],base.dealer[4],base.dealer[5]];
+  return {seats:[tl,tr,r1,r2,br,bottom,bl,l2,l1],bets,dealer,slots:[0,0,1,2,3,3,3,4,5],hero:5};}
+ return {...base,slots:[0,1,2,3,4,5],hero:3};
 }
 export function seatLayout(portrait=false,phone=false,narrow=false){
  // Phones in landscape: the top player sits a little lower and the lower side

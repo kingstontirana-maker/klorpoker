@@ -12,8 +12,8 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const password='TestPassword123!';
   const users=['CENTER','ADMIN','AGENT','USER','USER'].map((role,i)=>({id:String(i),username:'test'+i,role,parentId:i?String(i===4?2:i-1):null,salt:'test-salt',passHash:crypto.scryptSync(password,'test-salt',64).toString('hex'),balance:i===0?100000:0}));
   fs.writeFileSync(file,JSON.stringify({users,rakePercent:5,rakeCap:300,ledger:[],tables:[],nextTable:2}));
-  process.env.STATE_FILE=file;process.env.PORT='0';
-  const {server,runtime,tickTable,store,currentDb,shutdown,refreshAnalysis,mailer}=await import('./server.js');
+  process.env.STATE_FILE=file;process.env.PORT='0';process.env.TABLE_CATALOG='off';
+  const {server,runtime,tickTable,store,currentDb,shutdown,refreshAnalysis,mailer,checkMoney}=await import('./server.js');
   if(!server.listening)await new Promise(resolve=>server.once('listening',resolve));
   const base='http://127.0.0.1:'+server.address().port;
   const call=async(route,token,body)=>{const r=await fetch(base+'/api/'+route,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+(token||''),'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json()};};
@@ -340,6 +340,11 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      for(const i of ['3','4'])currentDb().users.find(x=>x.id===i).balance+=10000;
      assert.equal((await call('table/'+one+'/sit',a,{position:0,buyin:20,device:'device-aaaa'})).status,200);
      const same=await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-aaaa'});assert.equal(same.status,400);assert.match(same.data.error,/this device/);assert.ok(!runtime.get(one).seats[1]);
+     // Before an update: no new seats or hands while the running ones finish.
+     assert.equal((await call('maintenance',b,{on:true})).status,403);const on=await call('maintenance',center,{on:true});assert.equal(on.data.on,true);
+     const wait=await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-bbbb'});assert.equal(wait.status,503);assert.match(wait.data.error,/update/);
+     assert.equal((await call('table/'+one+'/state',a)).data.restarting,true,'players see that new hands are paused');
+     assert.equal((await call('maintenance',center,{on:false})).data.on,false);
      assert.equal((await call('table/'+one+'/sit',b,{position:1,buyin:20,device:'device-bbbb'})).status,200);
      // Profile picture: only from the list, and the table shows it at once.
      assert.equal((await call('profile/avatar',a,{id:'nope'})).status,400);assert.equal((await call('profile/avatar',a,{id:'<script>'})).status,400);assert.equal((await call('profile/avatar',center,{id:'boss'})).status,403);
@@ -347,6 +352,13 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.equal((await call('profile/avatar',a,{id:'boss'})).data.avatar,'boss');assert.equal((await call('state',a)).data.user.avatar,'boss');assert.equal((await call('table/'+one+'/state',b)).data.seats[0].avatar,'boss','the other player sees it');assert.equal((await call('table/'+one+'/state',b)).data.seats[1].avatar,null);
      for(const [id,token] of [[one,a],[one,b]])assert.equal((await call('table/'+id+'/leave',token,{})).status,200);
      assert.equal(runtime.get(two).seats.filter(Boolean).length,0);}
+    // The money check: everything adds up, and one cent out of place is caught and kept until the centre confirms.
+    {const center=await signIn(0);await call('money/accept',center,{});assert.equal(checkMoney(),true);const s=(await call('maintenance/status',center)).data;assert.equal(s.money.ok,true);assert.ok(s.money.total>0);
+     currentDb().users.find(x=>x.id==='3').balance+=1;assert.equal(checkMoney(),false);
+     const bad=(await call('maintenance/status',center)).data.money;assert.equal(bad.ok,false);assert.equal(bad.mismatch.difference,0.01);assert.ok((await call('alerts',center,{})).data.alerts.some(a=>/Money check/.test(a.text)));
+     currentDb().users.find(x=>x.id==='3').balance-=1;assert.equal(checkMoney(),false,'it stays flagged until the centre has looked');
+     assert.equal((await call('money/accept',await signIn(3),{})).status,403);assert.equal((await call('money/accept',center,{})).data.money.ok,true);assert.equal(checkMoney(),true);}
+    // Stopping: running hands may finish, no new hands, no new seats, and the state is saved.
     {await shutdown(1500);const before=[...runtime.values()].map(x=>x.hand);for(const x of runtime.values()){for(const s of x.seats)if(s)s.lastSeen=Date.now();x.lastActionAt=0;tickTable(x);}assert.deepEqual([...runtime.values()].map(x=>x.hand),before,'no new hand is dealt');assert.equal((await call('table/1/sit',await signIn(3),{position:5,buyin:20})).status,503);}
     // What is stored is exactly what the game has in memory, after the whole session.
     store.commit(currentDb());assert.deepEqual({...stored(),handSeq:0},{...JSON.parse(JSON.stringify(currentDb())),handSeq:0});

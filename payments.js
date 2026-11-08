@@ -21,6 +21,9 @@ export function validTronAddress(a){
  const body=Buffer.from(bytes.slice(0,21)),sum=crypto.createHash('sha256').update(crypto.createHash('sha256').update(body).digest()).digest();
  return sum.subarray(0,4).equals(Buffer.from(bytes.slice(21)));
 }
+// The 20-byte hex form of a Tron address, as it appears in a transfer log ('' if invalid).
+export function tronHex(a){if(!validTronAddress(a))return '';let n=0n;for(const ch of a)n=n*58n+BigInt(B58.indexOf(ch));const bytes=[];while(n>0n){bytes.unshift(Number(n&255n));n>>=8n;}return Buffer.from(bytes.slice(1,21)).toString('hex');}
+const TRANSFER_TOPIC='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const MICRO=1000000n;
 const usdt=micro=>(Number(micro)/1e6).toFixed(2);
 export const DEPOSIT_TTL_MS=3*3600000,MAX_OPEN_DEPOSITS=3,IDLE_SCAN_MS=5*60000;
@@ -36,6 +39,14 @@ export function createPayments({db,save,fail,fetchImpl=globalThis.fetch,now=()=>
  function expire(){const t=now();for(const d of C.deposits)if(d.status==='open'&&t>d.expiresAt)d.status='expired';}
 
  // ---- blockchain scan ----
+ // Second check, straight from the confirmed chain: the transfer succeeded, on the real
+ // USDT contract, to this wallet, for this amount. true / false (never counts) / null (ask again later).
+ async function onChain(id,micro){
+  const r=await fetchImpl(apiUrl+'/walletsolidity/gettransactioninfobyid',{method:'POST',headers:{'content-type':'application/json',...(apiKey?{'TRON-PRO-API-KEY':apiKey}:{})},body:JSON.stringify({value:id})});
+  if(!r.ok)return null;const i=await r.json().catch(()=>null);if(!i||i.id!==id)return null;
+  const to=tronHex(C.address),usdt=tronHex(USDT_TRC20);
+  return i.receipt?.result==='SUCCESS'&&(i.log||[]).some(l=>String(l.address||'').toLowerCase().slice(-40)===usdt&&l.topics?.[0]===TRANSFER_TOPIC&&String(l.topics?.[2]||'').toLowerCase().slice(-40)===to&&BigInt('0x'+(l.data||'0'))===micro);
+ }
  let scanning=null;
  async function scan(force=false){
   if(!validTronAddress(C.address))return {checked:0};
@@ -55,6 +66,8 @@ export function createPayments({db,save,fail,fetchImpl=globalThis.fetch,now=()=>
     const id=x.transaction_id;if(!id||C.seen.includes(id))continue;
     if(x.to!==C.address||x.token_info?.address!==USDT_TRC20||x.type&&x.type!=='Transfer')continue;
     const micro=BigInt(x.value||0),at=Number(x.block_timestamp)||now();
+    const real=await onChain(id,micro).catch(()=>null);if(real===null)continue;
+    if(!real){console.error('[Suprem Poker] crypto: transfer '+id+' failed the chain check and was ignored');C.seen.push(id);continue;}
     const d=C.deposits.find(d=>d.status==='open'&&BigInt(d.micro)===micro&&at>=d.createdAt-60000&&at<=d.expiresAt);
     // Center credit too low: not marked as seen, so it is credited as soon as it can be.
     if(d){if(!creditDeposit(d,id,at))continue;credited++;}else C.unmatched.push({tx:id,micro:String(micro),from:x.from,at,status:'open'});
