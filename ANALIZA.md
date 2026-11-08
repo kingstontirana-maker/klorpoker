@@ -608,3 +608,6 @@ Herën e parë që një lojtar hyn, i del një dritare me 48 figura (`public/ava
 Të gjitha tavolinat e vjetra mbyllen një herë në nisjen e parë të serverit (`CATALOG_VERSION=2`), dhe hapen 164 tavolina Texas Hold'em, të gjitha jeshile: 25 me 9 vende (Porto–Monaco), 73 me 6 (Lisbon–Abu Dhabi), 36 me 4 (Alicante–New York) dhe 30 kokë më kokë (Oxford–Boston). Çdo qytet është një nivel blindesh, me tavolinat e numëruara I, II, III… ID-të vazhdojnë nga më e madhja e mëparshme, që historiku i duarve të tavolinave të mbyllura të mos përzihet me të rejat.
 
 Tavolinat me 9 vende kanë dy lojtarë lart dhe nga një në secilën anë të lojtarit poshtë. Vendet e tjera janë pak më të vogla.
+
+## Faqja e hapjes (Grand opening)
+Deri më 10 nëntor 2026 në orën 20:00 (ora e Tiranës, 19:00 UTC), kush hap faqen pa qenë i hyrë në llogari sheh faqen e hapjes me ditët, orët, minutat dhe sekondat që numërohen. Kur mbaron numërimi, faqja kryesore del vetë, pa Redeploy. Ora llogaritet nga serveri (`/api/public/launch`), jo nga pajisja. `LAUNCH_AT` te Coolify e ndryshon datën pa ndryshuar kodin, për shembull `LAUNCH_AT=2026-11-10T19:00:00Z`. Butoni i vogël "Staff sign in" lejon stafin të hyjë para hapjes. Stili është te `public/opening.css`.

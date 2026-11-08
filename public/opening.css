@@ -1,0 +1,42 @@
+/* Grand opening: shown instead of the home page until the launch time, then it goes away by itself. */
+#opening{display:none}
+.preLaunch body{overflow:hidden}
+.preLaunch #login>:not(dialog){visibility:hidden}
+.preLaunch #opening{display:grid}
+#opening{position:fixed;inset:0;z-index:60;place-items:center;overflow:hidden auto;padding:max(28px,env(safe-area-inset-top)) 20px max(28px,env(safe-area-inset-bottom));color:#f4efe2;background:#030504;font-family:"SF Pro Display","Segoe UI Variable Display","Segoe UI",Inter,system-ui,sans-serif;text-align:center;isolation:isolate}
+.opBg{position:absolute;inset:-4%;z-index:-3;background:url(/home-table.webp) center/cover no-repeat;filter:blur(7px) saturate(1.1) brightness(.34);transform:scale(1.06);animation:opDrift 26s ease-in-out infinite alternate}
+@media(max-width:700px){.opBg{background-image:url(/home-table-m.webp)}}
+.opShade{position:absolute;inset:0;z-index:-2;background:radial-gradient(ellipse 70% 55% at 50% 46%,#0f2e2122 0%,#030504cc 62%,#030504 100%),linear-gradient(180deg,#030504aa,transparent 30%,transparent 70%,#030504ee)}
+.opRays{position:absolute;left:50%;top:44%;z-index:-2;width:160vmax;height:160vmax;margin:-80vmax 0 0 -80vmax;background:repeating-conic-gradient(from 0deg,#e9c97a10 0deg 4deg,transparent 4deg 18deg);mask:radial-gradient(circle,#000 0%,transparent 55%);-webkit-mask:radial-gradient(circle,#000 0%,transparent 55%);animation:opSpin 120s linear infinite}
+.opSparks{position:absolute;inset:0;z-index:-1;pointer-events:none}
+.opSparks i{position:absolute;bottom:-12px;width:var(--s);height:var(--s);border-radius:50%;background:radial-gradient(circle,#fff6d8 0%,#e9c97a 45%,transparent 72%);opacity:0;animation:opRise var(--d) linear var(--w) infinite;box-shadow:0 0 12px #e9c97a99}
+.opInner{position:relative;width:min(980px,100%);display:flex;flex-direction:column;align-items:center;gap:clamp(14px,2.6vh,26px)}
+.opLogo{width:min(400px,72vw);height:auto;filter:drop-shadow(0 10px 30px #000c);animation:opIn 1.2s cubic-bezier(.2,.8,.2,1) both}
+.opEyebrow{display:flex;align-items:center;gap:16px;font-size:clamp(11px,1.2vw,13px);font-weight:700;letter-spacing:.5em;text-transform:uppercase;color:#e9c97a;animation:opIn 1.2s .15s cubic-bezier(.2,.8,.2,1) both;padding-left:.5em}
+.opEyebrow::before,.opEyebrow::after{content:"";width:clamp(28px,7vw,90px);height:1px;background:linear-gradient(90deg,transparent,#e9c97a)}
+.opEyebrow::after{transform:scaleX(-1)}
+.opTitle{margin:0;font-family:"Didot","Bodoni 72","Bodoni MT","Playfair Display",Georgia,serif;font-weight:400;font-size:clamp(40px,8.4vw,104px);line-height:.98;letter-spacing:-.01em;animation:opIn 1.3s .3s cubic-bezier(.2,.8,.2,1) both}
+.opTitle em{display:block;font-style:italic;background:linear-gradient(100deg,#9a7432 0%,#f8e6b0 22%,#c9a052 38%,#fff3cf 50%,#b8893d 64%,#f3dc9c 82%,#9a7432 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:opShine 6s linear infinite}
+.opDate{margin:0;font-size:clamp(13px,1.6vw,17px);letter-spacing:.32em;text-transform:uppercase;color:#cfc7b2;animation:opIn 1.3s .45s cubic-bezier(.2,.8,.2,1) both}
+.opDate b{color:#f4efe2;font-weight:600}
+.opClock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(8px,1.8vw,22px);width:min(820px,100%);margin:clamp(6px,1.6vh,14px) 0;animation:opIn 1.4s .6s cubic-bezier(.2,.8,.2,1) both}
+.opUnit{position:relative;padding:clamp(14px,2.6vw,28px) 4px clamp(12px,2vw,20px);border-radius:clamp(14px,2vw,24px);background:linear-gradient(160deg,#ffffff0f,#ffffff03 40%,#0000001a),radial-gradient(120% 90% at 50% 0%,#14352699,#06100c);border:1px solid #e9c97a40;box-shadow:inset 0 1px 0 #ffffff1a,inset 0 -18px 30px #0007,0 24px 60px #000c,0 0 0 1px #000;overflow:hidden}
+.opUnit::before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#fff3cf1f 48%,transparent 62%);transform:translateX(-120%);animation:opSweep 5.5s ease-in-out infinite}
+.opUnit:nth-child(2)::before{animation-delay:.4s}.opUnit:nth-child(3)::before{animation-delay:.8s}.opUnit:nth-child(4)::before{animation-delay:1.2s}
+.opUnit::after{content:"";position:absolute;left:14%;right:14%;top:50%;height:1px;background:linear-gradient(90deg,transparent,#0009,transparent)}
+.opNum{display:block;font-family:"Didot","Bodoni 72","Bodoni MT","Playfair Display",Georgia,serif;font-size:clamp(40px,8.8vw,108px);line-height:1;font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#fff8e1 0%,#f1d48e 45%,#b88c3f 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #0008)}
+.opNum.tick{animation:opTick .5s cubic-bezier(.2,.8,.2,1)}
+.opLabel{display:block;margin-top:clamp(6px,1vw,12px);font-size:clamp(9px,1.05vw,12px);font-weight:700;letter-spacing:.34em;text-transform:uppercase;color:#a99f88;padding-left:.34em}
+.opLead{margin:0;max-width:600px;font-size:clamp(14px,1.6vw,17px);line-height:1.6;color:#c9c3b3;animation:opIn 1.4s .75s cubic-bezier(.2,.8,.2,1) both}
+.opSuits{display:flex;gap:22px;font-size:18px;color:#e9c97a99;animation:opIn 1.4s .9s both}.opSuits span:nth-child(even){color:#1f9d6b}
+.opStaff{margin-top:4px;padding:6px 10px;border:0;background:none;color:#8f877466;font:inherit;font-size:11px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}
+.opStaff:hover,.opStaff:focus-visible{color:#e9c97a}
+@media(max-height:520px) and (orientation:landscape){#opening{padding:10px 20px}.opLogo{width:min(210px,32vw)}.opTitle{font-size:clamp(28px,5vw,48px)}.opTitle em{display:inline;margin-left:.25em}.opNum{font-size:clamp(28px,5.2vw,54px)}.opUnit{padding:10px 4px 8px}.opClock{margin:0;width:min(640px,100%)}.opLead,.opSuits{display:none}.opInner{gap:8px}.opStaff{margin-top:0}}
+@keyframes opIn{from{opacity:0;transform:translateY(18px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@keyframes opShine{to{background-position:-220% 0}}
+@keyframes opSweep{0%,55%{transform:translateX(-120%)}85%,100%{transform:translateX(120%)}}
+@keyframes opTick{from{transform:translateY(-14%);opacity:.3}to{transform:none;opacity:1}}
+@keyframes opSpin{to{transform:rotate(360deg)}}
+@keyframes opDrift{to{transform:scale(1.12) translate(-1.5%,-1%)}}
+@keyframes opRise{0%{opacity:0;transform:translateY(0) scale(.6)}12%{opacity:.9}80%{opacity:.7}100%{opacity:0;transform:translateY(-105vh) translateX(var(--x)) scale(1.1)}}
+@media(prefers-reduced-motion:reduce){#opening *,#opening *::before{animation:none!important}.opSparks{display:none}}
