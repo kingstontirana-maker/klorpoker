@@ -138,8 +138,8 @@ if(p==='/api/register/verify'){const ip=clientIp(req),now=Date.now(),{username,p
  otps.delete(email);
  const salt=secret(),user={id:uid(),username,email,role:'USER',parentId:agent.id,salt,passHash:hash(password,salt),balance:0,registeredAt:now,lastLoginAt:now,lastLoginIp:ip};recordSeen(user,ip,body.device);db.users.push(user);db.ledger.push({id:uid(),type:'REGISTER',from:agent.id,to:user.id,amount:0,time:now});
  const t=openSession(user.id,ip);save();return {token:t,...stateFor(user)};}
-// Grand opening: 10 November 2026, 20:00 in Tirana (19:00 UTC). LAUNCH_AT can move it without a code change.
-if(p==='/api/public/launch'){const at=Date.parse(process.env.LAUNCH_AT||'2026-11-10T19:00:00Z');return {at:Number.isFinite(at)?at:0,now:Date.now()};}
+// Grand opening: 15 November 2026, 20:00 in Tirana (19:00 UTC). LAUNCH_AT can move it without a code change.
+if(p==='/api/public/launch'){const at=Date.parse(process.env.LAUNCH_AT||'2026-11-15T19:00:00Z');return {at:Number.isFinite(at)?at:0,now:Date.now()};}
 if(p==='/api/public/stats'){const tables=[...runtime.values()];return {tables:tables.length,players:tables.reduce((n,t)=>n+t.seats.filter(Boolean).length,0),live:tables.filter(t=>LIVE.includes(t.phase)).length,featured:tables.slice().sort((a,b)=>b.seats.filter(Boolean).length-a.seats.filter(Boolean).length).slice(0,6).map(t=>({name:t.name,game:t.game,color:t.color,sb:clean(t.sb),bb:clean(t.bb),players:t.seats.filter(Boolean).length,live:LIVE.includes(t.phase)}))};}
 if(p==='/api/health'){let ok=false;try{ok=store.ping();}catch{}if(!ok||saveFailed)fail('unhealthy',503);const free=diskFree();return {ok:true,uptime:Math.round(process.uptime()),restarting:draining,diskFreeMb:free===null?null:Math.round(free/1e6)};}
 if(p==='/api/logout'){endSession(token);return {ok:true};}const u=me(token);if(!u)fail(endReasons.get(tokenKey(token))||'Sign in to continue.',401);
