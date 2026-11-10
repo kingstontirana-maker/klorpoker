@@ -145,3 +145,34 @@ Vetëm për serverë që përdorin Nginx drejtpërdrejt, pa proxy të Coolify:
 5. Përditëso kodin dhe rinis procesin ekzistues Node.
 
 DNS, Nginx dhe certifikata nuk aktivizohen nga ndryshimet lokale të kodit.
+
+## Laboratori CENB për botat dhe rake-un
+
+Pas hyrjes CENTER, hap **Laboratori i testimit · kredite virtuale**.
+Simulimi punon në një Web Worker të shfletuesit: nuk dërgon veprime në API,
+nuk krijon llogari dhe nuk lexon apo ndryshon databazën ose botat ekzistuese.
+
+Qendra cakton numrin e duarve (deri 2000), kundërshtarët virtualë, buxhetet,
+kontributin fillestar, rake-un, stilin dhe objektivin e kthimit. Seed i njëjtë
+me parametra të njëjtë përsërit të njëjtin test. Raporti shkarkohet si JSON.
+
+Ky është model i thjeshtuar Hold'em: heads-up me kundërshtarë me rotacion,
+kontribute të barabarta, pa fold dhe pa side pots. Boti ndryshon check/call,
+raise, bluff dhe kohën e mendimit të raportuar (koha nuk vonon simulimin).
+Vendimet marrin vetëm letrat e veta dhe board-in e hapur. Shpërndarja e
+letrave është e riprodhueshme për testim, jo burim rastësie për lojë live.
+Fituesit dhe rake-u llogariten nga i njëjti modul pokeri si platforma.
+
+**Objektivi i kthimit** është përqindje e buxhetit fillestar të botit.
+Kthimi gjatë lojës numëron kontributin e botit, pasi hiqet pjesa e tij e
+rake-ut, në duart e fituara nga kundërshtarët. Në fund, një bonus i deklaruar
+shpërndahet nga gjendja e mbetur e botit për të plotësuar diferencën.
+Nëse kreditet nuk mjaftojnë, raportohet objektivi i paplotësuar; nëse loja
+e tejkalon objektivin, nuk merren kredite mbrapsht. Ky tregues mat rrjedhjen
+bruto nga boti, jo fitimin neto të lojtarëve ose RTP të garantuar.
+Bonusi nuk ndryshon letrat, fituesit apo rake-un e duarve.
+
+Raporti përfshin gjendjet, rake-un, kthimin nga loja, bonusin, përqindjen
+faktike, ruajtjen e krediteve dhe 50 duart e fundit me të gjitha letrat dhe
+veprimet. Kufizimet e modelit shfaqen edhe në panel. Logjika e botave live
+mbetet e pandryshuar nga ky laborator.
