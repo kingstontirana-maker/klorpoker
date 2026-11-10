@@ -1,13 +1,10 @@
 import crypto from 'node:crypto';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {evaluateHand,compare,ranks,suits} from './poker.js';
-import {analyzeCertainty,certaintyInput,certaintyForPlayer} from './bot-certainty.js';
 
-// Server decisions use the actual future board and dealt hands. Hidden cards
-// stay on the server; the public table reveals each street normally.
 
-// Bots carry ordinary names; only the center sees which players are bots
-// (isBot on the account and on the seat). Older bots named "Name [BOT]" are renamed.
+// Decisions use only own hole cards and public information; no future board or hidden hands.
+
 const OLD_SUFFIX=' [BOT]';
 const value=c=>ranks.indexOf(c[0])+2;
 
@@ -33,7 +30,7 @@ export function handStrength(v){
 // (opponents' hands, the rest of the board) is drawn at random from the cards the
 // bot cannot see. It never looks at a real opponent's hand.
 export function equity(v,iterations,random=Math.random){
- const opp=Math.max(1,Math.min(5,v.opponents||1)),hole=v.game==='omaha'?4:2,known=new Set([...v.cards,...v.board]),deck=[];
+ const opp=Math.max(1,Math.min(8,v.opponents||1)),hole=v.game==='omaha'?4:2,known=new Set([...v.cards,...v.board]),deck=[];
  for(const su of suits)for(const r of ranks)if(!known.has(r+su))deck.push(r+su);
  const n=iterations??(v.game==='omaha'?70:170);let won=0;
  for(let i=0;i<n;i++){
@@ -42,38 +39,39 @@ export function equity(v,iterations,random=Math.random){
   for(let o=0;o<opp;o++){const c=compare(evaluateHand(v.game,deck.slice(o*hole,o*hole+hole),board),mine);if(c>0){best=0;break;}if(c===0)ties++;}
   if(best)won+=1/ties;}
  return won/n;}
-// Style changes sizing within a cumulative hand budget.
-const SIZE={low:.6,medium:.66,high:.75};
-export function botDecision(v,risk='low',random=Math.random,proof){
- const invested=v.committed||0,startingStack=v.stack+invested;
- const certified=proof?.exact===true&&proof.safeToInvest===true&&proof.equity===1&&Array.isArray(proof.opponentEquities)&&proof.opponentEquities.length===(v.opponents||0)&&proof.opponentEquities.every(x=>x===0);
- const chance=Number.isFinite(proof?.equity)?proof.equity:equity(v,undefined,random);
- const investmentRate=certified?1:v.board.length===4&&proof?.ahead===true&&chance>.5?.3:.15;
- const investmentLimit=Math.floor(startingStack*investmentRate),remainingInvestment=Math.max(0,Math.min(v.stack,investmentLimit-invested));
- const result=action=>({...action,equity:chance,safeToInvest:!!certified,investmentRate,investmentLimit,remainingInvestment});
+const PROFILES={
+ low:{aggression:.48,bluffPercent:3,maxHandPercent:40,margin:.035,size:.45},
+ medium:{aggression:.68,bluffPercent:9,maxHandPercent:65,margin:.015,size:.65},
+ high:{aggression:.85,bluffPercent:16,maxHandPercent:85,margin:0,size:.85}
+};
+const setting=(body,key,fallback,min,max)=>{const n=body[key]===undefined?fallback:Number(body[key]);if(!Number.isFinite(n)||n<min||n>max)fail(`${key} must be ${min}–${max}`);return n;};
+export function botDecision(v,risk='low',random=Math.random,settings={}){
+ const style=PROFILES[risk]||PROFILES.low;
+ // Ignore legacy certainty proofs: neither opponent hands nor future cards enter this calculation.
+ const chance=equity(v,undefined,random),invested=v.committed||0,startingStack=v.stack+invested;
+ const percent=setting(settings,'maxHandPercent',style.maxHandPercent,10,100),bluffPercent=setting(settings,'bluffPercent',style.bluffPercent,0,30);
+ const investmentLimit=Math.floor(startingStack*percent/100),remainingInvestment=Math.max(0,Math.min(v.stack,investmentLimit-invested));
  const callCost=Math.min(v.toCall,v.stack),potOdds=callCost/(v.pot+callCost||1);
- const profitable=certified||chance>potOdds+.04;
- if(v.toCall&&(!profitable||callCost>remainingInvestment))return result({type:'fold'});
- if(v.canRaise&&remainingInvestment>v.toCall&&(certified||chance>=.6)){
-  const size=SIZE[risk]||SIZE.low;
-  let want=certified&&v.board.length===4?v.roundBet+remainingInvestment:v.currentBet===0?size*Math.max(v.pot,v.bb*2):v.currentBet+size*(v.pot+v.toCall);
-  if(certified&&v.board.length===3)want=Math.max(want,v.roundBet+Math.ceil(startingStack*.3));
-  if(certified&&v.winningFlopAnswered)want=v.roundBet+v.stack;
-  const ceiling=Math.min(v.maxRaiseTo,v.roundBet+remainingInvestment),target=Math.min(ceiling,Math.max(v.minRaiseTo,Math.round(want)));
-  if(target>v.currentBet&&(target>=v.minRaiseTo||target===v.roundBet+v.stack))return result({type:'raise',amount:target/100});
+ const result=action=>({...action,equity:chance,investmentRate:percent/100,investmentLimit,remainingInvestment});
+ // An inexpensive preflop call reaches the flop without the old 15% certainty gate.
+ const cheapPreflop=v.board.length===0&&callCost<=v.bb&&callCost<=startingStack*.05;
+ const priceIsGood=chance>potOdds+style.margin+(v.facingAllIn?.07:0);
+ if(v.toCall&&(callCost>remainingInvestment||(!cheapPreflop&&!priceIsGood)))return result({type:'fold'});
+ const valueThreshold=Math.max(.52,1/((v.opponents||1)+1)+.16),valueBet=chance>=valueThreshold;
+ const bluffRoom=Math.min(remainingInvestment,Math.floor(startingStack*.08));
+ const bluff=!valueBet&&v.opponents<=2&&!v.facingAllIn&&v.toCall<=v.bb&&random()<bluffPercent/100;
+ const raiseRoom=bluff?bluffRoom:remainingInvestment;
+ if(v.canRaise&&raiseRoom>v.toCall&&((valueBet&&random()<style.aggression)||bluff)){
+  const fraction=style.size*(.65+random()*.7);
+  const want=v.currentBet+Math.max(v.bb,Math.round((v.pot+v.toCall)*fraction));
+  const ceiling=Math.min(v.maxRaiseTo,v.roundBet+raiseRoom);
+  const target=Math.min(ceiling,Math.max(v.minRaiseTo,want));
+  if(target>v.currentBet&&(target>=v.minRaiseTo||target===v.roundBet+v.stack))return result({type:'raise',amount:target/100,bluff});
  }
- if(!v.toCall)return result({type:'check'});
- return result({type:Math.min(v.toCall,v.stack)<=remainingInvestment?'call':'fold'});
+ return result({type:v.toCall?'call':'check'});
 }
-
-export function createBots({db,runtime,engine,save,olderRake}){
- const certaintyCache=new WeakMap();
- const flopPlans=new WeakMap();
- function proofFor(t,s){
-  const input=certaintyInput(t),key=JSON.stringify(input);let cached=certaintyCache.get(t);
-  if(!cached||cached.key!==key){cached={key,result:analyzeCertainty(input)};certaintyCache.set(t,cached);}
-  return certaintyForPlayer(cached.result,s.userId);
- }
+export function createBots({db,runtime,engine,save,olderRake,random=Math.random}){
+ const thinking=new WeakMap();
  for(const u of db.users)if(u.isBot&&u.username.endsWith(OLD_SUFFIX)){const plain=u.username.slice(0,-OLD_SUFFIX.length);if(!db.users.some(x=>x!==u&&x.username.toLowerCase()===plain.toLowerCase()))u.username=plain;}
  const bots=()=>db.users.filter(u=>u.isBot),center=()=>db.users.find(x=>x.role==='CENTER');
  const seatOf=u=>{for(const t of runtime.values()){const s=t.seats.find(x=>x?.userId===u.id);if(s)return {t,s};}return null;};
@@ -92,13 +90,17 @@ export function createBots({db,runtime,engine,save,olderRake}){
  // Rake a bot pays goes straight back to the center, so the house result of a bot
  // is its chip result plus the rake it paid.
  function rakeByBot(){botRake();return rakeMap;}
- function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0};return {rakePaid:r.rake/100,rakeHands:r.hands,house:(eq-u.bot.funded+r.rake)/100,id:u.id,name:u.username,risk:u.bot.risk,mode:u.bot.mode||'play',enabled:u.bot.enabled,tableId:u.bot.tableId,buyin:u.bot.buyin/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?'Waiting for players':'Stopped')};});}
+ function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0};return {rakePaid:r.rake/100,rakeHands:r.hands,house:(eq-u.bot.funded+r.rake)/100,id:u.id,name:u.username,risk:u.bot.risk,bluffPercent:u.bot.bluffPercent??PROFILES[u.bot.risk||'low'].bluffPercent,maxHandPercent:u.bot.maxHandPercent??PROFILES[u.bot.risk||'low'].maxHandPercent,thinkMinMs:u.bot.thinkMinMs??1200,thinkMaxMs:u.bot.thinkMaxMs??4000,bonusPaid:(u.bot.bonusPaid||0)/100,bonusPercent:u.bot.bonusPercent||0,bonusBase:u.bot.funded/100,mode:u.bot.mode||'play',enabled:u.bot.enabled,tableId:u.bot.tableId,buyin:u.bot.buyin/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?'Waiting for players':'Stopped')};});}
  function configure(b,body,t){
   if(!['low','medium','high'].includes(body.risk||'low'))fail('Invalid risk');const l=engine.buyinLimits(t);
   const buyin=body.buyin===undefined?Math.min(b.balance,l.max):cents(body.buyin,'Buy-in'),stopLoss=cents(body.stopLoss??b.balance/100,'Loss limit'),stopWin=cents(body.stopWin??Math.max(l.min,buyin/2)/100,'Win limit');
   if(buyin<l.min||buyin>l.max)fail(`Buy-in must be within the table limits (€${(l.min/100).toFixed(2)}–€${(l.max/100).toFixed(2)})`);if(buyin>b.balance)fail('Buy-in is larger than the bot wallet');
   if(body.mode!==undefined&&!['play','seat'].includes(body.mode))fail('Invalid mode');
-  Object.assign(b.bot,{tableId:t.id,risk:body.risk||'low',mode:body.mode||b.bot.mode||'play',buyin,stopLoss,stopWin,error:null});}
+  const profile=PROFILES[body.risk||'low'];
+  const bluffPercent=setting(body,'bluffPercent',b.bot.bluffPercent??profile.bluffPercent,0,30),maxHandPercent=setting(body,'maxHandPercent',b.bot.maxHandPercent??profile.maxHandPercent,10,100);
+  const thinkMinMs=Math.round(setting(body,'thinkMinMs',b.bot.thinkMinMs??1200,500,10000)),thinkMaxMs=Math.round(setting(body,'thinkMaxMs',b.bot.thinkMaxMs??4000,500,10000));
+  if(thinkMinMs>thinkMaxMs)fail('Minimum thinking time exceeds maximum');
+  Object.assign(b.bot,{tableId:t.id,risk:body.risk||'low',mode:body.mode||b.bot.mode||'play',buyin,stopLoss,stopWin,bluffPercent,maxHandPercent,thinkMinMs,thinkMaxMs,error:null});}
  function route(p,body,u){if(!p.startsWith('/api/bots'))return undefined;if(u.role!=='CENTER')fail('Only the center can manage bots',403);
   if(p==='/api/bots')return list();
   if(p==='/api/bots/guard'){const g=db.botGuard;return {dailyLimit:g.dailyLimit/100,today:guardToday()/100,day:g.day,stopped:bots().some(b=>b.bot.error==='House daily limit reached')};}
@@ -110,6 +112,22 @@ export function createBots({db,runtime,engine,save,olderRake}){
    const b={id:crypto.randomUUID(),username:name,role:'USER',isBot:true,parentId:u.id,balance:amount,bot:{enabled:false,funded:amount,baseline:amount}};
    guardToday();configure(b,body,t);u.balance-=amount;db.users.push(b);db.botGuard.start+=amount;audit('BOT_FUND',b,amount);save();return {ok:true,id:b.id};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);
+  if(p==='/api/bots/bonus'){
+   // The percentage is a cumulative declared promotion budget, paid from CENTER.
+   // It never changes the bot's cards, hand result, session limits or rake.
+   const percent=setting(body,'percent',0,.01,100),target=Math.round(b.bot.funded*percent/100),paid=b.bot.bonusPaid||0,amount=target-paid;
+   if(amount<=0)fail('This bonus target is already paid; choose a higher cumulative percentage');
+   const t=runtime.get(b.bot.tableId);if(!t)fail('Table not found');
+   const recipients=t.seats.filter(isHuman).map(s=>db.users.find(x=>x.id===s.userId)).filter(x=>x&&x.role==='USER'&&!x.blocked);
+   if(!recipients.length)fail('There are no eligible players at this table');
+   if(amount<recipients.length)fail('Bonus is too small to give every player at least one cent');
+   if(u.balance<amount)fail('The center does not have enough credit for this bonus');
+   const awards=recipients.map((x,i)=>({user:x,amount:Math.floor(amount/recipients.length)+(i<amount%recipients.length?1:0)}));
+   const batchId=crypto.randomUUID();u.balance-=amount;
+   for(const a of awards){a.user.balance+=a.amount;db.ledger.push({id:crypto.randomUUID(),type:'BOT_BONUS',from:u.id,to:a.user.id,amount:a.amount,botId:b.id,tableId:t.id,percent,batchId,time:Date.now()});}
+   b.bot.bonusPaid=target;b.bot.bonusPercent=percent;save();
+   return {ok:true,amount:amount/100,percent,awards:awards.map(a=>({username:a.user.username,amount:a.amount/100}))};
+  }
   if(p==='/api/bots/configure'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table before changing it');const t=runtime.get(String(body.tableId));if(!t)fail('Table not found');configure(b,body,t);audit('BOT_MANAGE',b);}
   else if(p==='/api/bots/status'){if(typeof body.enabled!=='boolean')fail('Invalid status');
    // A new session starts from the bot's current money; the limits count from there.
@@ -118,16 +136,10 @@ export function createBots({db,runtime,engine,save,olderRake}){
   else if(p==='/api/bots/delete'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table first');guardToday();const left=b.balance+(rakeMap.get(b.id)?.rake||0);u.balance+=b.balance;audit('BOT_REFUND',b,b.balance);db.users.splice(db.users.indexOf(b),1);db.botGuard.start-=left;rakeTotal-=rakeMap.get(b.id)?.rake||0;rakeMap.delete(b.id);}
   else fail('Not found',404);
   save();return {ok:true};}
- const shoves=new Map(),seenHand=new Set();
- function observe(t){for(const x of t.seats){if(!x||x.isBot||!x.inHand)continue;const k=t.id+':'+t.hand+':'+x.userId,m=shoves.get(x.userId)||{hands:0,shoves:0};
-  if(!seenHand.has(k)){seenHand.add(k);m.hands++;}if(x.allIn&&!seenHand.has(k+':a')){seenHand.add(k+':a');m.shoves++;}shoves.set(x.userId,m);}
-  if(seenHand.size>20000)seenHand.clear();}
- const shoveRate=t=>{const ag=t.lastAggressor>=0?t.seats[t.lastAggressor]:t.seats.find(x=>x&&x.inHand&&!x.folded&&x.allIn&&!x.isBot);const m=ag&&shoves.get(ag.userId);return m&&m.hands>=4?m.shoves/m.hands:0;};
  const stop=(b,reason,at)=>{b.bot.enabled=false;b.bot.error=reason;if(at)try{engine.leave(at.t,b);}catch{}save();};
  function tick(now=Date.now()){
   const today=guardToday(now),limit=db.botGuard.dailyLimit;
   if(limit>0&&today<=-limit)for(const b of bots())if(b.bot.enabled)stop(b,'House daily limit reached',seatOf(b));
-  for(const t of runtime.values())if(t.seats.some(x=>x?.isBot)&&LIVE.includes(t.phase))observe(t);
   for(const b of bots()){
    let at=seatOf(b);if(at)at.s.lastSeen=now;
    if(!b.bot.enabled)continue;
@@ -151,15 +163,19 @@ export function createBots({db,runtime,engine,save,olderRake}){
     if(b.bot.mode==='seat'){if(!at.s.sittingOut)engine.sitOut(at.t,b,true);at.s.sitOutSince=now;if(!(LIVE.includes(at.t.phase)&&at.t.seats[at.t.turn]===at.s))continue;}
     const {t,s}=at;
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
-     // Think for 1.5–4 seconds like a person would.
-     s.botThink??=1500+Math.floor(Math.random()*2500);
-     if(now-t.turnStartedAt>=s.botThink){
-      delete s.botThink;
-      const plan=flopPlans.get(s),sameHand=plan?.hand===t.hand;
-      const winningFlopAnswered=!!sameHand&&plan.targets.some(p=>t.seats.some(o=>o?.userId===p.id&&o.inHand&&!o.folded&&o.committed>=p.target));
-      const d=botDecision(botView(t,s,{shoveRate:shoveRate(t),winningFlopAnswered}),b.bot.risk,Math.random,proofFor(t,s));
-      const nextPlan=!sameHand&&t.board.length===3&&d.safeToInvest&&d.type==='raise'?{hand:t.hand,targets:t.seats.filter(o=>o&&o!==s&&o.inHand&&!o.folded&&o.stack>0&&d.amount*100>o.roundBet).map(o=>({id:o.userId,target:o.committed+Math.min(o.stack,d.amount*100-o.roundBet)}))}:null;
-      try{engine.act(t,b.id,d.type,d.amount);if(nextPlan)flopPlans.set(s,nextPlan);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
+     // Each new turn gets its own delay; cap it against the server deadline.
+     const key=`${t.hand}:${t.phase}:${t.turnStartedAt}:${t.currentBet}:${s.roundBet}`;
+     let thought=thinking.get(s);
+     if(!thought||thought.key!==key){
+      const min=b.bot.thinkMinMs??1200,max=b.bot.thinkMaxMs??4000;
+      const pressure=toCall(t,s)>s.stack*.2?.8:0;
+      const delay=Math.min(max,Math.round(min+random()*(max-min)+pressure*500));
+      thought={key,at:Math.min(t.turnStartedAt+delay,(t.deadline||Infinity)-750)};thinking.set(s,thought);
+     }
+     if(now>=thought.at){
+      thinking.delete(s);
+      const d=botDecision(botView(t,s),b.bot.risk,random,b.bot);
+      try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
      }}
    }catch(e){stop(b,e.message,seatOf(b));}
   }

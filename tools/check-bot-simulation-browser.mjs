@@ -35,7 +35,9 @@ try{
  await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`sessionStorage.setItem('cenbToken','isolated-preview');window.__mutations=[];const originalFetch=window.fetch.bind(window);window.fetch=async(url,options={})=>{if(String(url).startsWith('/api/')){if(options.method==='POST')window.__mutations.push(String(url));const value=String(url).endsWith('/bots')?[]:String(url).endsWith('/bots/guard')?{dailyLimit:50,today:0,day:'test',stopped:false}:${JSON.stringify(state)};return new Response(JSON.stringify(value),{headers:{'content-type':'application/json'}});}return originalFetch(url,options);};`});
  await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
  await cdp('Page.navigate',{url:origin+'/bots-center.html'});
- await until("!!document.querySelector('#simulationForm')&&!document.querySelector('#dashboard').hidden");
+ await until("!document.querySelector('#dashboard').hidden");
+ await evaluate("import('/bot-simulation-panel.js')");
+ await until("!!document.querySelector('#simulationForm')");
  await evaluate("document.querySelector('#simulationPanel').open=true;document.querySelector('#simulationForm').elements.hands.value='80';document.querySelector('#simulationForm').requestSubmit()");
  await until("!document.querySelector('#simulationExport').hidden");
  assert.ok(await evaluate("document.querySelector('#simulationResult').textContent.includes('Kreditet:')"));

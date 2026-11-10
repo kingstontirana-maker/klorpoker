@@ -3,3 +3,5 @@
 body:has(#dashboard[hidden]) header,body:has(#dashboard[hidden]) footer{display:none}body:has(#dashboard[hidden]) main{min-height:100svh;margin:0 auto;display:grid;align-items:center}body:has(#dashboard[hidden]) #login{width:100%;margin:0 auto}
 
 #simulationPanel .stats{margin-top:24px}#simulationPanel .stat strong{font-size:21px}.simulation-scroll{overflow-x:auto;margin:24px 0}.simulation-scroll table{width:100%;border-collapse:collapse;font-size:13px}.simulation-scroll th,.simulation-scroll td{text-align:left;padding:12px;border-bottom:1px solid #2a3831;white-space:nowrap}.simulation-scroll caption{text-align:left;padding:12px 0}
+
+.bonus-panel{margin-top:24px;padding-top:18px;border-top:1px solid #34463e}.bonus-panel p{font-size:13px}.bonus-panel small{display:block;margin-top:14px}

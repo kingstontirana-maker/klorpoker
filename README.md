@@ -146,9 +146,33 @@ Vetëm për serverë që përdorin Nginx drejtpërdrejt, pa proxy të Coolify:
 
 DNS, Nginx dhe certifikata nuk aktivizohen nga ndryshimet lokale të kodit.
 
-## Laboratori CENB për botat dhe rake-un
+## Botat në platformë dhe bonusi i deklaruar
 
-Pas hyrjes CENTER, hap **Laboratori i testimit · kredite virtuale**.
+Te CENB, botat ekzistuese përdorin kreditin dhe tavolinat e platformës.
+Qendra cakton stilin, bluff-in (0–30%), kufirin e investimit për dorë
+(10–100% e stack-ut në fillim të dorës) dhe kohën e mendimit (500–10000 ms).
+Ndalo botin dhe prit daljen nga tavolina para se të ndryshosh konfigurimin.
+Stilet ndryshojnë shpeshtësinë dhe madhësinë e basteve; vendimet përdorin
+vetëm letrat e botit dhe informacionin publik, jo kundërshtarët ose deck-un.
+Një call preflop deri në një big blind dhe 5% të stack-ut fillestar vazhdon
+kur kufiri i investimit e lejon. Bastet e mëdha ende mund të sjellin fold.
+Një check falas nuk bëhet fold. Boti shfaqet me etiketën BOT në tavolinë.
+
+**Bonus i deklaruar për lojtarët e tavolinës**: qendra vendos objektivin
+kumulativ X% të buxhetit fillestar të atij boti dhe paguan diferencën nga
+balanca CENTER, barabar mes llogarive USER të pabllokuara të ulura në
+tavolinën e caktuar. Botat përjashtohen. Shembull: për buxhet fillestar 100,
+10% paguan 10 kredite; ndryshimi në 15% paguan edhe 5. Objektivi i njëjtë
+nuk paguhet përsëri, edhe pas rinisjes së serverit. Pagesa është manuale,
+e ndarë nga duart, rake-u dhe gjendja e botit, pa fitues të paracaktuar.
+Shfaqet si `BOT_BONUS` në historikun e përfituesit dhe në logun e qendrës.
+Nëse nuk ka përfitues, mungon krediti CENTER ose bonusi është tepër i vogël
+për t'i dhënë secilit një cent, nuk ndryshohet asnjë balancë.
+
+## Simulimi i mëparshëm (vetëm mjete testimi)
+
+Laboratori i mëparshëm është hequr nga paneli CENB. Modulet mbeten vetëm
+si mjete të izoluara testimi dhe nuk kontrollojnë botat e platformës.
 Simulimi punon në një Web Worker të shfletuesit: nuk dërgon veprime në API,
 nuk krijon llogari dhe nuk lexon apo ndryshon databazën ose botat ekzistuese.
 

@@ -316,7 +316,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    id:t.id,name:t.name,game,color:t.color||null,sb:clean(t.sb),bb:clean(t.bb),phase:t.phase,hand:t.hand,button:t.button,sbPos:t.sbPos,bbPos:t.bbPos,turn:t.turn,board:t.board,pot:clean(t.pot),currentBet:clean(t.currentBet),minRaise:clean(t.minRaise),
    pots:LIVE.includes(t.phase)?livePots(t).map(p=>({amount:clean(p.amount),eligible:p.eligible})):[],
    restarting:!canDeal(),
-   seats:t.seats.map((s,i)=>s?{inactiveHands:s.inactiveHands||0,lastAction:s.lastAction||null,id:s.id,position:i,username:s.username,avatar:s.avatar||null,stack:clean(s.stack),bet:clean(s.roundBet),folded:s.folded,allIn:s.allIn,inHand:s.inHand,sittingOut:!!s.sittingOut,leaving:!!s.leaveAfterHand,waiting:!s.inHand&&!s.sittingOut,cardCount:s.cards.length,cards:s.userId===userId||shown.has(s.id)?s.cards:[],isMe:s.userId===userId}:null),
+   seats:t.seats.map((s,i)=>s?{inactiveHands:s.inactiveHands||0,lastAction:s.lastAction||null,id:s.id,position:i,username:s.username,bot:!!s.isBot,avatar:s.avatar||null,stack:clean(s.stack),bet:clean(s.roundBet),folded:s.folded,allIn:s.allIn,inHand:s.inHand,sittingOut:!!s.sittingOut,leaving:!!s.leaveAfterHand,waiting:!s.inHand&&!s.sittingOut,cardCount:s.cards.length,cards:s.userId===userId||shown.has(s.id)?s.cards:[],isMe:s.userId===userId}:null),
    events:t.events.slice(0,30),
    lastResult:result?{...Object.fromEntries(Object.entries(result).filter(([k])=>!['totalRake','rakeContributions'].includes(k))),payments:Object.fromEntries(Object.entries(result.payments).map(([k,v])=>[k,clean(v)])),pots:result.pots.map(p=>({...Object.fromEntries(Object.entries(p).filter(([k])=>k!=='rake')),amount:clean(p.amount)}))}:null
   };

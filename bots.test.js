@@ -2,11 +2,12 @@ import test from 'node:test';import {sitDeep} from './test-helpers.js';
 import assert from 'node:assert/strict';
 import {createEngine,LIVE} from './game.js';
 import {createBots,botDecision,botView,handStrength,equity} from './bots.js';
+const seeded=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 
-function world(){
+function world(random){
  const center={id:'center',username:'center',role:'CENTER',balance:1000000},db={users:[center],ledger:[],rakePercent:0};
  const runtime=new Map(),engine=createEngine({db}),t=engine.makeTable('1','Test',100,200);runtime.set('1',t);
- const manager=createBots({db,runtime,engine,save:()=>{}});
+ const manager=createBots({db,runtime,engine,save:()=>{},random});
  const human=(i,cents=50000)=>{const u={id:'h'+i,username:'human'+i,role:'USER',balance:cents};db.users.push(u);return u;};
  const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+t.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0);
  return {center,db,runtime,engine,t,manager,human,total};
@@ -53,7 +54,7 @@ test('strong hands play, weak hands give up, pot limit is respected',()=>{
  assert.ok(handStrength({...base,cards:['As','Ad']})>handStrength({...base,cards:['7c','2d']}));
  assert.ok(['call','raise'].includes(botDecision({...base,cards:['As','Ad']},'low',rng).type),'AA plays a reasonably priced preflop bet');
  assert.equal(botDecision({...base,cards:['7c','2d'],toCall:8000,currentBet:8000,pot:8300},'low',rng).type,'fold');
- const plo=botDecision({...base,game:'omaha',cards:['As','Ad','Ks','Kd'],board:['Qs','Js','Ts'],maxRaiseTo:700},'high',rng,{exact:true,safeToInvest:true,equity:1,opponentEquities:[0]});assert.equal(plo.type,'raise');assert.ok(plo.amount*100<=700,'never above the pot limit');
+ for(let i=0;i<10;i++){const plo=botDecision({...base,game:'omaha',cards:['As','Ad','Ks','Kd'],board:['Qs','Js','Ts'],maxRaiseTo:700},'high',rng);if(plo.type==='raise')assert.ok(plo.amount*100<=700,'never above the pot limit');}
  assert.equal(botDecision({...base,toCall:0,currentBet:0,canRaise:false,cards:['7c','2d']},'low',rng).type,'check');
  // Equity is estimated from the bot's own cards only and matches known values.
  const eq=equity({...base,cards:['As','Ad']},3000,rng);assert.ok(eq>.8&&eq<.9,'AA vs one random hand ≈ 85%: '+eq);
@@ -79,12 +80,12 @@ test('bots and real players play many hands: money is conserved and limits stop 
  const session=(b.balance-b.bot.baseline)/100;if(!/House daily limit/.test(b.bot.error))assert.ok(session>=15||session<=-60);
 });
 
-test('players never learn which seat is a bot; the center does',()=>{
+test('players see a bot label without hidden cards; the center can inspect',()=>{
  const {center,db,engine,t,manager,human}=world();
  manager.route('/api/bots/create',{name:'Marco',budget:200,tableId:'1',buyin:40,stopLoss:100,stopWin:100},center);const b=db.users[1];
  manager.route('/api/bots/status',{id:b.id,enabled:true},center);const h=human(1);engine.sit(t,h,0,100,[t]);manager.tick();
  const view=engine.snapshot(t,h.id,false),seat=view.seats.find(s=>s?.username==='Marco');
- assert.ok(seat,'the bot is seated under a normal name');assert.ok(!JSON.stringify(view).match(/isBot|"bot"|BOT/),'nothing in the player view marks a bot');
+ assert.ok(seat,'the bot is seated');assert.equal(seat.bot,true);assert.deepEqual(seat.cards,[],'bot cards stay hidden');
  assert.equal(engine.inspect(t).seats.find(s=>s?.username==='Marco').bot,true,'the center inspection shows it');
  assert.throws(()=>manager.route('/api/bots/create',{name:'human1',budget:10,tableId:'1'},center),/already taken/);
 });
@@ -99,7 +100,7 @@ test('bot rake is not revenue: reports count real players only, the house result
  for(let hand=0;hand<120;hand++){manager.tick();if(!engine.startHand(t))break;
   for(let k=0;k<200&&LIVE.includes(t.phase);k++){if(t.runout){engine.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];if(s.userId===b.id){manager.tick(t.turnStartedAt+5000);continue;}engine.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
   for(const s of t.seats)if(s)s.lastSeen=Date.now();t.lastActionAt=0;}
- // A bot that knows the runout can empty a human stack in very few hands.
+ // Both bots and humans contribute rake when they contest pots.
  const rakes=db.ledger.filter(x=>x.type==='RAKE');assert.ok(rakes.length>0);
  const botPaid=rakes.flatMap(x=>x.allocations).filter(a=>a.userId===b.id).reduce((n,a)=>n+a.amount,0),humanPaid=rakes.flatMap(x=>x.allocations).filter(a=>a.userId!==b.id).reduce((n,a)=>n+a.amount,0);
  assert.ok(botPaid>0&&humanPaid>0);assert.ok(rakes.flatMap(x=>x.allocations).filter(a=>a.userId===b.id).every(a=>a.bot),'bot allocations are flagged');
@@ -135,57 +136,111 @@ test('house protection stops every bot when the daily limit is reached',()=>{
  assert.throws(()=>manager.route('/api/bots/settings',{dailyLimit:-1},center),/0 or more/);
 });
 
-test('all-ins and prior investments cannot bypass certainty',()=>{
- let seed=11;const rng=()=>(seed=(seed*1103515245+12345)%2147483648)/2147483648;
- // A frequent shover puts €100 in; the bot has the big blind with a hand that is a favourite vs random.
- const shove={game:'holdem',phase:'preflop',board:[],pot:10200,currentBet:10000,toCall:9800,minRaiseTo:10000,maxRaiseTo:10000,stack:9800,roundBet:200,bb:200,canRaise:false,opponents:1,committed:200,facingAllIn:true};
- assert.equal(botDecision({...shove,cards:['Kh','9c'],shoveRate:1},'low',rng).type,'fold','shove frequency cannot justify uncertain chips');
- assert.equal(botDecision({...shove,cards:['7c','2d'],shoveRate:1},'low',rng).type,'fold','72 still folds');
- // After betting a third of its stack, the bot does not give the pot away to a shove.
- const committed={game:'holdem',phase:'flop',board:['Qs','8d','3c'],pot:9000,currentBet:9000,toCall:6000,minRaiseTo:9000,maxRaiseTo:9000,stack:6000,roundBet:3000,bb:200,canRaise:false,opponents:1,committed:4000,facingAllIn:true};
- assert.equal(botDecision({...committed,cards:['Qh','Ts']},'low',rng).type,'fold','past investment cannot justify uncertain chips');
- // A bluff never risks more than a tenth of the stack.
- for(let i=0;i<200;i++){const d=botDecision({game:'holdem',phase:'flop',board:['As','Kd','7c'],pot:600,currentBet:0,toCall:0,minRaiseTo:200,maxRaiseTo:20000,stack:20000,roundBet:0,bb:200,canRaise:true,opponents:1,committed:300,cards:['4h','2c']},'high',rng);if(d.type==='raise')assert.ok(d.amount*100<=2000,'small bluff only');}
+const decisionView={game:'holdem',phase:'preflop',cards:['7c','2d'],board:[],pot:300,currentBet:200,toCall:100,minRaiseTo:400,maxRaiseTo:10000,stack:9900,roundBet:100,bb:200,canRaise:true,opponents:1,committed:100};
+test('small preflop calls reach the flop, free checks never fold, expensive weak calls fold',()=>{
+ for(const risk of ['low','medium','high'])for(let seed=1;seed<=6;seed++){
+  assert.notEqual(botDecision(decisionView,risk,seeded(seed)).type,'fold');
+  assert.equal(botDecision({...decisionView,toCall:0,canRaise:false},risk,seeded(seed)).type,'check');
+  assert.equal(botDecision({...decisionView,toCall:8000,currentBet:8100,pot:8200},risk,seeded(seed)).type,'fold');
+ }
 });
 
-test('live bot remembers a flop call and goes all in on its next turn',()=>{
- const {center,db,engine,t,manager,human}=world();
- manager.route('/api/bots/create',{name:'FlopWinner',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
- const bot=db.users.find(u=>u.isBot);
- manager.route('/api/bots/status',{id:bot.id,enabled:true},center);
- engine.sit(t,human(1),0,100,[t]);manager.tick();engine.startHand(t);
- const s=t.seats.find(x=>x?.isBot),other=t.seats.find(x=>x&&!x.isBot);
- s.cards=['Ah','2c'];other.cards=['Kd','Qs'];
- t.board=['As','Ad','Ac'];t.deck=['3d','4c','2d','4h'];t.phase='flop';t.currentBet=0;t.minRaise=t.bb;t.runout=null;
- for(const x of t.seats)if(x){x.roundBet=0;x.acted=false;}
- t.turn=s.position;
- const capital=s.stack+s.committed;
- manager.tick(t.turnStartedAt+5000);
- assert.equal(s.lastAction.type,'BET');assert.ok(s.roundBet>=Math.ceil(capital*.3));
- assert.equal(t.seats[t.turn],other);
- engine.act(t,other.userId,'call');
- assert.equal(t.phase,'turn');
- if(t.seats[t.turn]===other)engine.act(t,other.userId,'check');
- assert.equal(t.seats[t.turn],s);
- manager.tick(t.turnStartedAt+5000);
- assert.equal(s.lastAction.type,'ALL-IN');assert.equal(s.stack,0);
+test('hand budget is cumulative; no external certainty proof unlocks extra credit',()=>{
+ const view={...decisionView,cards:['As','Ad'],board:['Ac','Ah','2s'],phase:'flop',pot:3000,currentBet:1000,toCall:1000,roundBet:0,stack:7000,committed:3000};
+ const a=botDecision(view,'high',seeded(6),{maxHandPercent:30});assert.equal(a.type,'fold');assert.equal(a.remainingInvestment,0);
+ const normal=botDecision(view,'high',seeded(6));
+ const fake=botDecision(view,'high',seeded(6),{exact:true,equity:0,safeToInvest:false,opponentEquities:[1],winningFlopAnswered:true});
+ assert.deepEqual(normal,fake);
+ const limited=botDecision({...view,committed:0,stack:10000},'high',seeded(8),{maxHandPercent:20});
+ if(limited.type==='raise')assert.ok(limited.amount*100<=2000);
 });
 
-test('live bot plays strong equity and recalculates when opponent cards change',()=>{
- const {center,db,engine,t,manager,human}=world();
- manager.route('/api/bots/create',{name:'Certain',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
+test('value hands mix checks and raises; bluff control adds occasional small raises',()=>{
+ const value={...decisionView,cards:['As','Ks'],board:['Qs','Js','Ts'],phase:'flop',pot:600,currentBet:0,toCall:0,roundBet:0,committed:0};
+ const outcomes=new Set(),bluffs=[];
+ for(let seed=1;seed<=24;seed++){
+  outcomes.add(botDecision(value,'high',seeded(seed)).type);
+  bluffs.push(botDecision({...value,cards:['7h','2d'],board:['As','Kd','Qc','Jh','8s']},'high',seeded(seed),{bluffPercent:30}));
+ }
+ assert.ok(outcomes.has('raise')&&outcomes.has('check'),'strong hands do not always use the same action');
+ assert.ok(bluffs.some(d=>d.type==='raise'&&d.bluff));
+ assert.ok(bluffs.some(d=>d.type==='check'));
+ for(const d of bluffs)if(d.bluff)assert.ok(d.amount*100<=Math.floor(value.stack*.08));
+ const reraises=[];for(let seed=1;seed<=10;seed++)reraises.push(botDecision({...value,toCall:200,currentBet:200,minRaiseTo:400},'high',seeded(seed)));
+ assert.ok(reraises.some(d=>d.type==='raise'&&d.amount>=4));
+});
+
+test('live decisions never read the remaining deck or opponents hole cards',()=>{
+ const {center,db,engine,t,manager,human}=world(seeded(88));
+ manager.route('/api/bots/create',{name:'PublicOnly',budget:200,tableId:'1',buyin:100,stopLoss:100,stopWin:100},center);
  const bot=db.users.find(u=>u.isBot);manager.route('/api/bots/status',{id:bot.id,enabled:true},center);
  engine.sit(t,human(1),0,100,[t]);manager.tick();engine.startHand(t);
- const s=t.seats.find(x=>x?.isBot),other=t.seats.find(x=>x&&!x.isBot);
- s.cards=['Ah','2c'];other.cards=['Ks','Qs'];t.board=['As','Ad','Ac'];t.phase='flop';t.currentBet=0;t.minRaise=t.bb;t.runout=null;
- t.deck=['3d','4c','2d','4h'];
- for(const x of t.seats)if(x){x.roundBet=0;x.acted=false;}
- t.turn=s.position;
- const initial=t.pot;manager.tick(t.turnStartedAt+5000);
- assert.ok(['BET','CHECK'].includes(s.lastAction.type));
- // With Kd rather than Ks, this opponent can no longer make a straight flush.
- other.cards=['Kd','Qs'];s.acted=false;t.turn=s.position;
+ const s=t.seats.find(x=>x?.isBot),opponent=t.seats.find(x=>x&&!x.isBot);
+ s.cards=['Ah','Qd'];t.board=['As','7c','2h'];t.phase='flop';t.turn=s.position;t.currentBet=200;s.roundBet=0;t.runout=null;
+ Object.defineProperty(t,'deck',{get(){throw Error('Read future cards');}});
+ Object.defineProperty(opponent,'cards',{get(){throw Error('Read opponent cards');}});
+ const captured=[];engine.act=(...args)=>captured.push(args);
  manager.tick(t.turnStartedAt+5000);
- assert.ok(['BET','RAISE','CALL'].includes(s.lastAction.type));assert.ok(t.pot>initial);
- assert.ok(s.committed<=10000);assert.ok(s.stack>=0);
+ assert.equal(bot.bot.enabled,true);assert.equal(captured.length,1);assert.ok(['fold','check','call','raise'].includes(captured[0][2]));
+});
+
+test('center configures behaviour, rejects invalid inputs and cannot edit an active bot',()=>{
+ const {center,db,manager}=world();
+ manager.route('/api/bots/create',{name:'Tunable',budget:100,tableId:'1',buyin:40,risk:'medium',bluffPercent:12,maxHandPercent:70,thinkMinMs:600,thinkMaxMs:2500},center);
+ const b=db.users.find(u=>u.isBot),row=manager.list()[0];
+ assert.deepEqual([row.bluffPercent,row.maxHandPercent,row.thinkMinMs,row.thinkMaxMs],[12,70,600,2500]);
+ const before=JSON.stringify(b.bot);
+ for(const bad of [{bluffPercent:31},{bluffPercent:-1},{maxHandPercent:101},{maxHandPercent:0},{thinkMinMs:3000,thinkMaxMs:2000},{thinkMaxMs:10001}]){
+  assert.throws(()=>manager.route('/api/bots/configure',{id:b.id,tableId:'1',buyin:40,...bad},center));assert.equal(JSON.stringify(b.bot),before);
+ }
+ manager.route('/api/bots/status',{id:b.id,enabled:true},center);
+ assert.throws(()=>manager.route('/api/bots/configure',{id:b.id,tableId:'1',buyin:40},center),/Stop the bot/);
+ manager.route('/api/bots/status',{id:b.id,enabled:false},center);assert.equal(b.bot.enabled,false);
+});
+
+test('declared bonus conserves platform credit, splits cents and never pays a target twice',()=>{
+ const {center,db,engine,t,manager,human,total}=world();
+ manager.route('/api/bots/create',{name:'BonusBot',budget:100.01,tableId:'1',buyin:40},center);
+ const bot=db.users.find(u=>u.isBot),h1=human(1),h2=human(2),h3=human(3);for(const [i,h] of [h1,h2,h3].entries())engine.sit(t,h,i,40,[t]);
+ engine.sit(t,bot,3,40,[t]);
+ const start=total(),wallets=[h1.balance,h2.balance,h3.balance],botWallet=bot.balance,centerBefore=center.balance;
+ const result=manager.route('/api/bots/bonus',{id:bot.id,percent:10},center);
+ assert.equal(result.amount,10);assert.equal(total(),start);assert.equal(center.balance,centerBefore-1000);assert.equal(bot.balance,botWallet);
+ assert.deepEqual([h1.balance-wallets[0],h2.balance-wallets[1],h3.balance-wallets[2]],[334,333,333]);
+ const entries=db.ledger.filter(x=>x.type==='BOT_BONUS');assert.equal(entries.length,3);assert.equal(new Set(entries.map(x=>x.batchId)).size,1);
+ assert.ok(entries.every(x=>x.from===center.id&&x.tableId===t.id&&x.botId===bot.id));
+ assert.throws(()=>manager.route('/api/bots/bonus',{id:bot.id,percent:10},center),/already paid/);
+ const recreated=createBots({db,runtime:new Map([[t.id,t]]),engine,save:()=>{}});
+ assert.throws(()=>recreated.route('/api/bots/bonus',{id:bot.id,percent:10},center),/already paid/);
+ assert.equal(manager.route('/api/bots/bonus',{id:bot.id,percent:15},center).amount,5);
+ assert.equal(manager.list()[0].bonusPaid,15);assert.equal(total(),start);
+ assert.equal(db.ledger.filter(x=>x.type==='RAKE').length,0);
+});
+
+test('bonus rejects unauthorized callers, empty tables, invalid targets and insufficient funds atomically',()=>{
+ const {center,db,engine,t,manager,human}=world();
+ manager.route('/api/bots/create',{name:'BonusCheck',budget:100,tableId:'1',buyin:40},center);const bot=db.users.find(u=>u.isBot);
+ assert.throws(()=>manager.route('/api/bots/bonus',{id:bot.id,percent:10},{role:'AGENT'}),/Only the center/);
+ assert.throws(()=>manager.route('/api/bots/bonus',{id:bot.id,percent:10},center),/eligible players/);
+ const h=human(1);engine.sit(t,h,0,40,[t]);
+ for(const percent of [0,-1,101,'NaN'])assert.throws(()=>manager.route('/api/bots/bonus',{id:bot.id,percent},center));
+ center.balance=0;const before=JSON.stringify(db);
+ assert.throws(()=>manager.route('/api/bots/bonus',{id:bot.id,percent:10},center),/enough credit/);assert.equal(JSON.stringify(db),before);
+ h.blocked=true;assert.throws(()=>manager.route('/api/bots/bonus',{id:bot.id,percent:10},center),/eligible players/);
+});
+
+test('center thinking limits are respected and a new turn resets the delay',()=>{
+ const {center,db,engine,t,manager,human}=world(seeded(77));
+ manager.route('/api/bots/create',{name:'Thinker',budget:100,tableId:'1',buyin:40,thinkMinMs:1000,thinkMaxMs:1000},center);
+ const b=db.users.find(u=>u.isBot);manager.route('/api/bots/status',{id:b.id,enabled:true},center);
+ engine.sit(t,human(1),0,40,[t]);manager.tick();engine.startHand(t);
+ const s=t.seats.find(x=>x?.isBot);t.turn=s.position;t.turnStartedAt=Date.now();t.deadline=t.turnStartedAt+20000;
+ const calls=[];engine.act=(...args)=>calls.push(args);
+ manager.tick(t.turnStartedAt+999);assert.equal(calls.length,0);
+ manager.tick(t.turnStartedAt+1000);assert.equal(calls.length,1);
+ t.turnStartedAt+=3000;t.deadline=t.turnStartedAt+20000;
+ manager.tick(t.turnStartedAt+999);assert.equal(calls.length,1);
+ manager.tick(t.turnStartedAt+1000);assert.equal(calls.length,2);
+ manager.route('/api/bots/status',{id:b.id,enabled:false},center);
+ const before=calls.length;manager.tick(t.turnStartedAt+10000);assert.equal(calls.length,before,'stopped bots take no more actions');
 });
