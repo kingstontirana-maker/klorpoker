@@ -20,6 +20,21 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const stored=()=>{const s=openStore(path.join(dir,'klor.db')),value=s.load();s.close();return value;};
   const live=[];
   try {
+    for(const route of ['/bots','/bots/']){
+      const page=await fetch(base+route);
+      assert.equal(page.status,200);
+      assert.match(await page.text(),/bots-center\.js/);
+      assert.equal(page.headers.get('cache-control'),'no-store');
+    }
+    const {get}=await import('node:http');
+    const botHome=await new Promise((resolve,reject)=>{
+      get(base+'/',{headers:{Host:'cenb.suprempoker.com'}},res=>{
+        let html='';res.setEncoding('utf8');res.on('data',chunk=>html+=chunk);res.on('end',()=>resolve(html));
+      }).on('error',reject);
+    });
+    assert.match(botHome,/bots-center\.js/);
+    const mainHome=await fetch(base+'/');
+    assert.doesNotMatch(await mainHome.text(),/bots-center\.js/);
     const tokens=[];
     for(let i=0;i<5;i++)tokens.push((await call('login','',{username:'test'+i,password})).data.token);
     assert.equal((await call('rake/events',tokens[3])).status,403);

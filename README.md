@@ -113,3 +113,35 @@ Accounts, balances, transactions and hands live in the SQLite database `klor.db`
 1. Coolify → the application → **Persistent Storage** → add a volume, e.g. name `klorpoker-data`, destination `/data`.
 2. **Environment Variables** → `STATE_FILE=/data/state.json` (and optionally `CENTER_PASSWORD` for a brand-new database).
 3. Redeploy. To restore a database, stop the app and copy `klor.db` into the volume (Coolify → Terminal), together with `klor.db-wal` if it exists, then start it.
+
+## CENB — paneli i veçantë i botave
+
+Paneli hapet lokalisht te `http://localhost:3000/bots`. Në hostin
+`cenb.suprempoker.com`, rruga `/` shërben automatikisht të njëjtin panel.
+Hosti mund të ndryshohet me `BOTS_HOST`. Përdor të njëjtin proces Node dhe
+bazën ekzistuese; mos nis një proces tjetër mbi të njëjtën bazë.
+Hyrja dhe çdo veprim për botat kërkojnë llogarinë CENTER. Paneli përdor
+sesion të veçantë në sessionStorage; hyrja CENTER mbyll sesionin e mëparshëm
+sipas rregullit ekzistues të platformës.
+
+Për aktivizim në Coolify (hostimi i kësaj platforme):
+
+1. Ngarko ndryshimet e kodit në repository që përdor aplikacioni ekzistues.
+2. Te aplikacioni ekzistues, fusha **Domains**, ruaj domain-et aktuale dhe shto
+   `https://cenb.suprempoker.com`, të ndarë me presje nga domain-et e tjera.
+3. Ruaj konfigurimin dhe bëj Redeploy të të njëjtit aplikacion. Coolify menaxhon
+   proxy-n dhe certifikatën HTTPS. Mos krijo aplikacion ose databazë të dytë.
+4. Kontrollo `https://cenb.suprempoker.com`: duhet të shfaqet hyrja CENB,
+   ndërsa `https://suprempoker.com` duhet të vazhdojë të shfaqë platformën.
+
+Vetëm për serverë që përdorin Nginx drejtpërdrejt, pa proxy të Coolify:
+
+1. Krijo rekordin DNS A `cenb` drejt IP-së së serverit të platformës
+   (dhe AAAA vetëm nëse serveri shërben IPv6).
+2. Instalo konfigurimin `deploy/cenb.nginx.conf` krahas virtual host-it
+   ekzistues; ndrysho portën nëse Node nuk punon në 3000.
+3. Verifiko me `sudo nginx -t` dhe ringarko Nginx.
+4. Aktivizo HTTPS me `sudo certbot --nginx -d cenb.suprempoker.com`.
+5. Përditëso kodin dhe rinis procesin ekzistues Node.
+
+DNS, Nginx dhe certifikata nuk aktivizohen nga ndryshimet lokale të kodit.
