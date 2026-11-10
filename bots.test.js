@@ -84,9 +84,9 @@ test('players see a bot label without hidden cards; the center can inspect',()=>
  const {center,db,engine,t,manager,human}=world();
  manager.route('/api/bots/create',{name:'Marco',budget:200,tableId:'1',buyin:40,stopLoss:100,stopWin:100},center);const b=db.users[1];
  manager.route('/api/bots/status',{id:b.id,enabled:true},center);const h=human(1);engine.sit(t,h,0,100,[t]);manager.tick();
- const view=engine.snapshot(t,h.id,false),seat=view.seats.find(s=>s?.username==='Marco');
- assert.ok(seat,'the bot is seated');assert.equal(seat.bot,true);assert.deepEqual(seat.cards,[],'bot cards stay hidden');
- assert.equal(engine.inspect(t).seats.find(s=>s?.username==='Marco').bot,true,'the center inspection shows it');
+ const view=engine.snapshot(t,h.id,false),seat=view.seats.find(s=>s?.username==='Marco TESTING');
+ assert.equal(manager.list()[0].name,'Marco TESTING');assert.equal(b.username,'Marco','account identity stays unchanged');assert.ok(seat,'the bot is seated');assert.equal(seat.bot,true);assert.deepEqual(seat.cards,[],'bot cards stay hidden');
+ assert.equal(engine.inspect(t).seats.find(s=>s?.username==='Marco TESTING').bot,true,'the center inspection shows it');
  assert.throws(()=>manager.route('/api/bots/create',{name:'human1',budget:10,tableId:'1'},center),/already taken/);
 });
 

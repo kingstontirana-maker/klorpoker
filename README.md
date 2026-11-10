@@ -156,7 +156,9 @@ Stilet ndryshojnë shpeshtësinë dhe madhësinë e basteve; vendimet përdorin
 vetëm letrat e botit dhe informacionin publik, jo kundërshtarët ose deck-un.
 Një call preflop deri në një big blind dhe 5% të stack-ut fillestar vazhdon
 kur kufiri i investimit e lejon. Bastet e mëdha ende mund të sjellin fold.
-Një check falas nuk bëhet fold. Boti shfaqet me etiketën BOT në tavolinë.
+Një check falas nuk bëhet fold. Çdo emër boti shfaqet detyrimisht me
+prapashtesën TESTING në tavolinë, inspektim, panel dhe raportet e botave.
+Etiketa nuk ndryshon emrin e llogarisë, ID-në apo balancën.
 
 **Bonus i deklaruar për lojtarët e tavolinës**: qendra vendos objektivin
 kumulativ X% të buxhetit fillestar të atij boti dhe paguan diferencën nga

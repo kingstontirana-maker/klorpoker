@@ -1,4 +1,5 @@
 // Integer cents throughout; a pot's rake is shared equally by its contributors.
+import {botDisplayName} from './public/bot-label.js';
 export function rakeReport(db, user, now=Date.now()) {
   const ids=new Set([user.id]);
   for(let changed=true;changed;){changed=false;for(const u of db.users)if(ids.has(u.parentId)&&!ids.has(u.id)){ids.add(u.id);changed=true;}}
@@ -70,7 +71,7 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false,includeBots=
    if(!a.pid){const k='_legacy';const c=children.get(k)||children.set(k,{id:null,username:'Unattributed (before detailed records)',role:'LEGACY',rake:0,hands:new Set(),players:new Set()}).get(k);c.rake+=a.amount;c.hands.add(x.id);continue;}
    activePlayers.add(a.pid);
    const c=children.get(a.v.id)||children.set(a.v.id,{id:a.v.id==='_bots'?null:a.v.id,username:a.v.username,role:a.v.role,rake:0,hands:new Set(),players:new Set()}).get(a.v.id);c.rake+=a.amount;c.hands.add(x.id);c.players.add(a.pid);
-   const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:byId.get(a.pid)?.username||a.pid,...(a.bot?{agent:null,admin:null,bot:true}:upline(a.pid)),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
+   const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:botDisplayName(byId.get(a.pid)?.username||a.pid,!!a.bot),...(a.bot?{agent:null,admin:null,bot:true}:upline(a.pid)),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
    if(detail&&rows.length<20000)rows.push({time:x.time,table:t.name,hand:x.hand??null,player:p.username,agent:p.agent,admin:p.admin,amount:a.amount});
   }
   recent.push({time:x.time,table:t.name,tableId:x.tableId,hand:x.hand??null,amount:sum,parts:parts.map(a=>({player:a.pid?byId.get(a.pid)?.username||a.pid:null,amount:a.amount}))});

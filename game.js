@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import {deck,distribute,compare,rankNames,ranks,suits,GAMES,gameOf,evaluateHand,bestHand} from './poker.js';
 import {rakeShares} from './rake.js';
+import {botDisplayName} from './public/bot-label.js';
 
 export const LIVE=['preflop','flop','turn','river'];
 export const ACTION_MS=30000,BETWEEN_HANDS_MS=8000,RESULT_REVEAL_MS=8000,REBUY_WINDOW_MS=30000,SIT_OUT_MS=5*60000;
@@ -231,7 +232,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   u.balance-=amount;u.tableExit=null;
   // Joining a running game requires a live big blind before the first hand.
   const running=t.hand>0&&t.seats.filter(s=>eligible(t,s)).length>=2;
-  t.seats[pos]={id:u.id,userId:u.id,username:u.username,isBot:!!u.isBot,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
+  t.seats[pos]={id:u.id,userId:u.id,username:botDisplayName(u.username,!!u.isBot),isBot:!!u.isBot,position:pos,stack:amount,cards:[],inHand:false,folded:false,allIn:false,committed:0,roundBet:0,acted:false,actedAt:0,inactiveHands:0,lastTimeoutHand:null,mustPost:running,sittingOut:false,lastSeen:Date.now(),timeBank:TIME_BANK_START};
   if(t.waitlist?.length){t.waitlist=t.waitlist.filter(w=>w.userId!==u.id);if(t.waitOffer?.userId===u.id)t.waitOffer=null;offerNext(t);}
   db.ledger.push({id:uid(),type:'BUY_IN',from:u.id,tableId:t.id,amount,time:Date.now()});event(t,`${u.username} sat down in seat ${pos+1}${LIVE.includes(t.phase)?' · plays from the next hand':''}`);save();
  }

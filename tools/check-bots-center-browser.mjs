@@ -38,6 +38,7 @@ try{
  await cdp('Page.navigate',{url:origin+'/bots-center.html'});
  await until("!!document.querySelector('#botList [data-id]')&&!document.querySelector('#dashboard').hidden");
  assert.equal(await evaluate("!!document.querySelector('#simulationPanel')"),false,'no simulation panel');
+ assert.equal(await evaluate("document.querySelector('#botList h2').textContent"),'FixtureBot TESTING','mandatory testing label');
  assert.equal(await evaluate("document.querySelector('[data-config]').elements.bluffPercent.value"),'9');
  await evaluate("(()=>{const f=document.querySelector('[data-config]');f.elements.risk.value='high';f.elements.risk.dispatchEvent(new Event('change',{bubbles:true}));})()");
  assert.equal(await evaluate("document.querySelector('[data-config]').elements.maxHandPercent.value"),'85');

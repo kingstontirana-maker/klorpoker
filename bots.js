@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {evaluateHand,compare,ranks,suits} from './poker.js';
+import {botDisplayName} from './public/bot-label.js';
 
 
 // Decisions use only own hole cards and public information; no future board or hidden hands.
@@ -90,7 +91,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random}
  // Rake a bot pays goes straight back to the center, so the house result of a bot
  // is its chip result plus the rake it paid.
  function rakeByBot(){botRake();return rakeMap;}
- function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0};return {rakePaid:r.rake/100,rakeHands:r.hands,house:(eq-u.bot.funded+r.rake)/100,id:u.id,name:u.username,risk:u.bot.risk,bluffPercent:u.bot.bluffPercent??PROFILES[u.bot.risk||'low'].bluffPercent,maxHandPercent:u.bot.maxHandPercent??PROFILES[u.bot.risk||'low'].maxHandPercent,thinkMinMs:u.bot.thinkMinMs??1200,thinkMaxMs:u.bot.thinkMaxMs??4000,bonusPaid:(u.bot.bonusPaid||0)/100,bonusPercent:u.bot.bonusPercent||0,bonusBase:u.bot.funded/100,mode:u.bot.mode||'play',enabled:u.bot.enabled,tableId:u.bot.tableId,buyin:u.bot.buyin/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?'Waiting for players':'Stopped')};});}
+ function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0};return {rakePaid:r.rake/100,rakeHands:r.hands,house:(eq-u.bot.funded+r.rake)/100,id:u.id,name:botDisplayName(u.username),risk:u.bot.risk,bluffPercent:u.bot.bluffPercent??PROFILES[u.bot.risk||'low'].bluffPercent,maxHandPercent:u.bot.maxHandPercent??PROFILES[u.bot.risk||'low'].maxHandPercent,thinkMinMs:u.bot.thinkMinMs??1200,thinkMaxMs:u.bot.thinkMaxMs??4000,bonusPaid:(u.bot.bonusPaid||0)/100,bonusPercent:u.bot.bonusPercent||0,bonusBase:u.bot.funded/100,mode:u.bot.mode||'play',enabled:u.bot.enabled,tableId:u.bot.tableId,buyin:u.bot.buyin/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?'Waiting for players':'Stopped')};});}
  function configure(b,body,t){
   if(!['low','medium','high'].includes(body.risk||'low'))fail('Invalid risk');const l=engine.buyinLimits(t);
   const buyin=body.buyin===undefined?Math.min(b.balance,l.max):cents(body.buyin,'Buy-in'),stopLoss=cents(body.stopLoss??b.balance/100,'Loss limit'),stopWin=cents(body.stopWin??Math.max(l.min,buyin/2)/100,'Win limit');
