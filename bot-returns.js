@@ -1,0 +1,14 @@
+// All amounts are integer virtual-credit cents. Funding is never profit.
+export function returnBudget(bot,equity,percent){
+ const returned=bot.returned||0,reserved=bot.returnHand?.paid||0;
+ const net=equity-bot.funded;
+ const target=Math.floor(Math.max(0,net+returned)*percent/100);
+ return Math.max(0,Math.min(Math.max(0,net),target-returned)-reserved);
+}
+
+export function returnDecision(view,budget,random=Math.random){
+ if(view.outcome!=='loss'||!(view.toCall>0)||view.toCall>=view.stack||view.toCall>budget)return false;
+ // Pay a changing subset of affordable bets; never manufacture a raise size.
+ const pressure=view.toCall/Math.max(1,view.pot);
+ return random()<Math.max(.15,Math.min(.85,.75-pressure*.3));
+}

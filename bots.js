@@ -3,17 +3,16 @@ import {Worker} from 'node:worker_threads';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {decide,handStrength,rangeEquity,preflopRank,STYLES} from './bot-brain.js';
 import {evaluateHand,compare} from './poker.js';
+import {returnBudget,returnDecision} from './bot-returns.js';
 export {handStrength,rangeEquity,preflopRank,STYLES};
 
-// House bots keep thin tables going. They play honestly: a decision is made only from the
-// bot's own cards and what every player at the table sees (botView). The house is
-// protected by limits, never by information: per-bot loss limits, daily, weekly and
-// monthly limits for all bots together, a stake ceiling and a stop-everything switch.
+// Virtual-credit house bots use the actual runout to play passively.
+// Wallet, stake and house loss limits still apply.
 
 // Bots carry ordinary names; only CENB sees which players are bots.
 const OLD_SUFFIX=' [BOT]';
 
-// What a bot is allowed to know: its own cards and what everyone at the table saw.
+// Server-only view: public information plus the actual runout outcome flag.
 export function botView(t,s,profileOf=()=>null){
  const idx=t.seats.indexOf(s),size=t.seats.length;
  const acts=(t.record?.actions||[]).map(a=>({street:a.street,seat:a.seat-1,type:a.type,amount:a.amount,to:a.to}));
@@ -70,7 +69,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  // ---- House limits ----
  const g=db.botGuard??={};
  if(g.start!==undefined&&g.dayStart===undefined){g.dayStart=g.start;delete g.start;}
- for(const [k,v] of Object.entries({dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
+ for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
  const PERIODS=[['day','dailyLimit','daily'],['week','weeklyLimit','weekly'],['month','monthlyLimit','monthly']];
  const tirana=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
  function keys(now){const day=tirana(now),[y,m,d]=day.split('-').map(Number),wd=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7,monday=new Date(Date.UTC(y,m-1,d-wd)).toISOString().slice(0,10);return {day,week:monday,month:day.slice(0,7)};}
@@ -86,7 +85,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   return {day:value-g.dayStart,week:value-g.weekStart,month:value-g.monthStart};
  }
  const moveStarts=n=>{for(const [p] of PERIODS)g[p+'Start']+=n;};
- function guardInfo(){const r=periods();return {dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
+ function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
  // ---- What bots learn about real players: only public actions, over many hands ----
@@ -126,7 +125,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0},auto=u.bot.tableId==='auto',fixed=auto?null:runtime.get(u.bot.tableId);
   return {id:u.id,name:u.username,risk:u.bot.risk,style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
    buyin:(u.bot.buyin||0)/100,buyinBB:u.bot.buyinBB||null,maxBB:(u.bot.maxBB||0)/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,
-   session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,rakePaid:r.rake/100,house:(eq-u.bot.funded+r.rake)/100,hands:u.bot.hands||0,
+   session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:(eq-u.bot.funded+r.rake)/100,hands:u.bot.hands||0,
    status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null};});}
  function configure(b,body){
   const risk=body.risk??b.bot.risk??'medium';if(!STYLES[risk])fail('Invalid style');
@@ -159,8 +158,10 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
    return {bots:list(),guard:guardInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
     catalog:[...runtime.values()].map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,min:engine.buyinLimits(t).min/100,max:engine.buyinLimits(t).max/100}))};}
   if(p==='/api/bots/settings'){
+   if(body.returnPercent!==undefined){const n=Number(body.returnPercent);if(!Number.isFinite(n)||n<0||n>100)fail('Return percentage must be 0–100');}
    const next={};for(const [k,label] of [['dailyLimit','The daily limit'],['weeklyLimit','The weekly limit'],['monthlyLimit','The monthly limit'],['maxBB','The highest big blind']])if(body[k]!==undefined&&body[k]!==''){const n=Math.round(Number(body[k])*100);if(!Number.isSafeInteger(n)||n<0)fail(label+' must be 0 or more');next[k]=n;}
    if(body.maxPerTable!==undefined&&body.maxPerTable!==''){const n=Number(body.maxPerTable);if(!Number.isInteger(n)||n<1||n>4)fail('Bots per table: 1–4');next.maxPerTable=n;}
+   if(body.returnPercent!==undefined)next.returnPercent=Number(body.returnPercent);
    Object.assign(g,next);save();return guardInfo();}
   if(p==='/api/bots/create'){const b=create(u,String(body.name||'').trim(),cents(body.budget,'Budget'),body);save();return {ok:true,id:b.id};}
   if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');if(each*n>u.balance)fail('The center does not have enough credit for this budget');
@@ -179,9 +180,33 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
 
  // ---- Playing ----
  const plans=new WeakMap(),decisions=[];
+ function settleReturns(){
+  let changed=false;
+  for(const b of bots()){
+   const h=b.bot.returnHand;if(!h)continue;
+   const t=runtime.get(h.tableId);
+   if(t&&t.hand===h.hand&&LIVE.includes(t.phase))continue;
+   // Cancelled/restarted hands must never count as money returned.
+   if(t?.hand===h.hand&&t.lastResult){
+    const lost=Math.max(0,h.equity-equity(b));
+    const humanWinners=t.lastResult.winnerIds.filter(id=>!isBotId(id));
+    // Count only calls lost in pots awarded exclusively to human opponents.
+    const humanOnly=t.lastResult.pots.filter(p=>!p.refunded&&p.winners.length&&p.winners.every(id=>!isBotId(id)));
+    if(humanWinners.length&&humanOnly.length===t.lastResult.pots.filter(p=>!p.refunded).length){
+     // Conservatively exclude the hand's rake from the reported human return.
+     const paid=Math.max(0,Math.min(h.paid,lost)-t.lastResult.totalRake);
+     b.bot.returned=(b.bot.returned||0)+paid;
+     if(paid)audit('BOT_RETURN',b,paid,{tableId:h.tableId,hand:h.hand});
+    }
+   }
+   delete b.bot.returnHand;changed=true;
+  }
+  if(changed)save();
+ }
  const think=(d,v)=>{const big=d.type==='raise'&&d.amount*100>=v.stack+v.roundBet-1||d.type==='call'&&v.toCall>=v.stack*.5;
   return big?3000+random()*4000:d.type==='raise'?1500+random()*3000:d.type==='call'?1200+random()*2300:700+random()*1300;};
  function tick(now=Date.now()){
+  settleReturns();
   const r=periods(now);
   for(const [p,limit,name] of PERIODS)if(g[limit]>0&&r[p]<=-g[limit])for(const b of bots())if(b.bot.enabled)stop(b,`House ${name} limit reached`,seatOf(b));
   for(const t of runtime.values())if(t.seats.some(Boolean))observe(t);
@@ -211,8 +236,15 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
       else{plan.d=botDecision(v,b.bot.risk,random);plan.at=t.turnStartedAt+think(plan.d,v);}}
      // A decision that never came back: check when free, otherwise fold.
      if(!plan.d&&now-t.turnStartedAt>9000){plan.d=plan.v.toCall?{type:'fold'}:{type:'check'};plan.at=now;}
-     if(plan.d&&now>=plan.at){plans.delete(s);const {d,v}=plan;
-      try{engine.act(t,b.id,d.type,d.amount);}catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
+     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botView(t,s,profileOf),d=botDecision(current,b.bot.risk,random);
+      // Only humans may receive a deliberate return; avoid bot-to-bot transfers.
+      const humanOnly=current.opponents.filter(o=>!o.folded).every(o=>!isBotId(o.id));
+      const returning=d.type==='fold'&&humanOnly&&returnDecision(current,returnBudget(b.bot,equity(b),g.returnPercent),random);
+      if(returning)d.type='call';
+      const before=equity(b),cost=Math.min(current.toCall,current.stack);
+      try{engine.act(t,b.id,d.type,d.amount);
+       if(returning){b.bot.returnHand??={tableId:t.id,hand:t.hand,equity:before,paid:0};b.bot.returnHand.paid+=cost;save();}
+      }catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
       decisions.push({at:now,bot:b.username,table:t.name,hand:t.hand,street:v.phase,action:d.type,amount:d.amount??(d.type==='call'?Math.min(v.toCall,v.stack)/100:null),pot:v.pot/100,equity:d.equity==null?null:Math.round(d.equity*100)});
       if(decisions.length>200)decisions.splice(0,decisions.length-200);}}
    }catch(e){stop(b,e.message,seatOf(b));}

@@ -1,8 +1,5 @@
-// The house bots' poker brain. It decides only from what any player at the table knows:
-// its own cards, the board, the stacks, the pot and the actions everybody saw. Opponents'
-// cards and the cards still in the deck are never an input, so a bot can win or lose a
-// hand like anyone else. Strength comes from playing well: hand ranges, position, pot
-// odds, fold equity and what each opponent has shown over many hands.
+// Virtual-credit bots use a server-computed outcome flag for passive live play.
+// Range utilities below remain available for analysis.
 import {evaluateHand,compare,ranks,suits} from './poker.js';
 
 const rv=c=>ranks.indexOf(c[0])+2;
@@ -189,7 +186,9 @@ function postflop(v,st,random,E){
 // One decision. v is the bot's view of the table (see botView in bots.js).
 export function decide(v,style='medium',random=Math.random){
  if(Object.hasOwn(v,'outcome')){
-  const type=!v.toCall?'check':v.outcome==='win'&&v.toCall<v.stack?'call':'fold';
+  // Complete the ordinary entry price, but never chase a preflop raise.
+  const entry=v.phase==='preflop'&&v.raisesPreflop===0&&v.currentBet<=v.bb&&v.toCall<=v.bb;
+  const type=!v.toCall?'check':(entry||v.outcome==='win')&&v.toCall<v.stack?'call':'fold';
   return {type,equity:v.outcome==='win'?1:v.outcome==='loss'?0:null};
  }
  const st=STYLES[style]||STYLES.medium;

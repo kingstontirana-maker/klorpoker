@@ -2,23 +2,33 @@
 
 **Playable demo with virtual credits, not a production real-money gambling platform.** Node.js 20+, no npm dependencies. The interface recreates the emerald / black / gold feel of the reference design using responsive CSS and includes the original reference PNG in `public/design-reference.png`.
 
-Experimental bots use a strict certainty rule. Server-side analysis uses actual
-dealt hands, excludes folded cards from future boards, and checks every possible
-remaining board rather than reading the shuffled deck order. A bot may voluntarily
-call or raise only if it wins outright in every continuation. A possible loss or
-tie means check when free, otherwise fold; bluffing is disabled. Before the flop,
-an adverse continuation for each player proves uncertainty without computing or
-reporting a guessed percentage. From the flop onward, all continuations are
-counted and equity includes split pots. Decisions receive the proof and percentages,
-not opponents' cards; player snapshots do not expose this analysis.
-
-The total investment per hand, including blinds and previous bets, is capped at
-15% of the starting table stack, rising to 40% on the river for an outright winner.
-Risk styles affect sizing only and cannot bypass either rule. This intentionally
-causes very frequent folds, particularly preflop. Forced blinds, rake, and action
-timeouts can still cost virtual credits; the rule does not promise zero losses.
+Virtual-credit house bots now evaluate the actual remaining board server-side, using
+exactly the engine's burn-card and deal order without changing the deck. They check
+when free and call only when they will beat every remaining opponent outright.
+Before the flop, bots also pay the ordinary big-blind entry price regardless of
+outcome when nobody has raised. Losing, tied or unavailable outcomes otherwise
+cause a fold when facing a bet. Bots never
+raise or voluntarily go all-in, including by calling for their whole stack.
+Only an outcome flag reaches the decision worker; future cards and opponents'
+cards are not added to player snapshots. This is privileged-information behavior
+for this virtual-credit prototype, not fair-play poker AI. Forced blinds and rake
+can still cost credits. Existing wallet and house loss limits remain active.
 
 ## Launch
+
+Center/CENB can set `returnPercent` (0–100, default 0) through
+`/api/bots/settings` or the existing CENB `bots/settings` proxy. This permits
+occasional losing calls against humans, funded only by earned net profit, never
+by the original budget or top-ups. The outstanding target is the configured
+percentage of net profit before previously recorded returns, minus those returns.
+Pending calls reserve that allowance until settlement. Refunded/cancelled hands
+and bot-to-bot winnings do not count; rake is conservatively excluded from recorded
+returns. Overview reports `returned` and `returnAvailable` per bot. The separate
+`suprem-cenb` panel exposes this under Limitet → Kthimi te lojtarët, with a
+0–100% slider, numeric input, saved percentage and per-bot return statistics.
+Calls follow opponents' bet sizes; selection and timing vary, with no raises or
+voluntary all-ins. This is an approximate target over future suitable hands,
+not a guaranteed payout percentage per hand or a guarantee of human-like play.
 
 ```bash
 cd baron-poker

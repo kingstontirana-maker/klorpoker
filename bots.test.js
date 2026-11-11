@@ -18,7 +18,7 @@ function playHand(engine,manager,t,botIds,policy){
  for(let k=0;k<300&&LIVE.includes(t.phase);k++){
   if(t.runout){engine.tickTable(t,t.runout.at+1);continue;}
   const s=t.seats[t.turn];if(botIds.has(s.userId)){manager.tick(t.turnStartedAt+10000);continue;}
-  const owe=t.currentBet-s.roundBet;engine.act(t,s.userId,policy?policy(s,owe):owe?(Math.random()<.7?'call':'fold'):'check');}
+  const owe=t.currentBet-s.roundBet;const action=policy?policy(s,owe):owe?(Math.random()<.7?'call':'fold'):'check';engine.act(t,s.userId,action,action==='raise'?(t.currentBet+t.minRaise)/100:undefined);}
  for(const s of t.seats)if(s)s.lastSeen=Date.now();t.lastActionAt=0;
 }
 
@@ -54,30 +54,74 @@ test('bots only fill thin tables: a real player is needed, a seat stays free, cr
  assert.equal(t.seats.filter(Boolean).length,0,'when the real players leave, the bots stand up too');
 });
 
-test('honest: the decision never depends on opponents\' cards or the deck',()=>{
- const {center,db,engine,t,manager,human}=world();
- manager.route('/api/bots/create',{name:'Honest',budget:500,tableId:'1',buyin:100,stopLoss:500},center);const b=db.users.find(u=>u.isBot);
- manager.route('/api/bots/status',{id:b.id,enabled:true},center);
- engine.sit(t,human(1,90000),0,200,[t]);engine.sit(t,human(2,90000),2,200,[t]);manager.tick();assert.ok(t.seats.some(s=>s?.userId===b.id));
- let checked=0;
- for(let hand=0;hand<60&&checked<12;hand++){
-  if(!engine.startHand(t))break;
-  for(let k=0;k<200&&LIVE.includes(t.phase);k++){
-   if(t.runout){engine.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];
-   if(s.userId===b.id){
-    const v=botView(t,s),others=t.seats.filter(x=>x&&x!==s).flatMap(x=>x.cards);
-    const text=JSON.stringify(v);for(const c of [...others,...t.deck.slice(-6)])if(!v.cards.includes(c)&&!v.board.includes(c))assert.ok(!text.includes('"'+c+'"'),'the view holds no hidden card');
-    const before=botDecision(v,'medium',seeded(hand));
-    // Swap every hidden card around: other players' hands and the deck.
-    const saved=t.seats.map(x=>x?[...x.cards]:null),deck=[...t.deck];const hidden=[...others,...t.deck];hidden.reverse();let i=0;
-    for(const x of t.seats)if(x&&x!==s)x.cards=x.cards.map(()=>hidden[i++]);t.deck=hidden.slice(i);
-    const after=botDecision(botView(t,s),'medium',seeded(hand));
-    assert.deepEqual(after,before,'same decision whatever the hidden cards are');checked++;
-    t.seats.forEach((x,j)=>{if(x)x.cards=saved[j];});t.deck=deck;
-    manager.tick(t.turnStartedAt+10000);continue;}
-   engine.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
-  for(const s of t.seats)if(s)s.lastSeen=Date.now();t.lastActionAt=0;}
- assert.ok(checked>=5,'enough decisions were compared ('+checked+')');
+test('actual runout controls passive decisions without revealing hidden cards',()=>{
+ const {engine,t,human}=world();engine.sit(t,human(1),0,100,[t]);engine.sit(t,human(2),1,100,[t]);engine.startHand(t);
+ const bot=t.seats[0],opponent=t.seats[1];bot.cards=['As','Ah'];opponent.cards=['Ks','Kh'];
+ t.board=[];t.deck=['2c','3d','4c','5d','7c','8d','9c','Td'].reverse();
+ const saved=JSON.stringify({deck:t.deck,board:t.board});
+ const v=botView(t,bot);assert.equal(v.outcome,'win');assert.equal(JSON.stringify({deck:t.deck,board:t.board}),saved);
+ for(const card of opponent.cards)assert.ok(!JSON.stringify(v).includes('"'+card+'"'));
+ for(const style of ['low','medium','high']){
+  assert.equal(botDecision({...v,toCall:200,stack:1000},style).type,'call');
+  assert.equal(botDecision({...v,toCall:1000,stack:1000},style).type,'fold');
+  for(const outcome of ['loss','tie','unknown']){
+   assert.equal(botDecision({...v,outcome,phase:'flop',toCall:200},style).type,'fold');
+   assert.equal(botDecision({...v,outcome,toCall:0},style).type,'check');
+  }
+ }
+ opponent.cards=['Ts','Th'];assert.equal(botView(t,bot).outcome,'loss');
+ t.board=['2c','3c','4c','5c','6c'];assert.equal(botView(t,bot).outcome,'tie');
+});
+
+test('bots pay the unraised preflop entry even when losing, but fold to extra bets',()=>{
+ const base={outcome:'loss',phase:'preflop',raisesPreflop:0,currentBet:200,bb:200,toCall:200,stack:1000};
+ for(const outcome of ['loss','tie','unknown','win']){
+  assert.equal(botDecision({...base,outcome}).type,'call');
+  assert.equal(botDecision({...base,outcome,toCall:100,roundBet:100}).type,'call');
+  assert.equal(botDecision({...base,outcome,toCall:0}).type,'check');
+  assert.equal(botDecision({...base,outcome,stack:200}).type,'fold','no voluntary all-in');
+ }
+ assert.equal(botDecision({...base,raisesPreflop:1,currentBet:400,toCall:400}).type,'fold');
+ assert.equal(botDecision({...base,currentBet:400,toCall:400}).type,'fold');
+ assert.equal(botDecision({...base,phase:'flop'}).type,'fold');
+ assert.equal(botDecision({...base,phase:'turn'}).type,'fold');
+ assert.equal(botDecision({...base,phase:'river'}).type,'fold');
+ assert.equal(botDecision({...base,outcome:'win',raisesPreflop:1,currentBet:400,toCall:400}).type,'call');
+});
+
+test('center controls the net-profit return percentage; ordinary users cannot change it',()=>{
+ const {manager,center}=world();
+ assert.equal(manager.route('/api/bots/guard',{},center).returnPercent,0);
+ assert.throws(()=>manager.route('/api/bots/settings',{returnPercent:20},{role:'USER'}),/Only the center/);
+ for(const returnPercent of [-1,101,'invalid'])assert.throws(()=>manager.route('/api/bots/settings',{returnPercent},center),/percentage/);
+ assert.equal(manager.route('/api/bots/settings',{returnPercent:25},center).returnPercent,25);
+ assert.equal(manager.route('/api/bots/settings',{dailyLimit:200},center).returnPercent,25);
+});
+
+test('profit-funded losing calls settle once to humans and conserve all credit',()=>{
+ const {manager,center,engine,t,db,human,total}=world({size:2,random:()=>0});
+ manager.route('/api/bots/create',{name:'Returner',budget:500,tableId:'1',buyin:100,stopLoss:500},center);
+ const b=db.users.find(u=>u.isBot),h=human(1);
+ engine.sit(t,h,0,100,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();
+ // Existing earned profit, not an extra funding transfer.
+ b.balance+=10000;center.balance-=10000;
+ manager.route('/api/bots/settings',{returnPercent:50},center);
+ const original=total();engine.startHand(t);
+ const s=t.seats.find(s=>s?.userId===b.id);s.cards=['2c','3d'];t.seats[0].cards=['As','Ah'];
+ t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
+ // Bot completes its blind. Human raises, and the losing bot pays from profit.
+ manager.tick(t.turnStartedAt+10000);
+ engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
+ assert.equal(t.phase,'flop');assert.equal(b.bot.returnHand.paid,200);
+ manager.tick(t.turnStartedAt+10000); // Bot checks first after the flop.
+ engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
+ assert.equal(b.bot.returnHand.paid,600);
+ playHand(engine,manager,t,new Set([b.id]),()=> 'check');manager.tick();
+ assert.equal(b.bot.returned,600);assert.equal(b.bot.returnHand,undefined);
+ assert.equal(db.ledger.filter(x=>x.type==='BOT_RETURN').length,1);
+ manager.tick();assert.equal(b.bot.returned,600,'settlement is idempotent');
+ assert.equal(total(),original,'no credits minted or destroyed');
+ assert.equal(manager.list()[0].returnAvailable,43,'entry cost reduces net profit before the return target');
 });
 
 test('starting hands are ranked sensibly and equity follows the cards',()=>{
@@ -183,7 +227,7 @@ test('bots learn players\' habits from public actions only',()=>{
  manager.route('/api/bots/create',{name:'Scout',budget:500,tableId:'1',buyin:100,stopLoss:500},center);const b=db.users.find(u=>u.isBot);manager.route('/api/bots/status',{id:b.id,enabled:true},center);
  // The caller is deep enough that a winning bot never empties the stack in this test.
  const h1=human(1,5000000),h2=human(2,500000);sitDeep(engine,t,h1,0,50000);sitDeep(engine,t,h2,3,500);
- for(let hand=0;hand<40;hand++){manager.tick();if(!engine.startHand(t))break;playHand(engine,manager,t,new Set([b.id]),(s,owe)=>{manager.tick();return s.userId==='h1'?(owe?'call':'check'):(owe?'fold':'check');});manager.tick();}
+ for(let hand=0;hand<40;hand++){manager.tick();if(!engine.startHand(t))break;playHand(engine,manager,t,new Set([b.id]),(s,owe)=>{manager.tick();return s.userId==='h1'?(owe?'call':'raise'):(owe?'fold':'check');});manager.tick();}
  const p1=manager.profileOf('h1'),p2=manager.profileOf('h2');assert.ok(p1&&p2);assert.ok(p1.hands>=20,'hands seen: '+p1.hands);
  assert.ok(p1.vpip>p2.vpip,'the caller plays more hands than the folder');assert.ok(p2.ftb>p1.ftb,'the folder folds more to bets');
  const stored=JSON.stringify(db.botProfiles);assert.ok(!/[2-9TJQKA][cdhs]/.test(stored.replace(/"[^"]*":/g,'')),'only numbers are kept, no cards');
