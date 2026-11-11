@@ -20,21 +20,6 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
   const stored=()=>{const s=openStore(path.join(dir,'klor.db')),value=s.load();s.close();return value;};
   const live=[];
   try {
-    for(const route of ['/bots','/bots/']){
-      const page=await fetch(base+route);
-      assert.equal(page.status,200);
-      assert.match(await page.text(),/bots-center\.js/);
-      assert.equal(page.headers.get('cache-control'),'no-store');
-    }
-    const {get}=await import('node:http');
-    const botHome=await new Promise((resolve,reject)=>{
-      get(base+'/',{headers:{Host:'cenb.suprempoker.com'}},res=>{
-        let html='';res.setEncoding('utf8');res.on('data',chunk=>html+=chunk);res.on('end',()=>resolve(html));
-      }).on('error',reject);
-    });
-    assert.match(botHome,/bots-center\.js/);
-    const mainHome=await fetch(base+'/');
-    assert.doesNotMatch(await mainHome.text(),/bots-center\.js/);
     const tokens=[];
     for(let i=0;i<5;i++)tokens.push((await call('login','',{username:'test'+i,password})).data.token);
     assert.equal((await call('rake/events',tokens[3])).status,403);
@@ -367,24 +352,6 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
      assert.equal((await call('profile/avatar',a,{id:'boss'})).data.avatar,'boss');assert.equal((await call('state',a)).data.user.avatar,'boss');assert.equal((await call('table/'+one+'/state',b)).data.seats[0].avatar,'boss','the other player sees it');assert.equal((await call('table/'+one+'/state',b)).data.seats[1].avatar,null);
      for(const [id,token] of [[one,a],[one,b]])assert.equal((await call('table/'+id+'/leave',token,{})).status,200);
      assert.equal(runtime.get(two).seats.filter(Boolean).length,0);}
-    // Declared bot bonuses move actual platform credit and are visible to the recipient.
-    {const C=await signIn(0),P=await signIn(3),A=await signIn(2);
-     const table=(await call('tables/create',C,{name:'Declared bonus',sb:1,bb:2})).data.id;
-     const made=await call('bots/create',C,{name:'BonusApi',budget:50,tableId:table,buyin:20,risk:'medium',bluffPercent:7,maxHandPercent:60,thinkMinMs:800,thinkMaxMs:2000});
-     assert.equal(made.status,200);const id=made.data.id;
-     assert.equal((await call('table/'+table+'/sit',P,{position:0,buyin:20})).status,200);
-     assert.equal((await call('bots/bonus',P,{id,percent:10})).status,403);
-     assert.equal((await call('bots/bonus',A,{id,percent:10})).status,403);
-     const before=(await call('state',P)).data.user.balance,centerBefore=(await call('state',C)).data.user.balance;
-     const result=await call('bots/bonus',C,{id,percent:10});assert.equal(result.status,200);assert.equal(result.data.amount,5);
-     assert.equal((await call('state',P)).data.user.balance,before+5);assert.equal((await call('state',C)).data.user.balance,centerBefore-5);
-     const entries=(await call('ledger',P)).data.filter(x=>x.type==='BOT_BONUS');assert.equal(entries.length,1);assert.equal(entries[0].amount,5);assert.equal(entries[0].to,'3');
-     assert.equal(stored().users.find(x=>x.id===id).bot.bonusPaid,500,'paid target survives database reload');
-     assert.equal((await call('bots/bonus',C,{id,percent:10})).status,400);
-     assert.ok((await call('audit',C,{})).data.rows.some(x=>x.action==='bots/bonus'));
-     assert.equal((await call('table/'+table+'/leave',P,{})).status,200);
-     assert.equal((await call('bots/delete',C,{id})).status,200);
-    }
     // The money check: everything adds up, and one cent out of place is caught and kept until the centre confirms.
     {const center=await signIn(0);await call('money/accept',center,{});assert.equal(checkMoney(),true);const s=(await call('maintenance/status',center)).data;assert.equal(s.money.ok,true);assert.ok(s.money.total>0);
      currentDb().users.find(x=>x.id==='3').balance+=1;assert.equal(checkMoney(),false);

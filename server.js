@@ -1,5 +1,6 @@
 import {rakeReport,revenueReport,pct,isUnder} from './rake.js';
-import {createBots} from './bots.js';
+import {createBots,workerDecider} from './bots.js';
+import {createCenb,cenbHost,devHost} from './cenb.js';
 import {createPayments} from './payments.js';
 import {openStore} from './store.js';
 import {seatedFromSameDevice,descendants,recordSeen,sharedGroups,pairSignals,handSummaryFor,handFor,SIGNALS} from './security.js';
@@ -95,7 +96,7 @@ function withOldRake(){if(!oldRake)oldRake=store.olderRake();clearTimeout(oldRak
 // Newest 100 entries a viewer may see; older ones are read in pages only if needed.
 function ledgerFor(u){const view=x=>{if(u.role==='CENTER')return [x];if(x.type==='RAKE'){const s=x.shares?.find(s=>s.userId===u.id);return s?[{id:x.id,type:'COMMISSION',to:u.id,tableId:x.tableId,hand:x.hand,amount:s.amount,time:x.time}]:[];}return x.from===u.id||x.to===u.id?[x]:[];};let out=db.ledger.flatMap(view).slice(-100),before=Infinity;for(let page=0;out.length<100&&page<50;page++){const older=store.olderLedger(before);if(!older.rows.length)break;out=[...older.rows.flatMap(view),...out].slice(-100);before=older.seq;}return out.reverse().map(x=>({...x,amount:clean(x.amount)}));}
 // ---- Activity log: every change staff make, written after it succeeded ----
-const AUDITED=new Set(['rake','tables/create','tables/update','tables/delete','tables/color','users/create','users/password','users/status','users/share','users/mute','transfer','signup/agent','cashout/request','cashout/cancel','cashout/respond','maintenance','money/accept','moderation/resolve','bots/bonus','bots/create','bots/configure','bots/status','bots/delete','bots/guard','bots/settings','crypto/settings','crypto/assign','crypto/ignore','crypto/withdrawal']);
+const AUDITED=new Set(['rake','tables/create','tables/update','tables/delete','tables/color','users/create','users/password','users/status','users/share','users/mute','transfer','signup/agent','cashout/request','cashout/cancel','cashout/respond','maintenance','money/accept','moderation/resolve','bots/create','bots/configure','bots/status','bots/delete','bots/guard','bots/settings','crypto/settings','crypto/assign','crypto/ignore','crypto/withdrawal']);
 const SECRET_FIELDS=new Set(['password','current','next','token','device']);
 function audit(user,action,body,req,extra={}){try{const details=Object.fromEntries(Object.entries(body||{}).filter(([k])=>!SECRET_FIELDS.has(k)));const target=db.users.find(x=>x.id===body?.userId)?.username||runtime.get(String(body?.id??''))?.name||body?.username||body?.name||null;store.addAudit({at:Date.now(),actorId:user.id,actor:user.username,role:user.role,action,target,details:{...details,...extra},ip:clientIp(req)});}catch(err){console.error('[Suprem Poker] activity not logged',err.message);}}
 // The value before the change, where it is worth showing.
@@ -113,7 +114,6 @@ function alertsFor(u){const out=[],add=(level,panel,text)=>out.push({level,panel
  for(const t of analysis?.today||[])if(t.net>=SIGNALS.bigWin){const p=db.users.find(x=>x.id===t.id);if(p&&!p.isBot&&inView(u,p.id))add('warn','reports',p.username+' won '+t.net.toFixed(2)+' € in 24 hours ('+t.hands+' hands)');}
  if(u.role==='CENTER'){const c=db.crypto||{},pending=(c.withdrawals||[]).filter(w=>w.status==='pending'),big=pending.filter(w=>w.cents/100>=SIGNALS.bigWithdrawal).length,unmatched=(c.unmatched||[]).filter(x=>!x.status||x.status==='open').length;
   if(pending.length)add(big?'high':'warn','crypto',pending.length+(pending.length>1?' withdrawals':' withdrawal')+' waiting'+(big?' · '+big+' large':''));if(unmatched)add('warn','crypto',unmatched+' crypto '+(unmatched>1?'transfers':'transfer')+' without a player');
-  for(const b of db.users.filter(x=>x.isBot&&x.bot?.error))add('info','bots',b.username+' stopped: '+b.bot.error);
   if(saveFailed)add('high','overview','Changes cannot be saved. Money actions are paused until saving works again. Check the server disk.');const free=diskFree();if(free!==null&&free<LOW_DISK)add('high','overview','Only '+Math.round(free/1e6)+' MB of disk space is left on the server.');
   for(const t of runtime.values())if((t.tickFails||0)>=TICK_FAIL_ALERT)add('high','inspect',t.name+' stopped with an error. Restart the server: chips return to the wallets.');
   if(lastError&&Date.now()-lastError.at<86400000)add('warn','overview','The server caught an error ('+lastError.where+'): '+lastError.message);
@@ -145,7 +145,6 @@ if(p==='/api/health'){let ok=false;try{ok=store.ping();}catch{}if(!ok||saveFaile
 if(p==='/api/logout'){endSession(token);return {ok:true};}const u=me(token);if(!u)fail(endReasons.get(tokenKey(token))||'Sign in to continue.',401);
 if(req.headers['x-klor-visible']==='1'&&u.role==='USER'){const now=Date.now();for(const t of runtime.values())for(const seat of t.seats)if(seat?.userId===u.id&&!seat.sittingOut)seat.lastSeen=now;}
 if(p==='/api/state')return stateFor(u);
-{const bots=botManager.route(p,body,u);if(bots!==undefined)return bots;}
 {const pay=payments.route(p,body,u);if(pay!==undefined)return pay;}
 // The centre chooses the agent who receives every new player.
 if(p==='/api/signup/agents'){roleCheck(u,'CENTER');return {agentId:signupAgent()?.id||null,mail:mailConfigured(),agents:db.users.filter(x=>x.role==='AGENT'&&!x.blocked).map(x=>({id:x.id,username:x.username}))};}
@@ -248,7 +247,9 @@ setInterval(guarded('save retry',()=>{if(saveFailed&&!replaced)save();}),5000).u
 function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner||replaced)return;replaced=true;draining=true;console.log('[Suprem Poker] A newer server took over the database. This one has stopped.');for(const res of tableSubs.keys())res.end();tableSubs.clear();for(const res of inspectSubs.keys())res.end();inspectSubs.clear();for(const res of rakeClients.keys())res.end();rakeClients.clear();}
 setInterval(guarded('owner check',checkOwner),1000).unref();
 // Table-filling bots act from the server; they are never logged in.
-const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake()});
+const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake(),decider:workerDecider()});
+// CENB, the bot control room: its own address and its own sign-in (cenb.js).
+const cenb=createCenb({db,bots:botManager,save,fail});
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});
@@ -277,10 +278,14 @@ function openInspectStream(req,res){const token=(req.headers.authorization||'').
  inspectSubs.set(res,token);res.write('data: '+JSON.stringify(inspectView())+'\n\n');
  const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();res.on('close',()=>{clearInterval(beat);inspectSubs.delete(res);});}
 
+const CENB_FILES=new Set(['cenb.html','cenb.js','cenb.css','logo.webp','icon.png','apple-touch-icon.png']);
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.webp':'image/webp','.m4a':'audio/mp4'};
 const SECURITY_HEADERS={'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()','cross-origin-opener-policy':'same-origin',
  'content-security-policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
-export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost');if(url.pathname.startsWith('/api/')){checkOwner();if(replaced)fail('The server is restarting. Please try again in a moment.',503);}const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
+export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost'),host=req.headers.host||'',onCenb=cenbHost(host);
+ // The CENB address serves only CENB; the poker address never serves CENB (except on this computer, for testing).
+ if(onCenb?url.pathname.startsWith('/api/')&&!url.pathname.startsWith('/api/cenb/'):url.pathname.startsWith('/api/cenb/')&&!devHost(host))fail('Not found',404);
+ if(url.pathname.startsWith('/api/')){checkOwner();if(replaced)fail('The server is restarting. Please try again in a moment.',503);}const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
  const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Login required',401);roleCheck(u,'CENTER','ADMIN','AGENT');
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
  rakeClients.set(res,token);res.write('data: '+JSON.stringify(staffRakeReport(u))+'\n\n');
@@ -288,11 +293,12 @@ export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object
  }if(url.pathname.startsWith('/api/')){let input='';for await(const c of req){input+=c;if(input.length>50_000)fail('Body too large',413);}let body={};try{body=input?JSON.parse(input):{};}catch{fail('Invalid JSON');}const action=url.pathname.slice(5);
  // Saving is failing: nothing new that moves money until it works again. Hands in play finish.
  if(saveFailed&&req.method==='POST'&&PAUSED.test(action)){save();if(saveFailed)fail('Saving is not working right now, so this was not done. Please try again shortly.',503);}
- const audited=req.method==='POST'&&AUDITED.has(action),actor=audited?me((req.headers.authorization||'').replace(/^Bearer /,'')):null,before=actor?auditBefore(action,body):null;const value=await route(req,res,url,body);if(actor&&actor.role!=='USER')audit(actor,action,body,req,{...before,...(value?.network?{network:value.network}:{})});res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));return;}const botHost=String(req.headers.host||'').toLowerCase().replace(/:\d+$/, '')===(process.env.BOTS_HOST||'cenb.suprempoker.com').toLowerCase();let name=(url.pathname==='/'&&botHost)||url.pathname==='/bots'||url.pathname==='/bots/'?'bots-center.html':url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1));let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'public')+path.sep))fail('Forbidden',403);let contents=fs.readFileSync(f);
+ const audited=req.method==='POST'&&AUDITED.has(action),actor=audited?me((req.headers.authorization||'').replace(/^Bearer /,'')):null,before=actor?auditBefore(action,body):null;const value=action.startsWith('cenb/')?cenb.route(action.slice(5),body,(req.headers.authorization||'').replace(/^Bearer /,''),clientIp(req)):await route(req,res,url,body);if(actor&&actor.role!=='USER')audit(actor,action,body,req,{...before,...(value?.network?{network:value.network}:{})});res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));return;}let name=url.pathname==='/'?(onCenb?'cenb.html':'index.html'):url.pathname==='/cenb'&&devHost(host)?'cenb.html':decodeURIComponent(url.pathname.slice(1));
+ if(onCenb?!CENB_FILES.has(name):/^cenb\./.test(name)&&!devHost(host))fail('Not found',404);let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'public')+path.sep))fail('Forbidden',403);let contents=fs.readFileSync(f);
  // Stamp stylesheet and script links with their modification time so phones and
  // browsers always fetch the newest version after a change.
  if(name==='index.html')contents=String(contents).replace(/(\/[\w.-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
- res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':['index.html','bots-center.html'].includes(name)?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
+ res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name==='index.html'||name==='cenb.html'?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
 server.on('error',err=>{console.error('[Suprem Poker] server cannot start:',err.message);process.exit(1);});
 server.listen(PORT,()=>console.log(`Suprem Poker http://localhost:${PORT}`));
 // Set after everything started, so a failed start still stops the process.

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="sq"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png"><link rel="stylesheet" href="/cenb.css"><script type="module" src="/cenb.js"></script></head>
+<body>
+<section id="login"><form class="loginCard" id="loginForm" autocomplete="on"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Kontrolli i botave · hyrje e veçantë</p>
+ <label>Përdoruesi<input name="username" autocomplete="username" required></label>
+ <label>Fjalëkalimi<input name="password" type="password" autocomplete="current-password" required></label>
+ <button class="gold">Hyr</button><p class="err" id="loginErr" role="alert"></p></form></section>
+
+<div id="app" class="hidden">
+ <header class="top"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><div class="brand"><b>CENB</b><small>Kontrolli i botave</small></div><span class="live" id="live"><i></i><span>Live</span></span>
+  <div class="topActions"><button id="startAll" class="ghost">▶ Nis të gjithë</button><button id="stopAll" class="danger">■ Ndalo të gjithë</button><button id="logout" class="ghost">Dil</button></div></header>
+ <main>
+  <div id="banner" class="banner hidden"></div>
+  <section class="kpis" id="kpis"></section>
+  <nav class="tabs" id="tabs">
+   <button data-tab="bots" class="on">Botat <em id="nBots">0</em></button><button data-tab="new">Krijo</button><button data-tab="tables">Tavolinat <em id="nTables">0</em></button><button data-tab="players">Lojtarët</button><button data-tab="moves">Vendimet</button><button data-tab="limits">Limitet</button><button data-tab="log">Aktiviteti</button>
+  </nav>
+  <section data-pane="bots"><div class="bots" id="botList"></div></section>
+  <section data-pane="new" class="hidden"><div class="split">
+   <form class="card" id="createOne"><h2>Një bot</h2><p>Paratë dalin nga kredia e qendrës. Boti krijohet i ndalur.</p><div class="grid">
+    <label>Emri<input name="name" pattern="[a-zA-Z0-9_]{3,18}" placeholder="p.sh. marco_88" required></label>
+    <label>Buxheti (€)<input name="budget" type="number" min="0.01" step="0.01" required></label>
+    <div data-config style="display:contents"></div></div><p></p><button class="gold">Krijo botin</button></form>
+   <form class="card" id="createMany"><h2>Disa bota njëherësh</h2><p>Emra të zakonshëm, të gjeneruar vetë. Stili "Të përziera" i ndan në Tight, Balanced dhe Aggressive.</p><div class="grid">
+    <label>Sa bota (1–20)<input name="count" type="number" min="1" max="20" value="6" required></label>
+    <label>Buxheti për secilin (€)<input name="budget" type="number" min="0.01" step="0.01" required></label>
+    <div data-config data-mix style="display:contents"></div></div><p></p><button class="gold">Krijo botat</button></form>
+  </div></section>
+  <section data-pane="tables" class="hidden"><div class="card"><h2>Tavolinat me lojtarë</h2><p>Botat ulen vetëm aty ku ka lojtarë të vërtetë dhe vende të lira, dhe ngrihen kur tavolina mbushet ose kur dikush pret radhën.</p><div class="tableWrap" id="tableList"></div></div></section>
+  <section data-pane="players" class="hidden"><div class="card"><h2>Stili i lojtarëve</h2><p>Çfarë kanë mësuar botat nga veprimet publike të lojtarëve (asnjëherë nga letrat e tyre). VPIP: sa shpesh hyn në pot · PFR: sa shpesh ngre para flop-it · AF: agresiviteti · Fold: sa shpesh heq dorë përballë një basti.</p><div class="tableWrap" id="playerList"></div></div></section>
+  <section data-pane="moves" class="hidden"><div class="card"><h2>Vendimet e fundit</h2><p>Shanset llogariten nga letrat e botit dhe nga ato që mund të ketë kundërshtari sipas lojës së tij.</p><div class="tableWrap" id="moveList"></div></div></section>
+  <section data-pane="limits" class="hidden"><form class="card" id="limitsForm"><h2>Mbrojtja e shtëpisë</h2><p>Kur të gjithë botat bashkë humbasin sa limiti, ndalen dhe ngrihen nga tavolinat. Nisin vetë sërish në periudhën tjetër (ora e Tiranës). 0 do të thotë pa limit. Llogariten edhe chipet, edhe rake-u që botat i kthejnë qendrës.</p><div class="grid">
+   <label>Humbja max në ditë (€)<input name="dailyLimit" type="number" min="0" step="0.01"></label>
+   <label>Humbja max në javë (€)<input name="weeklyLimit" type="number" min="0" step="0.01"></label>
+   <label>Humbja max në muaj (€)<input name="monthlyLimit" type="number" min="0" step="0.01"></label>
+   <label>Big blind më i lartë (€) · 0 pa limit<input name="maxBB" type="number" min="0" step="0.01"></label>
+   <label>Bota për tavolinë (1–4)<input name="maxPerTable" type="number" min="1" max="4" step="1"></label>
+   <button class="gold">Ruaj limitet</button></div></form></section>
+  <section data-pane="log" class="hidden"><div class="card"><h2>Aktiviteti në CENB</h2><p>Çdo hyrje dhe çdo ndryshim, me adresën nga erdhi.</p><div class="tableWrap" id="logList"></div></div></section>
+ </main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+</body></html>

@@ -614,3 +614,40 @@ Deri më 15 nëntor 2026 (e diel) në orën 20:00 (ora e Tiranës, 19:00 UTC), k
 
 ## Domeni suprempoker.com
 Platforma kalon te **suprempoker.com** (blerë te Hostinger). Kodi nuk ka domen të shkruar brenda, ndaj nuk ndryshon asgjë në lojë: ndryshimi bëhet te DNS-i i Hostinger (rekordet A për `@` dhe `www` drejt IP-së së serverit të Coolify) dhe te Coolify (Domains: `https://suprempoker.com,https://www.suprempoker.com`). klorpoker.com hiqet nga Coolify dhe mbetet bosh. Llogaritë, balancat dhe tavolinat mbeten në të njëjtën databazë (`/data/klor.db`). Shfletuesit i ruajnë cilësimet sipas domenit, ndaj kush ka hyrë te klorpoker.com duhet të hyjë sërish një herë te domeni i ri, dhe ikona e shtuar në ekranin e telefonit duhet shtuar sërish. Për email-et e regjistrimit, domeni verifikohet te Resend dhe `EMAIL_FROM` bëhet p.sh. `Suprem Poker <no-reply@suprempoker.com>`.
+
+## Botat e ndershëm dhe CENB (cenb.suprempoker.com)
+Puna e AI-së tjetër u hoq e gjitha. Ndryshimet e saj të pa-commit-uara u ruajtën në `git stash`. U hoq edhe `bot-certainty.js`, që i lejonte botat të shihnin letrat e lojtarëve dhe board-in e ardhshëm.
+
+**Truri (`bot-brain.js`).** Boti vendos vetëm nga letrat e veta, board-i, stack-et, poti dhe veprimet që sheh çdo lojtar. Ai:
+- llogarit shanset kundër duarve që kundërshtari mund të ketë sipas mënyrës si ka luajtur atë dorë: kush ngre tre herë para flop-it ka dorë të fortë, kush bën bast në river rrallë është bosh;
+- njeh pozicionin, potin dhe çmimin e thirrjes, si dhe sa shpesh heq dorë kundërshtari;
+- zgjedh veprimin me vlerën më të lartë të pritshme;
+- blofon rrallë dhe me masë, dhe ndonjëherë luan ngadalë një dorë shumë të fortë.
+
+Para flop-it përdor tabela duarsh sipas pozicionit dhe thellësisë së stack-ut, me push/fold kur stack-u është i shkurtër. Stilet janë Tight, Balanced dhe Aggressive.
+
+**Mësimi i lojtarëve.** Botat mësojnë nga veprimet publike (VPIP, PFR, agresiviteti, fold ndaj bastit) dhe ruajnë vetëm numra, kurrë letra. Një test e provon që vendimi mbetet i njëjtë edhe kur ndryshohen letrat e kundërshtarëve dhe deku.
+
+**Shpejtësia.** Vendimet llogariten në një thread më vete (`bot-worker.js`), ndaj nuk e ngadalësojnë lojën.
+
+**Ku ulen.** Me "Auto", boti zgjedh vetë tavolinën ku një lojtar i vërtetë është vetëm ose me pak lojtarë, brenda big blind-it maksimal. Rregullat:
+- ulet vetëm ku ka lojtar të vërtetë dhe të paktën 2 vende të lira (1 në heads-up);
+- deri në 2 bota për tavolinë (ndryshohet 1–4);
+- ngrihet kur tavolina mbushet, kur dikush pret në radhë, kur lojtarët e vërtetë arrijnë 2/3 e vendeve, ose kur ikin të gjithë.
+
+**Mbrojtja e shtëpisë, pa mashtrim.** Kur arrihet një limit, botat ndalen dhe nisin vetë në periudhën tjetër. Limitet janë:
+- limit humbjeje dhe fitimi për çdo bot;
+- limit ditor, javor dhe mujor për të gjithë botat bashkë;
+- big blind-i maksimal ku ulen botat;
+- butoni "Ndalo të gjithë".
+
+**CENB.** Paneli hapet vetëm te `cenb.suprempoker.com`, me hyrjen e vet nga `CENB_USER` (parazgjedhur `cenb`) dhe `CENB_PASSWORD` (të paktën 12 shenja) te Coolify.
+- Ka 5 tentativa për adresë në 15 minuta, dhe sesioni mbaron pas 2 orësh pa aktivitet.
+- Domeni i pokerit nuk e hap CENB-në, dhe CENB-ja nuk hap faqen e pokerit.
+- Menaxhimi i botave u hoq nga paneli i qendrës.
+- Paneli tregon:
+  - rezultatin e shtëpisë sot, këtë javë dhe këtë muaj;
+  - botat, me nisje, ndalje, ndryshim, shtim parash dhe fshirje;
+  - krijimin e një boti ose deri në 20 njëherësh, me emra të zakonshëm;
+  - tavolinat, stilin e lojtarëve dhe vendimet e fundit me shanset;
+  - limitet dhe çdo veprim në panel, me adresën nga erdhi.
