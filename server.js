@@ -249,7 +249,7 @@ setInterval(guarded('owner check',checkOwner),1000).unref();
 // Table-filling bots act from the server; they are never logged in.
 const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake(),decider:workerDecider()});
 // CENB, the bot control room: its own address and its own sign-in (cenb.js).
-const cenb=createCenb({db,bots:botManager,save,fail});
+const cenb=createCenb({db,bots:botManager,save,fail,checkCenter:(name,password)=>{const c=db.users.find(x=>x.role==='CENTER'&&x.username.toLowerCase()===String(name).trim().toLowerCase());try{return !!c&&samePassword(c,password);}catch{return false;}}});
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});

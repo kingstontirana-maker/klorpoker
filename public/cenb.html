@@ -2,7 +2,14 @@
 <html lang="sq"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png"><link rel="stylesheet" href="/cenb.css"><script type="module" src="/cenb.js"></script></head>
 <body>
-<section id="login"><form class="loginCard" id="loginForm" autocomplete="on"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Kontrolli i botave · hyrje e veçantë</p>
+<section id="login"><form class="loginCard hidden" id="setupForm" autocomplete="off"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Hapja e parë: krijo hyrjen e CENB. Konfirmo një herë me llogarinë e qendrës. Pas kësaj, CENB hapet vetëm me përdoruesin dhe fjalëkalimin që zgjedh këtu.</p>
+ <label>Qendra · përdoruesi<input name="centerUsername" autocomplete="username" required></label>
+ <label>Qendra · fjalëkalimi<input name="centerPassword" type="password" autocomplete="current-password" required></label>
+ <label>CENB · përdoruesi i ri<input name="username" pattern="[a-zA-Z0-9_]{3,24}" value="cenb" required></label>
+ <label>CENB · fjalëkalimi i ri (12+ shenja, shkronja dhe numra)<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
+ <label>Përsërit fjalëkalimin e ri<input name="again" type="password" minlength="12" autocomplete="new-password" required></label>
+ <button class="gold">Krijo hyrjen</button><p class="err" id="setupErr" role="alert"></p></form>
+<form class="loginCard" id="loginForm" autocomplete="on"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Kontrolli i botave · hyrje e veçantë</p>
  <label>Përdoruesi<input name="username" autocomplete="username" required></label>
  <label>Fjalëkalimi<input name="password" type="password" autocomplete="current-password" required></label>
  <button class="gold">Hyr</button><p class="err" id="loginErr" role="alert"></p></form></section>
@@ -36,7 +43,12 @@
    <label>Humbja max në muaj (€)<input name="monthlyLimit" type="number" min="0" step="0.01"></label>
    <label>Big blind më i lartë (€) · 0 pa limit<input name="maxBB" type="number" min="0" step="0.01"></label>
    <label>Bota për tavolinë (1–4)<input name="maxPerTable" type="number" min="1" max="4" step="1"></label>
-   <button class="gold">Ruaj limitet</button></div></form></section>
+   <button class="gold">Ruaj limitet</button></div></form>
+  <form class="card" id="passForm"><h2>Fjalëkalimi i CENB</h2><p id="passNote">Pas ndryshimit, sesionet e tjera mbyllen.</p><div class="grid">
+   <label>Fjalëkalimi aktual<input name="current" type="password" autocomplete="current-password" required></label>
+   <label>I riu (12+ shenja)<input name="next" type="password" minlength="12" autocomplete="new-password" required></label>
+   <label>Përsërite<input name="again" type="password" minlength="12" autocomplete="new-password" required></label>
+   <button class="gold">Ndrysho</button></div></form></section>
   <section data-pane="log" class="hidden"><div class="card"><h2>Aktiviteti në CENB</h2><p>Çdo hyrje dhe çdo ndryshim, me adresën nga erdhi.</p><div class="tableWrap" id="logList"></div></div></section>
  </main>
 </div>

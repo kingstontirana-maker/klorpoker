@@ -11,14 +11,19 @@ function toast(text,bad=false){const t=$('#toast');t.textContent=text;t.classNam
 async function api(path,body){
  const r=await fetch('/api/cenb/'+path,{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(body||{})});
  const j=await r.json().catch(()=>({error:'The server did not answer'}));
- if(r.status===401&&path!=='login'){signOut();throw Error('Hyr sërish në CENB');}
+ if(r.status===401&&!['login','setup','password'].includes(path)){signOut();throw Error('Hyr sërish në CENB');}
  if(!r.ok)throw Error(j.error||'Error');return j;
 }
-function signOut(){token=null;try{sessionStorage.removeItem('cenbToken');}catch{}data=null;$('#app').classList.add('hidden');$('#login').classList.remove('hidden');}
+function signOut(){token=null;try{sessionStorage.removeItem('cenbToken');}catch{}data=null;$('#app').classList.add('hidden');$('#login').classList.remove('hidden');showSignIn();}
 
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginErr').textContent='';const f=e.target;
  try{const r=await api('login',{username:f.username.value,password:f.password.value});token=r.token;try{sessionStorage.setItem('cenbToken',token);}catch{}f.reset();await start();}
  catch(err){$('#loginErr').textContent=err.message;}};
+$('#setupForm').onsubmit=async e=>{e.preventDefault();$('#setupErr').textContent='';const f=e.target;if(f.password.value!==f.again.value){$('#setupErr').textContent='Fjalëkalimet e reja nuk janë njësoj';return;}
+ try{const r=await api('setup',{centerUsername:f.centerUsername.value,centerPassword:f.centerPassword.value,username:f.username.value,password:f.password.value});token=r.token;try{sessionStorage.setItem('cenbToken',token);}catch{}f.reset();toast('Hyrja e CENB u krijua. Përdoruesi: '+r.user);await start();}
+ catch(err){$('#setupErr').textContent=err.message;}};
+$('#passForm').onsubmit=async e=>{e.preventDefault();const f=e.target;if(f.next.value!==f.again.value)return toast('Fjalëkalimet e reja nuk janë njësoj',true);try{await api('password',{current:f.current.value,next:f.next.value});f.reset();toast('Fjalëkalimi u ndryshua');}catch(err){toast(err.message,true);}};
+async function showSignIn(){try{const s=await fetch('/api/cenb/status',{method:'POST'}).then(r=>r.json());$('#setupForm').classList.toggle('hidden',!s.setup);$('#loginForm').classList.toggle('hidden',!!s.setup);}catch{}}
 $('#logout').onclick=async()=>{try{await api('logout');}catch{}signOut();};
 
 async function start(){$('#login').classList.add('hidden');$('#app').classList.remove('hidden');await refresh(true);}
@@ -99,6 +104,7 @@ function renderOthers(){
  const sq={fold:'Fold',check:'Check',call:'Call',raise:'Raise'},st={preflop:'Preflop',flop:'Flop',turn:'Turn',river:'River'};
  $('#moveList').innerHTML=table(['Kur','Boti','Tavolina','Dora ','Rruga','Veprimi','Shuma ','Poti ','Shanset '],data.decisions.map(d=>'<tr><td>'+ago(d.at)+'</td><td>'+safe(d.bot)+'</td><td>'+safe(d.table)+'</td>'+num('#'+d.hand)+'<td>'+(st[d.street]||d.street)+'</td><td>'+(sq[d.action]||d.action)+'</td>'+num(d.amount!=null?eur(d.amount):'')+num(eur(d.pot))+num(d.equity!=null?d.equity+'%':'—')+'</tr>'),'Asnjë vendim ende.');
  $('#logList').innerHTML=table(['Kur','Veprimi','Detaje','Adresa'],data.log.map(l=>'<tr><td>'+new Date(l.at).toLocaleString('en-GB')+'</td><td>'+safe(l.action)+'</td><td>'+safe(l.detail)+'</td><td class="muted">'+safe(l.ip)+'</td></tr>'),'Asnjë veprim ende.');
+ $('#passForm').classList.toggle('hidden',!!data.signIn?.fromServer);
  const f=$('#limitsForm');if(!f.contains(document.activeElement))for(const k of ['dailyLimit','weeklyLimit','monthlyLimit','maxBB','maxPerTable'])f[k].value=data.guard[k];
 }
 $('#limitsForm').onsubmit=async e=>{e.preventDefault();try{await api('bots/settings',Object.fromEntries(new FormData(e.target)));toast('Limitet u ruajtën');await refresh();}catch(err){toast(err.message,true);}};
@@ -108,4 +114,4 @@ async function refresh(first=false){
  catch(err){$('#live').classList.add('off');if(first)toast(err.message,true);}
 }
 setInterval(()=>{if(token&&data&&!document.hidden&&!document.activeElement?.closest('form'))refresh();},3000);
-if(token)start().catch(()=>signOut());
+if(token)start().catch(()=>signOut());else showSignIn();

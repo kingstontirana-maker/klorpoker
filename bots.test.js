@@ -181,27 +181,40 @@ test('auto mode: a bot finds the table where a real player sits alone, within th
 test('bots learn players\' habits from public actions only',()=>{
  const {center,db,engine,t,manager,human}=world();
  manager.route('/api/bots/create',{name:'Scout',budget:500,tableId:'1',buyin:100,stopLoss:500},center);const b=db.users.find(u=>u.isBot);manager.route('/api/bots/status',{id:b.id,enabled:true},center);
- const h1=human(1,500000),h2=human(2,500000);sitDeep(engine,t,h1,0,500);sitDeep(engine,t,h2,3,500);
- for(let hand=0;hand<40;hand++){manager.tick();if(!engine.startHand(t))break;playHand(engine,manager,t,new Set([b.id]),(s,owe)=>s.userId==='h1'?(owe?'call':'check'):(owe?'fold':'check'));manager.tick();}
- const p1=manager.profileOf('h1'),p2=manager.profileOf('h2');assert.ok(p1&&p2);assert.ok(p1.hands>=10);
+ // The caller is deep enough that a winning bot never empties the stack in this test.
+ const h1=human(1,5000000),h2=human(2,500000);sitDeep(engine,t,h1,0,50000);sitDeep(engine,t,h2,3,500);
+ for(let hand=0;hand<40;hand++){manager.tick();if(!engine.startHand(t))break;playHand(engine,manager,t,new Set([b.id]),(s,owe)=>{manager.tick();return s.userId==='h1'?(owe?'call':'check'):(owe?'fold':'check');});manager.tick();}
+ const p1=manager.profileOf('h1'),p2=manager.profileOf('h2');assert.ok(p1&&p2);assert.ok(p1.hands>=20,'hands seen: '+p1.hands);
  assert.ok(p1.vpip>p2.vpip,'the caller plays more hands than the folder');assert.ok(p2.ftb>p1.ftb,'the folder folds more to bets');
  const stored=JSON.stringify(db.botProfiles);assert.ok(!/[2-9TJQKA][cdhs]/.test(stored.replace(/"[^"]*":/g,'')),'only numbers are kept, no cards');
 });
 
-test('CENB: its own sign-in, lockout, and only its own address',()=>{
+test('CENB: first-visit setup by the center, its own sign-in, lockout, and only its own address',()=>{
  const db={users:[{id:'c',username:'center',role:'CENTER',balance:100000}],ledger:[]},fail=(m,s=400)=>{throw Object.assign(Error(m),{status:s});};
  const bots={route:(p)=>p==='/api/bots/overview'?{bots:[],guard:{}}:p==='/api/bots/guard'?{ok:1}:undefined};
- const off=createCenb({db,bots,save:()=>{},fail,env:{}});assert.throws(()=>off.route('login',{username:'cenb',password:'x'},'','1.1.1.1'),/not set up/);
- assert.throws(()=>createCenb({db,bots,save:()=>{},fail,env:{CENB_PASSWORD:'short'}}).route('login',{username:'cenb',password:'short'},'','1'),/not set up/,'a short password is not accepted');
- const c=createCenb({db,bots,save:()=>{},fail,env:{CENB_USER:'Boss',CENB_PASSWORD:'a-long-test-passphrase'}});
+ const checkCenter=(n,p)=>n.toLowerCase()==='center'&&p==='center-pass-123';
+ const c=createCenb({db,bots,save:()=>{},fail,env:{},checkCenter});
+ assert.deepEqual(c.route('status',{},'','1'),{ready:false,setup:true});assert.throws(()=>c.route('login',{username:'cenb',password:'x'},'','1'),/no sign-in yet/);
+ assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'nope',username:'boss',password:'a-long-pass-2026'},'','4.4.4.4'),/center username or password is wrong/);
+ assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'center-pass-123',username:'boss',password:'short1'},'','4'),/12 characters/);
+ assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'center-pass-123',username:'boss',password:'center-pass-123'},'','4'),/different from the center/);
+ const first=c.route('setup',{centerUsername:'Center',centerPassword:'center-pass-123',username:'Boss',password:'a-long-pass-2026'},'','4');assert.equal(first.user,'boss');assert.ok(first.token.length>=64);
+ assert.ok(db.cenbAuth.hash&&!JSON.stringify(db.cenbAuth).includes('a-long-pass-2026'),'only a hash is stored');
+ assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'center-pass-123',username:'x2y',password:'another-pass-2026'},'','4'),/already has a sign-in/);
+ assert.throws(()=>c.route('login',{username:'center',password:'center-pass-123'},'','5.5.5.5'),/Wrong username or password/,'the center account does not open CENB');
  assert.throws(()=>c.route('overview',{},'','1.1.1.1'),/Sign in/);
  for(let i=0;i<5;i++)assert.throws(()=>c.route('login',{username:'boss',password:'wrong'},'','2.2.2.2'),/Wrong username or password/);
- assert.throws(()=>c.route('login',{username:'boss',password:'a-long-test-passphrase'},'','2.2.2.2'),/Too many/,'locked after five tries');
- const {token}=c.route('login',{username:'BOSS',password:'a-long-test-passphrase'},'','3.3.3.3');assert.ok(token.length>=64);
- assert.equal(c.route('overview',{},token,'3.3.3.3').centerBalance,1000);assert.deepEqual(c.route('bots/guard',{},token,'3.3.3.3'),{ok:1});
- assert.throws(()=>c.route('bots/nothing',{},token,'3'),/Not found/);
- assert.ok(db.cenbLog.some(l=>l.action==='Failed sign-in')&&db.cenbLog.some(l=>l.action==='Signed in'));
+ assert.throws(()=>c.route('login',{username:'boss',password:'a-long-pass-2026'},'','2.2.2.2'),/Too many/,'locked after five tries');
+ const {token}=c.route('login',{username:'BOSS',password:'a-long-pass-2026'},'','3.3.3.3');
+ assert.equal(c.route('overview',{},token,'3').centerBalance,1000);assert.deepEqual(c.route('bots/guard',{},token,'3'),{ok:1});assert.throws(()=>c.route('bots/nothing',{},token,'3'),/Not found/);
+ assert.throws(()=>c.route('password',{current:'wrong',next:'new-long-pass-2027'},token,'3'),/current password/);
+ c.route('password',{current:'a-long-pass-2026',next:'new-long-pass-2027'},token,'3');assert.throws(()=>c.route('overview',{},first.token,'4'),/Sign in/,'other sessions end');
+ assert.ok(c.route('login',{username:'boss',password:'new-long-pass-2027'},'','6').token);
+ assert.ok(db.cenbLog.some(l=>l.action==='Failed sign-in')&&db.cenbLog.some(l=>l.action==='Created the CENB sign-in'));
  c.route('logout',{},token,'3');assert.throws(()=>c.route('overview',{},token,'3'),/Sign in/);
+ // A password on the server takes precedence over the stored one.
+ const e=createCenb({db,bots,save:()=>{},fail,env:{CENB_USER:'Ops',CENB_PASSWORD:'server-side-pass-1'},checkCenter});
+ assert.ok(e.route('login',{username:'ops',password:'server-side-pass-1'},'','7').token);assert.throws(()=>e.route('login',{username:'boss',password:'new-long-pass-2027'},'','8'),/Wrong/);
  assert.ok(cenbHost('cenb.suprempoker.com')&&cenbHost('CENB.suprempoker.com:443')&&!cenbHost('suprempoker.com')&&!cenbHost('www.suprempoker.com'));
  assert.ok(devHost('localhost:3100')&&devHost('127.0.0.1')&&!devHost('suprempoker.com'));
 });

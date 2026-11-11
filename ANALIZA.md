@@ -651,3 +651,11 @@ Para flop-it përdor tabela duarsh sipas pozicionit dhe thellësisë së stack-u
   - krijimin e një boti ose deri në 20 njëherësh, me emra të zakonshëm;
   - tavolinat, stilin e lojtarëve dhe vendimet e fundit me shanset;
   - limitet dhe çdo veprim në panel, me adresën nga erdhi.
+
+**Hyrja në CENB pa Coolify.** Herën e parë që hapet `cenb.suprempoker.com`, del faqja "Krijo hyrjen e CENB".
+- Qendra konfirmon një herë me përdoruesin dhe fjalëkalimin e saj të pokerit.
+- Pastaj zgjedh përdoruesin e CENB-së (parazgjedhur `cenb`) dhe një fjalëkalim me 12+ shenja, shkronja dhe numra, të ndryshëm nga ai i qendrës.
+- Ruhet vetëm hash-i (`db.cenbAuth`).
+- Pas kësaj, llogaria e qendrës nuk hap më CENB-në, dhe faqja e krijimit nuk del më.
+- Fjalëkalimi ndryshohet te Limitet → "Fjalëkalimi i CENB". Kur ndryshohet, mbyllen sesionet e tjera.
+- `CENB_PASSWORD` te Coolify mbetet opsionale. Nëse vendoset, ka përparësi.
