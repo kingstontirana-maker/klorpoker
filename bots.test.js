@@ -2,7 +2,7 @@ import test from 'node:test';import {sitDeep} from './test-helpers.js';
 import assert from 'node:assert/strict';
 import {createEngine,LIVE} from './game.js';
 import {createBots,botDecision,botView,handStrength,preflopRank,rangeEquity} from './bots.js';
-import {createCenb,cenbHost,devHost} from './cenb.js';
+import {createCenb} from './cenb.js';
 
 const seeded=(a=7)=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};
 function world(opts={}){
@@ -189,7 +189,7 @@ test('bots learn players\' habits from public actions only',()=>{
  const stored=JSON.stringify(db.botProfiles);assert.ok(!/[2-9TJQKA][cdhs]/.test(stored.replace(/"[^"]*":/g,'')),'only numbers are kept, no cards');
 });
 
-test('CENB: first-visit setup by the center, its own sign-in, lockout, and only its own address',()=>{
+test('CENB: first-visit setup by the center, its own sign-in and lockout',()=>{
  const db={users:[{id:'c',username:'center',role:'CENTER',balance:100000}],ledger:[]},fail=(m,s=400)=>{throw Object.assign(Error(m),{status:s});};
  const bots={route:(p)=>p==='/api/bots/overview'?{bots:[],guard:{}}:p==='/api/bots/guard'?{ok:1}:undefined};
  const checkCenter=(n,p)=>n.toLowerCase()==='center'&&p==='center-pass-123';
@@ -215,8 +215,6 @@ test('CENB: first-visit setup by the center, its own sign-in, lockout, and only 
  // A password on the server takes precedence over the stored one.
  const e=createCenb({db,bots,save:()=>{},fail,env:{CENB_USER:'Ops',CENB_PASSWORD:'server-side-pass-1'},checkCenter});
  assert.ok(e.route('login',{username:'ops',password:'server-side-pass-1'},'','7').token);assert.throws(()=>e.route('login',{username:'boss',password:'new-long-pass-2027'},'','8'),/Wrong/);
- assert.ok(cenbHost('cenb.suprempoker.com')&&cenbHost('CENB.suprempoker.com:443')&&!cenbHost('suprempoker.com')&&!cenbHost('www.suprempoker.com'));
- assert.ok(devHost('localhost:3100')&&devHost('127.0.0.1')&&!devHost('suprempoker.com'));
 });
 
 test('decisions on the bot thread come back and the game plays on with them',async()=>{

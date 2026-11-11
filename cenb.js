@@ -1,13 +1,12 @@
-// CENB: the bot control room. It lives on its own address (cenb.suprempoker.com) with its
-// own sign-in. The first visit creates that sign-in: the center confirms once with its
-// poker account and chooses the CENB username and password; from then on only those open
-// CENB, and the poker account no longer does. CENB_PASSWORD on the server, if set, takes
-// precedence (username CENB_USER, default "cenb").
+// CENB: the bot control room's interface on the poker server (/api/cenb/...). The panel itself
+// is a separate project (suprem-cenb, cenb.suprempoker.com) that forwards its requests here.
+// The first visit creates the CENB sign-in: the center confirms once with its poker account and
+// chooses the CENB username and password; from then on only those open CENB, and the poker
+// account no longer does. CENB_PASSWORD on the server, if set, takes precedence (username
+// CENB_USER, default "cenb").
 import crypto from 'node:crypto';
 
 const IDLE_MS=2*3600_000,MAX_MS=12*3600_000,LOCK_MS=15*60_000;
-export const cenbHost=host=>/^cenb\./i.test(String(host||'').split(':')[0]);
-export const devHost=host=>['localhost','127.0.0.1','[::1]'].includes(String(host||'').toLowerCase().replace(/:\d+$/,''));
 const sha=v=>crypto.createHash('sha256').update(String(v)).digest();
 const strong=p=>String(p).length>=12&&/[a-zA-Z]/.test(p)&&/[0-9]/.test(p);
 

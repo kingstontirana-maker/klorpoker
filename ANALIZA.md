@@ -659,3 +659,8 @@ Para flop-it përdor tabela duarsh sipas pozicionit dhe thellësisë së stack-u
 - Pas kësaj, llogaria e qendrës nuk hap më CENB-në, dhe faqja e krijimit nuk del më.
 - Fjalëkalimi ndryshohet te Limitet → "Fjalëkalimi i CENB". Kur ndryshohet, mbyllen sesionet e tjera.
 - `CENB_PASSWORD` te Coolify mbetet opsionale. Nëse vendoset, ka përparësi.
+
+**CENB si projekt më vete.** Paneli u nxor nga ky projekt dhe tani është projekti `suprem-cenb` (`C:\xampp\htdocs\suprem-cenb`), me repo, aplikacion Coolify dhe domain `cenb.suprempoker.com` të vetat.
+- Projekti CENB shërben panelin dhe ia kalon çdo kërkesë serverit të pokerit te `/api/cenb/...`. Nuk ruan të dhëna.
+- Motori i botave (`bots.js`, `bot-brain.js`, `bot-worker.js`) dhe hyrja e CENB-së (`cenb.js`) mbeten këtu, sepse botat luajnë në tavolinat e këtij serveri.
+- Faqja e pokerit nuk e shërben më panelin.
