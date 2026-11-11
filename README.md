@@ -23,8 +23,8 @@ by the original budget or top-ups. The outstanding target is the configured
 percentage of net profit before previously recorded returns, minus those returns.
 Pending calls reserve that allowance until settlement. Refunded/cancelled hands
 and bot-to-bot winnings do not count; rake is conservatively excluded from recorded
-returns. Overview reports `returned` and `returnAvailable` per bot. The separate
-`suprem-cenb` panel exposes this under Limitet → Kthimi te lojtarët, with a
+returns. Overview reports `returned` and `returnAvailable` per bot. The
+bundled CENB panel exposes this under Limitet → Kthimi te lojtarët, with a
 0–100% slider, numeric input, saved percentage and per-bot return statistics.
 Calls follow opponents' bet sizes; selection and timing vary, with no raises or
 voluntary all-ins. This is an approximate target over future suitable hands,
@@ -123,3 +123,19 @@ Accounts, balances, transactions and hands live in the SQLite database `klor.db`
 1. Coolify → the application → **Persistent Storage** → add a volume, e.g. name `klorpoker-data`, destination `/data`.
 2. **Environment Variables** → `STATE_FILE=/data/state.json` (and optionally `CENTER_PASSWORD` for a brand-new database).
 3. Redeploy. To restore a database, stop the app and copy `klor.db` into the volume (Coolify → Terminal), together with `klor.db-wal` if it exists, then start it.
+
+## Bundled CENB control panel
+
+CENB ships in this repository under `public/cenb/` and uses the existing
+`/api/cenb/...` endpoints directly. Open `/cenb/` on the poker server, or
+`https://cenb.suprempoker.com/`; that exact Host serves the panel at `/`,
+while the main poker domain keeps the player homepage. CENB retains its own
+sign-in, setup, sessions and bot controls, including the profit-return slider.
+No separate CENB application or API proxy is needed.
+
+In Coolify, assign both `https://suprempoker.com` and
+`https://cenb.suprempoker.com` to this poker application (port 3000),
+remove the CENB domain from any other application, and redeploy this repository.
+Keep the existing database volume; this change needs no account or balance reset.
+Validation: `node --test --experimental-test-isolation=none cenb-routing.test.js`
+and `node tools/check-cenb-returns.mjs` (isolated Chrome fixtures).

@@ -1,6 +1,6 @@
 import {rakeReport,revenueReport,pct,isUnder} from './rake.js';
 import {createBots,workerDecider} from './bots.js';
-import {createCenb} from './cenb.js';
+import {createCenb,cenbDocument} from './cenb.js';
 import {createPayments} from './payments.js';
 import {openStore} from './store.js';
 import {seatedFromSameDevice,descendants,recordSeen,sharedGroups,pairSignals,handSummaryFor,handFor,SIGNALS} from './security.js';
@@ -248,7 +248,7 @@ function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner|
 setInterval(guarded('owner check',checkOwner),1000).unref();
 // Table-filling bots act from the server; they are never logged in.
 const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake(),decider:workerDecider()});
-// CENB, the bot control room, is a project of its own (suprem-cenb, cenb.suprempoker.com).
+// CENB is bundled at /cenb/ and at the root of cenb.suprempoker.com.
 // It reaches the bots only through /api/cenb/..., behind its own sign-in (cenb.js).
 const cenb=createCenb({db,bots:botManager,save,fail,checkCenter:(name,password)=>{const c=db.users.find(x=>x.role==='CENTER'&&x.username.toLowerCase()===String(name).trim().toLowerCase());try{return !!c&&samePassword(c,password);}catch{return false;}}});
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
@@ -291,12 +291,12 @@ export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object
  }if(url.pathname.startsWith('/api/')){let input='';for await(const c of req){input+=c;if(input.length>50_000)fail('Body too large',413);}let body={};try{body=input?JSON.parse(input):{};}catch{fail('Invalid JSON');}const action=url.pathname.slice(5);
  // Saving is failing: nothing new that moves money until it works again. Hands in play finish.
  if(saveFailed&&req.method==='POST'&&PAUSED.test(action)){save();if(saveFailed)fail('Saving is not working right now, so this was not done. Please try again shortly.',503);}
- const audited=req.method==='POST'&&AUDITED.has(action),actor=audited?me((req.headers.authorization||'').replace(/^Bearer /,'')):null,before=actor?auditBefore(action,body):null;const value=action.startsWith('cenb/')?cenb.route(action.slice(5),body,(req.headers.authorization||'').replace(/^Bearer /,''),clientIp(req)):await route(req,res,url,body);if(actor&&actor.role!=='USER')audit(actor,action,body,req,{...before,...(value?.network?{network:value.network}:{})});res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));return;}let name=url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1));
+ const audited=req.method==='POST'&&AUDITED.has(action),actor=audited?me((req.headers.authorization||'').replace(/^Bearer /,'')):null,before=actor?auditBefore(action,body):null;const value=action.startsWith('cenb/')?cenb.route(action.slice(5),body,(req.headers.authorization||'').replace(/^Bearer /,''),clientIp(req)):await route(req,res,url,body);if(actor&&actor.role!=='USER')audit(actor,action,body,req,{...before,...(value?.network?{network:value.network}:{})});res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));return;}let name=cenbDocument(req.headers.host,url.pathname)||(url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1)));
 let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'public')+path.sep))fail('Forbidden',403);let contents=fs.readFileSync(f);
  // Stamp stylesheet and script links with their modification time so phones and
  // browsers always fetch the newest version after a change.
  if(name==='index.html')contents=String(contents).replace(/(\/[\w.-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
- res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name==='index.html'?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
+ res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name.endsWith('index.html')?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
 server.on('error',err=>{console.error('[Suprem Poker] server cannot start:',err.message);process.exit(1);});
 server.listen(PORT,()=>console.log(`Suprem Poker http://localhost:${PORT}`));
 // Set after everything started, so a failed start still stops the process.

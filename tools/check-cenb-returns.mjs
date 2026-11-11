@@ -4,18 +4,18 @@ import path from 'node:path';
 import http from 'node:http';
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
-const root='C:/xampp/htdocs/suprem-cenb/public',out=path.resolve('artifacts');
+const root=path.resolve('public/cenb'),out=path.resolve('artifacts');
 fs.mkdirSync(out,{recursive:true});
 const fixture={guard:{returnPercent:25,dailyLimit:50,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,today:0,week:0,month:0},bots:[{id:'b',name:'Demo',status:'Stopped',enabled:false,style:'Balanced',mode:'play',tableId:'auto',buyinBB:100,stopLoss:50,equity:120,total:20,session:20,hands:10,rakePaid:0,house:20,returned:5,returnAvailable:15}],tables:[],players:[],decisions:[],catalog:[],log:[],centerBalance:1000};
 let settings=[];
 const server=http.createServer(async(req,res)=>{
  if(req.url.startsWith('/api/')){let raw='';for await(const c of req)raw+=c;let value=fixture;
-  if(req.url==='/api/status')value={ready:true};
-  if(req.url==='/api/bots/settings'){const body=JSON.parse(raw);settings.push(body);fixture.guard.returnPercent=body.returnPercent;value=fixture.guard;}
+  if(req.url==='/api/cenb/status')value={ready:true};
+  if(req.url==='/api/cenb/bots/settings'){const body=JSON.parse(raw);settings.push(body);fixture.guard.returnPercent=body.returnPercent;value=fixture.guard;}
   res.setHeader('content-type','application/json');res.end(JSON.stringify(value));return;
  }
- const name=req.url==='/'?'index.html':req.url.slice(1);if(!['index.html','cenb.js','cenb.css','logo.webp','icon.png'].includes(name)){res.writeHead(404);res.end();return;}
- res.setHeader('content-type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.html')?'text/html':'image/webp');res.end(name==='cenb.js'?fs.readFileSync(path.join(root,name),'utf8')+'\nwindow.__refresh=refresh;':fs.readFileSync(path.join(root,name)));
+ const name=req.url==='/'?'index.html':req.url.slice(1).replace(/^cenb\//,'');if(!['index.html','cenb.js','cenb.css','logo.webp','icon.png'].includes(name)){res.writeHead(404);res.end();return;}
+ res.setHeader('content-type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.html')?'text/html':'image/webp');res.end(name==='cenb.js'?fs.readFileSync(path.join(root,name),'utf8')+'\nwindow.__refresh=refresh;':fs.readFileSync(path.join(root,['logo.webp','icon.png'].includes(name)?'../'+name:name)));
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const origin='http://127.0.0.1:'+server.address().port;
