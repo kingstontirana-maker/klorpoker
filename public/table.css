@@ -17,7 +17,7 @@ body[data-view="table"] #app{display:flex;flex-direction:column;min-height:100dv
 body[data-view="table"] header{height:52px;min-height:52px;padding:0 20px;background:#0a110fcc;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 body[data-view="table"] header .brand{font-size:15px}
 body[data-view="table"] header button,body[data-view="table"] #balanceTag{padding:7px 11px;font-size:12px}
-.game{display:grid;grid-template-rows:auto minmax(var(--stage-min,440px),1fr) auto;flex:1;min-height:calc(100dvh - 52px);width:100%;max-width:1680px;margin:0 auto;padding:0 16px;position:relative}
+.game{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(var(--stage-min,440px),1fr) auto;flex:1;min-height:calc(100dvh - 52px);width:100%;max-width:1680px;margin:0 auto;padding:0 16px;position:relative}
 .game[hidden]{display:none}
 
 /* ---------- Toolbar ---------- */
@@ -675,3 +675,5 @@ body[data-view="table"]{background:transparent}
 body[data-view="table"]::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#000000b8 0,#00000000 20%),url(/table-bg.webp) center/cover no-repeat,#050a08}
 /* Nine seats share the same felt: slightly smaller seats. */
 .game.nineMax .seat:not(.me){scale:.86}
+/* Nothing in the action panel may widen the table: long rows wrap instead. */
+.game>*{min-width:0}.dockExtras{flex-wrap:wrap}

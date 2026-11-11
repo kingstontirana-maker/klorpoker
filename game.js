@@ -8,7 +8,7 @@ export const LIVE=['preflop','flop','turn','river'];
 export const ACTION_MS=30000,BETWEEN_HANDS_MS=8000,RESULT_REVEAL_MS=8000,REBUY_WINDOW_MS=30000,SIT_OUT_MS=5*60000;
 // A seated player whose browser stops checking in is protected: sat out after
 // AWAY_MS, cashed out to the wallet after AWAY_CASHOUT_MS.
-export const AWAY_MS=25000,AWAY_CASHOUT_MS=3*60000;
+export const AWAY_MS=25000,AWAY_CASHOUT_MS=3*60000,AWAY_GRACE_MS=8000;
 // A player may sit at up to MAX_TABLES tables at once. When a full table frees a
 // seat, the first player on its waiting list has WAIT_OFFER_MS to take it.
 export const MAX_TABLES=4,WAIT_OFFER_MS=45000;
@@ -334,7 +334,8 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    else if(s.sittingOut&&now-s.sitOutSince>=SIT_OUT_MS&&idle){cashOutSeat(t,i,'SIT_OUT');changed=true;}
    else if(t.phase==='waiting'){s.idleSince??=now;if(now-s.idleSince>=IDLE_TABLE_MS){cashOutSeat(t,i,'IDLE_TABLE');changed=true;}}
    else delete s.idleSince;}
-  if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}if(t.turn>=0&&(now>=t.deadline||t.seats[t.turn].autoSitOut))act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}
+  if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}// A player who just lost the connection still gets AWAY_GRACE_MS of their turn to come back.
+  if(t.turn>=0&&(now>=t.deadline||t.seats[t.turn].autoSitOut&&now-t.turnStartedAt>=AWAY_GRACE_MS))act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}
   if(now-t.lastActionAt>=BETWEEN_HANDS_MS){if(t.seats.some(s=>(s?.inactiveHands||0)>=INACTIVE_HANDS)){removeInactive(t);changed=true;}if(t.seats.filter(s=>eligible(t,s)).length>=2){startHand(t);changed=true;}else if(t.phase==='finished'||t.board.length||t.seats.some(s=>s?.cards.length)){clearTable(t);changed=true;}}
   if(changed)save();
  }

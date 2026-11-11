@@ -664,3 +664,12 @@ Para flop-it përdor tabela duarsh sipas pozicionit dhe thellësisë së stack-u
 - Projekti CENB shërben panelin dhe ia kalon çdo kërkesë serverit të pokerit te `/api/cenb/...`. Nuk ruan të dhëna.
 - Motori i botave (`bots.js`, `bot-brain.js`, `bot-worker.js`) dhe hyrja e CENB-së (`cenb.js`) mbeten këtu, sepse botat luajnë në tavolinat e këtij serveri.
 - Faqja e pokerit nuk e shërben më panelin.
+
+## Rregullime në tavolinë (raport nga loja)
+- **Emrat dhe krediti që lëviznin.** Paneli i butonave ndryshon lartësinë (radha jote, para-zgjedhjet, pritja), dhe tavolina rillogaritej sa herë ndryshonte paneli, ndaj lëviznin të gjithë lojtarët. Këtë e shihja në pamjen vertikale, si në tablet ose dritare të ngushtë. Tani tavolina llogaritet për panelin më të lartë që ka nevojë ky ekran, i matur që në fillim, dhe nuk lëviz më. Asgjë në panel nuk e zgjeron më tavolinën.
+- **Butonat që nganjëherë nuk punonin.** Teksti i Call dhe Raise rishkruhej në çdo përditësim. Nëse kjo ndodhte gjatë prekjes, shfletuesi e humbte klikimin. Tani teksti ndryshon vetëm kur ndryshon vlera. Pas veprimit butonat nuk mbeten të bllokuar duke pritur rifreskimin, dhe një radhë merr vetëm një veprim.
+- **Fold sapo nis dora.** Butonat Fold/Check/Raise shfaqen aty ku ishin para-zgjedhjet ("Check/Fold", "Call any"). Një prekje në atë çast binte mbi Fold. Tani prekjet në 0.4 s e para pas shfaqjes nuk llogariten. Në server, lojtari që sapo humbi lidhjen ka 8 sekonda kur i vjen radha, në vend të fold-it të menjëhershëm (`AWAY_GRACE_MS`).
+- **Tingujt pa pushim pas lobby-t.** Telefonat e ngrijnë orën e audios kur ekrani fiket ose faqja s'shihet, dhe tingujt grumbulloheshin për t'u luajtur njëherësh. Tani:
+  - asnjë tingull nuk planifikohet më shumë se 1 s përpara;
+  - tingujt nuk luhen kur ora e audios është e ngrirë;
+  - kur del nga tavolina ose fsheh faqen, ndalen të gjithë tingujt e mbetur.

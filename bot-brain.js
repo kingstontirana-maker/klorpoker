@@ -188,6 +188,10 @@ function postflop(v,st,random,E){
 
 // One decision. v is the bot's view of the table (see botView in bots.js).
 export function decide(v,style='medium',random=Math.random){
+ if(Object.hasOwn(v,'outcome')){
+  const type=!v.toCall?'check':v.outcome==='win'&&v.toCall<v.stack?'call':'fold';
+  return {type,equity:v.outcome==='win'?1:v.outcome==='loss'?0:null};
+ }
  const st=STYLES[style]||STYLES.medium;
  const opponents=(v.opponents||[]).filter(o=>!o.folded).map(o=>({...o,model:opponentModel(o)}));
  if(v.board.length<3){const d=preflop({...v,opponents},st,random);return {...d,equity:null};}

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {Worker} from 'node:worker_threads';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {decide,handStrength,rangeEquity,preflopRank,STYLES} from './bot-brain.js';
+import {evaluateHand,compare} from './poker.js';
 export {handStrength,rangeEquity,preflopRank,STYLES};
 
 // House bots keep thin tables going. They play honestly: a decision is made only from the
@@ -20,11 +21,22 @@ export function botView(t,s,profileOf=()=>null){
  const after=dealt.slice(dealt.indexOf(idx)+1).filter(p=>!t.seats[p].folded&&!t.seats[p].allIn);
  const start=dealt.indexOf(t.bbPos),pre=start<0?dealt:[...dealt.slice(start+1),...dealt.slice(0,start+1)];
  const behind=pre.slice(pre.indexOf(idx)+1).filter(p=>!t.seats[p].folded&&!t.seats[p].allIn).length;
- return {game:t.game||'holdem',phase:t.phase,cards:[...s.cards],board:[...t.board],pot:t.pot,currentBet:t.currentBet,toCall:toCall(t,s),
+ return {outcome:handOutcome(t,s),game:t.game||'holdem',phase:t.phase,cards:[...s.cards],board:[...t.board],pot:t.pot,currentBet:t.currentBet,toCall:toCall(t,s),
   minRaiseTo:t.currentBet+t.minRaise,maxRaiseTo:maxRaiseTo(t,s),stack:s.stack,roundBet:s.roundBet,committed:s.committed,bb:t.bb,canRaise:canRaise(t,s),
   dealt:dealt.length,isSB:idx===t.sbPos,isBB:idx===t.bbPos,playersBehind:behind,inPosition:after.length===0,
   raisesPreflop:acts.filter(a=>a.street==='preflop'&&(a.type==='BET'||a.type==='RAISE')).length,
   opponents:dealt.filter(p=>p!==idx).map(p=>{const o=t.seats[p];return {id:o.userId,folded:o.folded,allIn:o.allIn,stack:o.stack,roundBet:o.roundBet,committed:o.committed,actions:acts.filter(a=>a.seat===p),profile:profileOf(o.userId)};})};
+}
+// Read a copy with the engine's burn/pop order; never alter the actual deal.
+export function handOutcome(t,s){
+ try{
+  const board=[...t.board],deck=[...t.deck];
+  while(board.length<5){deck.pop();const count=board.length===0?3:1;for(let i=0;i<count;i++){const c=deck.pop();if(!c)return 'unknown';board.push(c);}}
+  const score=evaluateHand(t.game||'holdem',s.cards,board);let tied=false;
+  for(const o of t.seats){if(!o||o===s||!o.inHand||o.folded)continue;
+   const c=compare(evaluateHand(t.game||'holdem',o.cards,board),score);if(c>0)return 'loss';if(c===0)tied=true;}
+  return tied?'tie':'win';
+ }catch{return 'unknown';}
 }
 export const botDecision=(v,style='medium',random=Math.random)=>decide(v,style,random);
 

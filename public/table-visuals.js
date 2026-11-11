@@ -35,9 +35,12 @@ export function betLimits(t,mine){const stack=Math.round(((mine?.stack||0)+(mine
 // Effect nodes live outside the seat/board DOM, so polling cannot destroy a flight.
 export class TableVisuals {
   constructor(root){this.root=root;this.lastSeq=0;this.tableId=null;this.hand=0;this.generation=0;this.queue=Promise.resolve();this.scheduled=0;this.clockOffset=0;this.lastSync=0;this.state=null;this.sound=false;this.motion=true;this.audio=null;this.timeoutSoundKey='';}
-  reset(){this.generation++;this.root.querySelector('#chipFlights').replaceChildren();this.root.querySelectorAll('.effectActive').forEach(n=>n.classList.remove('effectActive'));this.queue=Promise.resolve();this.scheduled=0;this.turnPending=false;this.lastSeq=0;this.tableId=null;this.state=null;}
+  reset(){this.generation++;this.silence();this.root.querySelector('#chipFlights').replaceChildren();this.root.querySelectorAll('.effectActive').forEach(n=>n.classList.remove('effectActive'));this.queue=Promise.resolve();this.scheduled=0;this.turnPending=false;this.lastSeq=0;this.tableId=null;this.state=null;}
   update(t){const initial=this.tableId!==t.id||t.hand<this.hand;this.clockOffset=t.serverNow-Date.now();this.lastSync=Date.now();this.state=t;this.tick();if(initial){this.reset();this.tableId=t.id;this.state=t;this.lastSeq=t.visualEvents?.at(-1)?.seq||0;this.hand=t.hand;return;}if(t.hand!==this.hand){this.generation++;this.root.querySelector('#chipFlights').replaceChildren();this.queue=Promise.resolve();this.scheduled=0;}const events=freshEvents(t.visualEvents||[],this.lastSeq,t.hand);this.lastSeq=Math.max(this.lastSeq,t.visualEvents?.at(-1)?.seq||0);this.hand=t.hand;for(const event of events)this.enqueue(event,t);}
   enqueue(event,t){if(Date.now()+this.clockOffset-event.at>7000)return;const generation=this.generation;const slots=(event.type==='street'||event.type==='board')&&this.motion&&!document.hidden?this.boardSlots(event):[];slots.forEach(s=>s.classList.add('pendingReveal'));if(slots.length)setTimeout(()=>slots.forEach(s=>s.classList.remove('pendingReveal')),6000);this.scheduled++;this.queue=this.queue.then(async()=>{if(generation!==this.generation||!this.motion||document.hidden)return;await this.play(event,t,generation);}).catch(()=>{}).finally(()=>{slots.forEach(s=>s.classList.remove('pendingReveal'));this.scheduled=Math.max(0,this.scheduled-1);if(!this.scheduled&&this.turnPending){this.turnPending=false;this.beep('turn');}});}
+  // Leaving a table stops every sound still waiting to play.
+  silence(){for(const n of this.playing||[])try{n.stop();}catch{}this.playing=new Set();this.lastSound=null;this.clock=null;}
+  track(n,end){(this.playing??=new Set()).add(n);n.onended=()=>this.playing.delete(n);try{n.stop(end);}catch{}}
   // "Your turn" sounds once the other players' actions on screen have played.
   turnChime(){this.turnPending=true;setTimeout(()=>{if(this.turnPending&&!this.scheduled){this.turnPending=false;this.beep('turn');}},60);}
   boardSlots(e){const count=e.type==='board'?5:e.count,from=e.type==='board'?e.fromCount||0:count===3?0:count===4?3:4;return [...this.root.querySelectorAll('#community .boardSlot')].slice(from,count);}
@@ -112,13 +115,19 @@ export class TableVisuals {
   // the bet or call that closed the round, new board cards wait 0.3 s after it, and the
   // 'your turn' chime comes 0.25 s after the previous sound.
   beep(type){if(!this.sound||!this.audio||this.audio.state!=='running'||document.hidden||!this.tableId&&type!=='turn')return;
-    const ctx=this.audio,now=ctx.currentTime,last=this.lastSound||{type:'',at:-1};
+    const ctx=this.audio,now=ctx.currentTime,wall=performance.now()/1000,clock=this.clock;this.clock={wall,ctx:now};
+    // Phones freeze the audio clock when the screen sleeps or the page is in the background.
+    // A frozen clock would pile sounds up and play them all at once later: skip instead.
+    if(clock&&wall-clock.wall>.5&&now-clock.ctx<(wall-clock.wall)*.5){this.lastSound=null;return;}
+    const last=this.lastSound&&this.lastSound.at<=now+1?this.lastSound:{type:'',at:-1};
     if(type===last.type&&type!=='card'&&now-last.at<.06)return;if(type==='chip'&&now-last.at<.45)return;
     // Cards wait for the action that closed the round, then follow each other 150 ms apart.
-    const gap=type==='card'?(last.type==='card'?.15:.3):type==='turn'?.25:0,when=Math.max(now,last.at+gap);this.lastSound={type,at:when};
+    const gap=type==='card'?(last.type==='card'?.15:.3):type==='turn'?.25:0,when=Math.max(now,last.at+gap);
+    // Never a queue of sounds: one that would start more than a second from now is dropped.
+    if(when-now>1)return;this.lastSound={type,at:when};
     const file={fold:'fold',check:'check',chip:'bet',bet:'bet',allin:'allin',win:'allin',card:'card'}[type],buf=file&&this.buffers?.[file];
     // A recorded sound that has not finished loading is skipped, never replaced by a tone.
-    if(file){if(buf){const src=ctx.createBufferSource(),gain=ctx.createGain();gain.gain.value=type==='chip'?.45:.9;src.buffer=buf;src.connect(gain);gain.connect(ctx.destination);src.start(when);}return;}const start=when,notes=type==='win'?[523,659,784]:type==='turn'?[660,880]:type==='allin'?[392,523,659]:[({chip:900,card:420,fold:180,check:600,alert:880})[type]||500];notes.forEach((frequency,i)=>{const oscillator=ctx.createOscillator(),gain=ctx.createGain();oscillator.type=type==='chip'?'triangle':'sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start+i*.1);gain.gain.linearRampToValueAtTime(.035,start+i*.1+.01);gain.gain.exponentialRampToValueAtTime(.001,start+i*.1+.13);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start+i*.1);oscillator.stop(start+i*.1+.15);});}
+    if(file){if(buf){const src=ctx.createBufferSource(),gain=ctx.createGain();gain.gain.value=type==='chip'?.45:.9;src.buffer=buf;src.connect(gain);gain.connect(ctx.destination);src.start(when);this.track(src,when+buf.duration+.05);}return;}const start=when,notes=type==='win'?[523,659,784]:type==='turn'?[660,880]:type==='allin'?[392,523,659]:[({chip:900,card:420,fold:180,check:600,alert:880})[type]||500];notes.forEach((frequency,i)=>{const oscillator=ctx.createOscillator(),gain=ctx.createGain();oscillator.type=type==='chip'?'triangle':'sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,start+i*.1);gain.gain.linearRampToValueAtTime(.035,start+i*.1+.01);gain.gain.exponentialRampToValueAtTime(.001,start+i*.1+.13);oscillator.connect(gain);gain.connect(ctx.destination);oscillator.start(start+i*.1);this.track(oscillator,start+i*.1+.15);});}
 }
 
 // Geometry changes the felt only. Cards, names and controls keep native sizes.
