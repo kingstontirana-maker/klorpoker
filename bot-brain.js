@@ -186,6 +186,16 @@ function postflop(v,st,random,E){
 // One decision. v is the bot's view of the table (see botView in bots.js).
 export function decide(v,style='medium',random=Math.random){
  if(Object.hasOwn(v,'outcome')){
+  if(v.outcome==='win'&&v.firstFlopAction){
+   // About one in 4–5 winning flops: commit 20–40% of the current table stack.
+   const low=Math.max(v.minRaiseTo,v.currentBet+1,v.roundBet+Math.ceil(v.stack*.2));
+   const high=Math.min(v.maxRaiseTo,v.roundBet+Math.floor(v.stack*.4));
+   if(v.canRaise&&Number.isSafeInteger(low)&&Number.isSafeInteger(high)&&low<=high&&random()<.225){
+    const target=low+Math.floor(random()*(high-low+1));
+    return {type:'raise',amount:target/100,equity:1};
+   }
+   return {type:v.toCall?'call':'check',equity:1};
+  }
   // Follow winning hands, mixing in modest legal raises without going all-in.
   if(v.outcome==='win'&&v.toCall<v.stack&&v.canRaise){
    const chance=({low:.12,medium:.2,high:.3})[style]??.2;
@@ -193,9 +203,10 @@ export function decide(v,style='medium',random=Math.random){
    if(Number.isSafeInteger(target)&&target>=v.minRaiseTo&&target>v.currentBet&&random()<chance)
     return {type:'raise',amount:target/100,equity:1};
   }
+  if(v.outcome==='win')return {type:v.toCall?'call':'check',equity:1};
   // Complete the ordinary entry price, but never chase a preflop raise.
   const entry=v.phase==='preflop'&&v.raisesPreflop===0&&v.currentBet<=v.bb&&v.toCall<=v.bb;
-  const type=!v.toCall?'check':(entry||v.outcome==='win')&&v.toCall<v.stack?'call':'fold';
+  const type=!v.toCall?'check':v.stack>0&&(v.outcome==='win'||entry&&v.toCall<v.stack)?'call':'fold';
   return {type,equity:v.outcome==='win'?1:v.outcome==='loss'?0:null};
  }
  const st=STYLES[style]||STYLES.medium;

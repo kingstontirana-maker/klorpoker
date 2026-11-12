@@ -20,7 +20,7 @@ export function botView(t,s,profileOf=()=>null){
  const after=dealt.slice(dealt.indexOf(idx)+1).filter(p=>!t.seats[p].folded&&!t.seats[p].allIn);
  const start=dealt.indexOf(t.bbPos),pre=start<0?dealt:[...dealt.slice(start+1),...dealt.slice(0,start+1)];
  const behind=pre.slice(pre.indexOf(idx)+1).filter(p=>!t.seats[p].folded&&!t.seats[p].allIn).length;
- return {outcome:handOutcome(t,s),game:t.game||'holdem',phase:t.phase,cards:[...s.cards],board:[...t.board],pot:t.pot,currentBet:t.currentBet,toCall:toCall(t,s),
+ return {outcome:handOutcome(t,s),game:t.game||'holdem',phase:t.phase,firstFlopAction:t.phase==='flop'&&!acts.some(a=>a.street==='flop'&&a.seat===idx),cards:[...s.cards],board:[...t.board],pot:t.pot,currentBet:t.currentBet,toCall:toCall(t,s),
   minRaiseTo:t.currentBet+t.minRaise,maxRaiseTo:maxRaiseTo(t,s),stack:s.stack,roundBet:s.roundBet,committed:s.committed,bb:t.bb,canRaise:canRaise(t,s),
   dealt:dealt.length,isSB:idx===t.sbPos,isBB:idx===t.bbPos,playersBehind:behind,inPosition:after.length===0,
   raisesPreflop:acts.filter(a=>a.street==='preflop'&&(a.type==='BET'||a.type==='RAISE')).length,
@@ -247,7 +247,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
       const before=equity(b),cost=Math.min(current.toCall,current.stack);
       try{engine.act(t,b.id,d.type,d.amount);
        if(returning){b.bot.returnHand??={tableId:t.id,hand:t.hand,equity:before,paid:0,limit:Math.floor(budget*.6)};b.bot.returnHand.paid+=cost;save();}
-      }catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
+      }catch{const fallback=toCall(t,s)?current.outcome==='win'?'call':'fold':'check';engine.act(t,b.id,fallback);d.type=fallback;delete d.amount;}
       decisions.push({at:now,bot:b.username,table:t.name,hand:t.hand,street:v.phase,action:d.type,amount:d.amount??(d.type==='call'?Math.min(v.toCall,v.stack)/100:null),pot:v.pot/100,equity:d.equity==null?null:Math.round(d.equity*100)});
       if(decisions.length>200)decisions.splice(0,decisions.length-200);}}
    }catch(e){stop(b,e.message,seatOf(b));}

@@ -96,7 +96,7 @@ test('actual runout controls decisions without revealing hidden cards',()=>{
  for(const card of opponent.cards)assert.ok(!JSON.stringify(v).includes('"'+card+'"'));
  for(const style of ['low','medium','high']){
   assert.equal(botDecision({...v,toCall:200,stack:1000},style,()=>.99).type,'call');
-  assert.equal(botDecision({...v,toCall:1000,stack:1000},style).type,'fold');
+  assert.equal(botDecision({...v,toCall:1000,stack:1000},style).type,'call');
   for(const outcome of ['loss','tie','unknown']){
    assert.equal(botDecision({...v,outcome,phase:'flop',toCall:200},style).type,'fold');
    assert.equal(botDecision({...v,outcome,toCall:0},style).type,'check');
@@ -116,7 +116,8 @@ test('winning outcome follows bets and sometimes raises within legal limits',()=
   assert.equal(botDecision({...v,canRaise:false},style,()=>0).type,'call');
   assert.equal(botDecision({...v,maxRaiseTo:600},style,()=>0).amount,6,'pot-limit cap applies');
   assert.equal(botDecision({...v,stack:400},style,()=>0).type,'call','minimum raise would require all-in');
-  assert.equal(botDecision({...v,stack:200},style,()=>0).type,'fold','no all-in call');
+  assert.equal(botDecision({...v,stack:200},style,()=>0).type,'call','winning hand calls all-in');
+  assert.equal(botDecision({...v,stack:100},style,()=>0).type,'call','winning hand can make a short all-in call');
   for(const outcome of ['loss','tie','unknown'])assert.equal(botDecision({...v,outcome},style,()=>0).type,'fold');
  }
  assert.equal(botDecision(v,'low',()=>.15).type,'call');
@@ -125,13 +126,50 @@ test('winning outcome follows bets and sometimes raises within legal limits',()=
  assert.equal(botDecision(v,'high',()=>.25).type,'raise');
 });
 
+test('first winning flop sometimes raises 20–40 percent of the table stack',()=>{
+ const v={outcome:'win',phase:'flop',firstFlopAction:true,toCall:0,stack:10000,roundBet:0,pot:1000,currentBet:0,minRaiseTo:200,maxRaiseTo:10000,canRaise:true};
+ for(const style of ['low','medium','high']){
+  assert.equal(botDecision(v,style,()=>.99).type,'check');
+  const low=botDecision(v,style,()=>0);assert.equal(low.type,'raise');assert.equal(low.amount,20);
+  let draws=[0,.999999];assert.equal(botDecision(v,style,()=>draws.shift()).amount,40);
+  assert.equal(botDecision({...v,toCall:100},style,()=>.99).type,'call');
+  assert.equal(botDecision({...v,toCall:10000},style,()=>.99).type,'call');
+  assert.equal(botDecision({...v,maxRaiseTo:1500},style,()=>0).type,'check','skip if pot limit prevents a 20 percent bet');
+  assert.equal(botDecision({...v,minRaiseTo:4500},style,()=>0).type,'check','skip if minimum exceeds 40 percent');
+  assert.equal(botDecision({...v,roundBet:500,currentBet:600,minRaiseTo:700},style,()=>0).amount,25,'size measures extra stack committed');
+ }
+ const rng=seeded(19);let raised=0;
+ for(let i=0;i<10000;i++){const d=botDecision(v,'medium',rng);if(d.type==='raise'){raised++;assert.ok(d.amount>=20&&d.amount<=40);}}
+ assert.ok(raised>2000&&raised<2500,'roughly one in 4–5 winning flops');
+});
+
+test('winning bot falls back to call when a raise is rejected and marks its first flop action once',()=>{
+ let roll=.99;
+ const {manager,center,engine,t,db,human}=world({size:2,random:()=>roll});
+ manager.route('/api/bots/create',{name:'WinningFallback',budget:500,tableId:'1',buyin:100,stopLoss:100},center);
+ const b=db.users.find(u=>u.isBot),h=human(1);
+ engine.sit(t,h,0,100,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();
+ engine.startHand(t);const s=t.seats.find(s=>s?.userId===b.id);
+ s.cards=['As','Ah'];t.seats[0].cards=['2c','3d'];t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
+ engine.act(t,h.id,'call');manager.tick(t.turnStartedAt+10000);
+ assert.equal(botView(t,s).firstFlopAction,true);
+ manager.tick(t.turnStartedAt+10000);
+ assert.equal(botView(t,s).firstFlopAction,false,'later flop decisions cannot retry the opening offer');
+ engine.act(t,h.id,'raise',4);roll=0;
+ const act=engine.act;let rejected=0;
+ engine.act=(table,id,type,amount)=>{if(id===b.id&&type==='raise'){rejected++;throw Error('Simulated raise rejection');}return act(table,id,type,amount);};
+ manager.tick(t.turnStartedAt+10000);
+ assert.equal(rejected,1);assert.equal(s.folded,false);assert.equal(t.phase,'turn');
+ assert.equal(manager.route('/api/bots/overview',{},center).decisions[0].action,'call','audit shows the actual fallback action');
+});
+
 test('bots pay the unraised preflop entry even when losing, but fold to extra bets',()=>{
  const base={outcome:'loss',phase:'preflop',raisesPreflop:0,currentBet:200,bb:200,toCall:200,stack:1000};
  for(const outcome of ['loss','tie','unknown','win']){
   assert.equal(botDecision({...base,outcome}).type,'call');
   assert.equal(botDecision({...base,outcome,toCall:100,roundBet:100}).type,'call');
   assert.equal(botDecision({...base,outcome,toCall:0}).type,'check');
-  assert.equal(botDecision({...base,outcome,stack:200}).type,'fold','no voluntary all-in');
+  assert.equal(botDecision({...base,outcome,stack:200}).type,outcome==='win'?'call':'fold','winning entry can call all-in');
  }
  assert.equal(botDecision({...base,raisesPreflop:1,currentBet:400,toCall:400}).type,'fold');
  assert.equal(botDecision({...base,currentBet:400,toCall:400}).type,'fold');
@@ -178,6 +216,36 @@ test('profit-funded losing calls settle once to humans and conserve all credit',
  manager.tick();assert.equal(b.bot.returned,600,'settlement is idempotent');
  assert.equal(total(),original,'no credits minted or destroyed');
  assert.equal(manager.list()[0].returnAvailable,43,'entry cost reduces net profit before the return target');
+});
+
+test('live hand calls 50 cents, 1 euro and a final 50-cent all-in',()=>{
+ for(const winning of [true,false]){
+  let roll=.99;
+  const {manager,center,engine,t,db,human,total}=world({size:2,random:()=>roll});
+  t.sb=5;t.bb=10;
+  manager.route('/api/bots/create',{name:'SmallAllin',budget:500,tableId:'1',buyin:2.1,stopLoss:100},center);
+  const b=db.users.find(u=>u.isBot),h=human(1);
+  engine.sit(t,h,0,2.1,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();
+  b.balance+=10000;center.balance-=10000;
+  manager.route('/api/bots/settings',{returnPercent:50},center);
+  const initial=total();engine.startHand(t);
+  const s=t.seats.find(s=>s?.userId===b.id),hs=t.seats.find(s=>s?.userId===h.id);
+  s.cards=winning?['As','Ah']:['2c','3d'];hs.cards=winning?['2c','3d']:['As','Ah'];
+  t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
+  engine.act(t,h.id,'call');manager.tick(t.turnStartedAt+10000);
+  for(const bet of [.5,1,.5]){
+   manager.tick(t.turnStartedAt+10000); // Bot checks, human bets.
+   engine.act(t,h.id,'raise',bet);
+   roll=!winning&&bet===.5&&t.phase==='flop'?0:.99;
+   manager.tick(t.turnStartedAt+10000);
+   assert.equal(s.folded,false,'bot follows each affordable bet');
+   roll=.99;
+  }
+  assert.equal(s.stack,0,'last 50 cents call the all-in');
+  playHand(engine,manager,t,new Set([b.id]));manager.tick();
+  assert.equal(total(),initial,'all-in settlement conserves credit');
+  assert.equal(b.bot.returned||0,winning?0:200,'only losing return calls are counted');
+ }
 });
 
 test('starting hands are ranked sensibly and equity follows the cards',()=>{

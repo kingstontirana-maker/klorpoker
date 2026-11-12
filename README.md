@@ -9,8 +9,14 @@ Before the flop, bots also pay the ordinary big-blind entry price regardless of
 outcome when nobody has raised. Losing, tied or unavailable outcomes otherwise
 cause a fold when facing a bet, apart from profit-funded return calls. With a winning
 outcome, bots usually follow the bet and occasionally make a legal raise: 12% for
-Tight, 20% for Balanced and 30% for Aggressive. Bots never voluntarily go all-in,
-including by calling for their whole stack. Deliberate losing return calls share
+Tight, 20% for Balanced and 30% for Aggressive after the opening flop decision.
+On their first action on a winning flop, bots have a 22.5% chance to raise by
+20–40% of their remaining table stack, when legal table limits permit that size.
+Winning hands never fold to a bet and can call all-in; a rejected winning raise
+falls back to call or check. Other
+raises leave chips behind. Selected losing return hands follow subsequent calls,
+including all-in, while the effective call cost remains inside the return budget.
+Deliberate losing return calls share
 a per-hand cap of 60% of the available return budget before the first such call.
 Only an outcome flag reaches the decision worker; future cards and opponents'
 cards are not added to player snapshots. This is privileged-information behavior

@@ -10,8 +10,12 @@ export function returnDecision(view,budget,random=Math.random,hand=null){
  // One losing hand may spend at most 60% of the available return budget
  // recorded before its first deliberate losing call, across all streets.
  const paid=hand?.paid||0,limit=hand?.limit??Math.floor((budget+paid)*.6);
- if(view.outcome!=='loss'||!(view.toCall>0)||view.toCall>=view.stack||view.toCall>Math.min(budget,Math.max(0,limit-paid)))return false;
+ const cost=Math.min(view.toCall,view.stack);
+ if(view.outcome!=='loss'||!(view.toCall>0)||!(cost>0)||cost>Math.min(budget,Math.max(0,limit-paid)))return false;
+ // Once a hand is selected for a return, follow affordable later bets,
+ // including all-in calls, without rerolling the selection on each street.
+ if(paid>0)return true;
  // Pay a changing subset of affordable bets; never manufacture a raise size.
- const pressure=view.toCall/Math.max(1,view.pot);
+ const pressure=cost/Math.max(1,view.pot);
  return random()<Math.max(.15,Math.min(.85,.75-pressure*.3));
 }
