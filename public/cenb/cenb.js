@@ -71,7 +71,7 @@ function renderKpis(){
 // ---- Bots ----
 const statusSq=s=>s.replace('Playing at','Luan te').replace('Looking for a table','Kërkon tavolinë').replace('Waiting for players','Pret lojtarë').replace('Stopped','I ndalur').replace('Loss limit reached','Arriti limitin e humbjes').replace('Win limit reached','Arriti limitin e fitimit').replace('Wallet smaller than the buy-in','Portofoli më i vogël se buy-in').replace(/House (daily|weekly|monthly) limit reached/,(m,p)=>'Limiti '+({daily:'ditor',weekly:'javor',monthly:'mujor'}[p])+' i shtëpisë');
 function renderBots(){
- const list=$('#botList');if(editing&&list.contains(document.activeElement))return;
+ const list=$('#botList');if(editing&&list.querySelector('[data-edit]')?.contains(document.activeElement))return;
  $('#nBots').textContent=data.bots.length;
  list.innerHTML=data.bots.length?data.bots.map(b=>{const err=!b.enabled&&b.status!=='Stopped';
   return '<article class="bot'+(b.seatedAt?' on':'')+(err?' err':'')+'" data-id="'+safe(b.id)+'"><div class="botHead"><span class="avatar">'+safe(b.name[0].toUpperCase())+'</span><div><strong>'+safe(b.name)+'</strong><small>'+safe(statusSq(b.status))+'</small></div><span class="pill'+(b.enabled?' on':err?' warn':'')+'">'+(b.enabled?'Ndezur':'Fikur')+'</span></div>'
