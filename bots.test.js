@@ -54,7 +54,40 @@ test('bots only fill thin tables: a real player is needed, a seat stays free, cr
  assert.equal(t.seats.filter(Boolean).length,0,'when the real players leave, the bots stand up too');
 });
 
-test('actual runout controls passive decisions without revealing hidden cards',()=>{
+test('direct seating bots wait alone, play with other bots and preserve credit',()=>{
+ for(const tableId of ['1','auto']){
+  const {center,db,engine,t,manager,human,total}=world({random:()=>0});
+  const initial=total();
+  for(const name of ['WaitingOne','WaitingTwo']){
+   const {id}=manager.route('/api/bots/create',{name,budget:300,tableId,buyin:100,buyinBB:50,stopLoss:300,waitForPlayers:'true'},center);
+   manager.route('/api/bots/status',{id,enabled:true},center);
+   if(name==='WaitingOne'){
+    manager.tick();assert.equal(t.seats.filter(Boolean).length,1);
+    assert.equal(engine.startHand(t),false,'one bot waits alone');
+    const waiting=t.seats.find(Boolean);waiting.idleSince=Date.now()-11*60*1000;
+    engine.tickTable(t);assert.ok(t.seats.includes(waiting),'waiting bot stays beyond the idle-table timeout');
+   }
+  }
+  manager.tick();manager.tick();
+  assert.equal(t.seats.filter(Boolean).length,2,'two bots can sit without a human');
+  assert.equal(engine.startHand(t),true,'bots can play against each other');
+  playHand(engine,manager,t,new Set(db.users.filter(u=>u.isBot).map(u=>u.id)));
+  assert.equal(manager.route('/api/bots',{},center)[0].waitForPlayers,true);
+  const h=human(1);engine.sit(t,h,t.seats.findIndex(s=>!s),100,[t]);manager.tick();
+  assert.equal(t.seats.filter(s=>s?.isBot).length,2,'another bot may join once a human sits');
+  assert.equal(engine.startHand(t),true,'play begins with a human');
+  playHand(engine,manager,t,new Set(db.users.filter(u=>u.isBot).map(u=>u.id)),()=> 'fold');
+  engine.leave(t,h);
+  manager.tick();manager.tick();assert.equal(t.seats.filter(Boolean).length,2,'bots remain after the human leaves');
+  assert.equal(engine.startHand(t),true,'bots continue playing without humans');
+  playHand(engine,manager,t,new Set(db.users.filter(u=>u.isBot).map(u=>u.id)));
+  for(const b of db.users.filter(u=>u.isBot))manager.route('/api/bots/status',{id:b.id,enabled:false},center);
+  assert.equal(t.seats.filter(Boolean).length,0,'stopping returns waiting bots to their wallets');
+  assert.equal(total(),initial+50000,'only the fixture human adds credit');
+ }
+});
+
+test('actual runout controls decisions without revealing hidden cards',()=>{
  const {engine,t,human}=world();engine.sit(t,human(1),0,100,[t]);engine.sit(t,human(2),1,100,[t]);engine.startHand(t);
  const bot=t.seats[0],opponent=t.seats[1];bot.cards=['As','Ah'];opponent.cards=['Ks','Kh'];
  t.board=[];t.deck=['2c','3d','4c','5d','7c','8d','9c','Td'].reverse();
@@ -62,7 +95,7 @@ test('actual runout controls passive decisions without revealing hidden cards',(
  const v=botView(t,bot);assert.equal(v.outcome,'win');assert.equal(JSON.stringify({deck:t.deck,board:t.board}),saved);
  for(const card of opponent.cards)assert.ok(!JSON.stringify(v).includes('"'+card+'"'));
  for(const style of ['low','medium','high']){
-  assert.equal(botDecision({...v,toCall:200,stack:1000},style).type,'call');
+  assert.equal(botDecision({...v,toCall:200,stack:1000},style,()=>.99).type,'call');
   assert.equal(botDecision({...v,toCall:1000,stack:1000},style).type,'fold');
   for(const outcome of ['loss','tie','unknown']){
    assert.equal(botDecision({...v,outcome,phase:'flop',toCall:200},style).type,'fold');
@@ -71,6 +104,25 @@ test('actual runout controls passive decisions without revealing hidden cards',(
  }
  opponent.cards=['Ts','Th'];assert.equal(botView(t,bot).outcome,'loss');
  t.board=['2c','3c','4c','5c','6c'];assert.equal(botView(t,bot).outcome,'tie');
+});
+
+test('winning outcome follows bets and sometimes raises within legal limits',()=>{
+ const v={outcome:'win',phase:'flop',toCall:200,stack:5000,roundBet:0,pot:1000,currentBet:200,minRaiseTo:400,maxRaiseTo:5000,canRaise:true};
+ for(const style of ['low','medium','high']){
+  assert.equal(botDecision(v,style,()=>.99).type,'call');
+  assert.deepEqual(botDecision(v,style,()=>0),{type:'raise',amount:8,equity:1});
+  assert.equal(botDecision({...v,toCall:0,currentBet:0,minRaiseTo:200},style,()=>.99).type,'check');
+  assert.equal(botDecision({...v,toCall:0,currentBet:0,minRaiseTo:200},style,()=>0).type,'raise');
+  assert.equal(botDecision({...v,canRaise:false},style,()=>0).type,'call');
+  assert.equal(botDecision({...v,maxRaiseTo:600},style,()=>0).amount,6,'pot-limit cap applies');
+  assert.equal(botDecision({...v,stack:400},style,()=>0).type,'call','minimum raise would require all-in');
+  assert.equal(botDecision({...v,stack:200},style,()=>0).type,'fold','no all-in call');
+  for(const outcome of ['loss','tie','unknown'])assert.equal(botDecision({...v,outcome},style,()=>0).type,'fold');
+ }
+ assert.equal(botDecision(v,'low',()=>.15).type,'call');
+ assert.equal(botDecision(v,'medium',()=>.15).type,'raise');
+ assert.equal(botDecision(v,'medium',()=>.25).type,'call');
+ assert.equal(botDecision(v,'high',()=>.25).type,'raise');
 });
 
 test('bots pay the unraised preflop entry even when losing, but fold to extra bets',()=>{
@@ -113,10 +165,14 @@ test('profit-funded losing calls settle once to humans and conserve all credit',
  manager.tick(t.turnStartedAt+10000);
  engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
  assert.equal(t.phase,'flop');assert.equal(b.bot.returnHand.paid,200);
+ assert.equal(b.bot.returnHand.limit,3000,'60 percent of the 5000-cent available return budget');
  manager.tick(t.turnStartedAt+10000); // Bot checks first after the flop.
  engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
  assert.equal(b.bot.returnHand.paid,600);
- playHand(engine,manager,t,new Set([b.id]),()=> 'check');manager.tick();
+ manager.tick(t.turnStartedAt+10000); // Check on the turn before the human bets.
+ engine.act(t,h.id,'raise',25);manager.tick(t.turnStartedAt+10000);
+ assert.equal(s.folded,true,'2500 more would exceed the remaining 2400-cent hand limit');
+ manager.tick();
  assert.equal(b.bot.returned,600);assert.equal(b.bot.returnHand,undefined);
  assert.equal(db.ledger.filter(x=>x.type==='BOT_RETURN').length,1);
  manager.tick();assert.equal(b.bot.returned,600,'settlement is idempotent');

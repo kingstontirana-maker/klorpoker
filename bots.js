@@ -6,7 +6,7 @@ import {evaluateHand,compare} from './poker.js';
 import {returnBudget,returnDecision} from './bot-returns.js';
 export {handStrength,rangeEquity,preflopRank,STYLES};
 
-// Virtual-credit house bots use the actual runout to play passively.
+// Virtual-credit house bots use the actual runout to follow winning hands and mix in raises.
 // Wallet, stake and house loss limits still apply.
 
 // Bots carry ordinary names; only CENB sees which players are bots.
@@ -109,27 +109,29 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  // ---- Where a bot sits ----
  const humansAt=t=>t.seats.filter(isHuman).length,botsAt=t=>t.seats.filter(s=>s&&!isHuman(s)).length,freeAt=t=>t.seats.filter(s=>!s).length;
  const crowd=t=>t.seats.length===2?2:Math.ceil(t.seats.length*.67);
- const perTable=t=>Math.max(1,Math.min(g.maxPerTable||2,t.seats.length-1));
+ const perTable=t=>Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
- const canJoin=(t,b)=>stakeOk(t,b)&&humansAt(t)>=1&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2)&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ const canJoin=(t,b)=>stakeOk(t,b)&&(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2)&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
   options.sort((a,b)=>b.score-a.score);return options[0]?.t||null;
  }
- const shouldLeave=(t,b,s)=>!humansAt(t)||t.waitlist?.length||t.waitOffer||(t.seats.length>2&&!freeAt(t))||humansAt(t)>=crowd(t)||botsAt(t)>perTable(t)||!stakeOk(t,b)||s.stack<t.bb||s.rebuyDeadline;
+ const shouldLeave=(t,b,s)=>(!humansAt(t)&&!b.bot.waitForPlayers)||t.waitlist?.length||t.waitOffer||(t.seats.length>2&&!freeAt(t))||humansAt(t)>=crowd(t)||botsAt(t)>perTable(t)||!stakeOk(t,b)||s.stack<t.bb||s.rebuyDeadline;
 
  // ---- Managing bots ----
  function rakeByBot(){botRake();return rakeMap;}
  function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0},auto=u.bot.tableId==='auto',fixed=auto?null:runtime.get(u.bot.tableId);
-  return {id:u.id,name:u.username,risk:u.bot.risk,style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
+  return {id:u.id,name:u.username,risk:u.bot.risk,style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',waitForPlayers:!!u.bot.waitForPlayers,enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
    buyin:(u.bot.buyin||0)/100,buyinBB:u.bot.buyinBB||null,maxBB:(u.bot.maxBB||0)/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,
    session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:(eq-u.bot.funded+r.rake)/100,hands:u.bot.hands||0,
    status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null};});}
  function configure(b,body){
   const risk=body.risk??b.bot.risk??'medium';if(!STYLES[risk])fail('Invalid style');
   const mode=body.mode??b.bot.mode??'play';if(!['play','seat'].includes(mode))fail('Invalid mode');
+  const wait=body.waitForPlayers??b.bot.waitForPlayers??false;
+  if(![true,false,'true','false'].includes(wait))fail('Invalid waiting option');
   const stopLoss=cents(body.stopLoss??(b.bot.stopLoss??b.balance)/100,'Loss limit'),stopWin=cents(body.stopWin??(b.bot.stopWin||0)/100,'Win limit',true);
   if(String(body.tableId??b.bot.tableId)==='auto'){
    const bbs=Math.round(Number(body.buyinBB??b.bot.buyinBB??100));if(!(bbs>=10&&bbs<=100))fail('Auto buy-in must be 10–100 big blinds');
@@ -141,7 +143,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
    if(buyin<l.min||buyin>l.max)fail(`Buy-in must be within the table limits (€${(l.min/100).toFixed(2)}–€${(l.max/100).toFixed(2)})`);if(buyin>b.balance)fail('Buy-in is larger than the bot wallet');
    Object.assign(b.bot,{tableId:t.id,buyin,buyinBB:null,maxBB:0});
   }
-  Object.assign(b.bot,{risk,mode,stopLoss,stopWin,error:null});
+  Object.assign(b.bot,{risk,mode,waitForPlayers:wait===true||wait==='true',stopLoss,stopWin,error:null});
  }
  function create(u,name,amount,body){
   if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=100)fail('Maximum 100 bots');
@@ -239,11 +241,12 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
      if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botView(t,s,profileOf),d=botDecision(current,b.bot.risk,random);
       // Only humans may receive a deliberate return; avoid bot-to-bot transfers.
       const humanOnly=current.opponents.filter(o=>!o.folded).every(o=>!isBotId(o.id));
-      const returning=d.type==='fold'&&humanOnly&&returnDecision(current,returnBudget(b.bot,equity(b),g.returnPercent),random);
+      const budget=returnBudget(b.bot,equity(b),g.returnPercent);
+      const returning=d.type==='fold'&&humanOnly&&returnDecision(current,budget,random,b.bot.returnHand);
       if(returning)d.type='call';
       const before=equity(b),cost=Math.min(current.toCall,current.stack);
       try{engine.act(t,b.id,d.type,d.amount);
-       if(returning){b.bot.returnHand??={tableId:t.id,hand:t.hand,equity:before,paid:0};b.bot.returnHand.paid+=cost;save();}
+       if(returning){b.bot.returnHand??={tableId:t.id,hand:t.hand,equity:before,paid:0,limit:Math.floor(budget*.6)};b.bot.returnHand.paid+=cost;save();}
       }catch{engine.act(t,b.id,toCall(t,s)?'fold':'check');}
       decisions.push({at:now,bot:b.username,table:t.name,hand:t.hand,street:v.phase,action:d.type,amount:d.amount??(d.type==='call'?Math.min(v.toCall,v.stack)/100:null),pot:v.pot/100,equity:d.equity==null?null:Math.round(d.equity*100)});
       if(decisions.length>200)decisions.splice(0,decisions.length-200);}}

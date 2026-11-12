@@ -6,8 +6,11 @@ export function returnBudget(bot,equity,percent){
  return Math.max(0,Math.min(Math.max(0,net),target-returned)-reserved);
 }
 
-export function returnDecision(view,budget,random=Math.random){
- if(view.outcome!=='loss'||!(view.toCall>0)||view.toCall>=view.stack||view.toCall>budget)return false;
+export function returnDecision(view,budget,random=Math.random,hand=null){
+ // One losing hand may spend at most 60% of the available return budget
+ // recorded before its first deliberate losing call, across all streets.
+ const paid=hand?.paid||0,limit=hand?.limit??Math.floor((budget+paid)*.6);
+ if(view.outcome!=='loss'||!(view.toCall>0)||view.toCall>=view.stack||view.toCall>Math.min(budget,Math.max(0,limit-paid)))return false;
  // Pay a changing subset of affordable bets; never manufacture a raise size.
  const pressure=view.toCall/Math.max(1,view.pot);
  return random()<Math.max(.15,Math.min(.85,.75-pressure*.3));

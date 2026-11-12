@@ -23,7 +23,7 @@
   <nav class="tabs" id="tabs">
    <button data-tab="bots" class="on">Botat <em id="nBots">0</em></button><button data-tab="new">Krijo</button><button data-tab="tables">Tavolinat <em id="nTables">0</em></button><button data-tab="players">Lojtarët</button><button data-tab="moves">Vendimet</button><button data-tab="limits">Limitet</button><button data-tab="log">Aktiviteti</button>
   </nav>
-  <section data-pane="bots"><div class="bots" id="botList"></div></section>
+  <section data-pane="bots"><p class="botListHelp">Kliko një bot për statistikat, veprimet dhe konfigurimin.</p><div class="bots" id="botList" role="list" aria-label="Lista e botëve"></div></section>
   <section data-pane="new" class="hidden"><div class="split">
    <form class="card" id="createOne"><h2>Një bot</h2><p>Paratë dalin nga kredia e qendrës. Boti krijohet i ndalur.</p><div class="grid">
     <label>Emri<input name="name" pattern="[a-zA-Z0-9_]{3,18}" placeholder="p.sh. marco_88" required></label>
@@ -34,7 +34,7 @@
     <label>Buxheti për secilin (€)<input name="budget" type="number" min="0.01" step="0.01" required></label>
     <div data-config data-mix style="display:contents"></div></div><p></p><button class="gold">Krijo botat</button></form>
   </div></section>
-  <section data-pane="tables" class="hidden"><div class="card"><h2>Tavolinat me lojtarë</h2><p>Botat ulen vetëm aty ku ka lojtarë të vërtetë dhe vende të lira, dhe ngrihen kur tavolina mbushet ose kur dikush pret radhën.</p><div class="tableWrap" id="tableList"></div></div></section>
+  <section data-pane="tables" class="hidden"><div class="card"><h2>Tavolinat me lojtarë</h2><p>Me opsionin “Ulet direkt”, botat ulen edhe në tavolinë bosh dhe mund të luajnë me njëri-tjetrin. Botat lënë vende për lojtarët dhe ngrihen kur tavolina mbushet ose kur dikush pret radhën.</p><div class="tableWrap" id="tableList"></div></div></section>
   <section data-pane="players" class="hidden"><div class="card"><h2>Stili i lojtarëve</h2><p>Çfarë kanë mësuar botat nga veprimet publike të lojtarëve (asnjëherë nga letrat e tyre). VPIP: sa shpesh hyn në pot · PFR: sa shpesh ngre para flop-it · AF: agresiviteti · Fold: sa shpesh heq dorë përballë një basti.</p><div class="tableWrap" id="playerList"></div></div></section>
   <section data-pane="moves" class="hidden"><div class="card"><h2>Vendimet e fundit</h2><p>Rezultati kontrollohet nga letrat reale që do të hapen dhe duart ende aktive. Call-et humbëse për kthim varen nga përqindja dhe fitimi i disponueshëm.</p><div class="tableWrap" id="moveList"></div></div></section>
   <section data-pane="limits" class="hidden">
@@ -43,7 +43,7 @@
    <fieldset id="returnControls"><div class="returnsInputs">
     <label for="returnPercent">Përqindja e fitimit neto (%)<input id="returnPercent" name="returnPercent" type="number" min="0" max="100" step="0.1" value="0" required aria-describedby="returnHelp"></label>
     <div class="returnSlider"><label for="returnRange">Rregullo përqindjen</label><input id="returnRange" type="range" min="0" max="100" step="0.1" value="0"><div class="rangeMarks"><span>0% · pa kthim</span><span>100%</span></div></div>
-   </div><p id="returnHelp">Llogaritet vetëm fitimi neto; buxheti fillestar dhe rimbushjet përjashtohen. Kthimi është gradual dhe varet nga duart e përshtatshme.</p>
+   </div><p id="returnHelp">Llogaritet vetëm fitimi neto; buxheti fillestar dhe rimbushjet përjashtohen. Në një dorë humbëse, call-et për kthim së bashku mund të përdorin deri në 60% të shumës së disponueshme para call-it të parë për kthim.</p>
    <p class="returnExample" id="returnExample"></p><button class="gold" id="saveReturns">Ruaj përqindjen</button></fieldset>
    <p id="returnSaved" role="status" aria-live="polite"></p>
   </form><form class="card" id="limitsForm"><h2>Mbrojtja e shtëpisë</h2><p>Kur të gjithë botat bashkë humbasin sa limiti, ndalen dhe ngrihen nga tavolinat. Nisin vetë sërish në periudhën tjetër (ora e Tiranës). 0 do të thotë pa limit. Llogariten edhe chipet, edhe rake-u që botat i kthejnë qendrës.</p><div class="grid">

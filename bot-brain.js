@@ -1,4 +1,4 @@
-// Virtual-credit bots use a server-computed outcome flag for passive live play.
+// Virtual-credit bots use a server-computed outcome flag for live play.
 // Range utilities below remain available for analysis.
 import {evaluateHand,compare,ranks,suits} from './poker.js';
 
@@ -186,6 +186,13 @@ function postflop(v,st,random,E){
 // One decision. v is the bot's view of the table (see botView in bots.js).
 export function decide(v,style='medium',random=Math.random){
  if(Object.hasOwn(v,'outcome')){
+  // Follow winning hands, mixing in modest legal raises without going all-in.
+  if(v.outcome==='win'&&v.toCall<v.stack&&v.canRaise){
+   const chance=({low:.12,medium:.2,high:.3})[style]??.2;
+   const target=Math.min(v.maxRaiseTo,shove(v)-1,Math.max(v.minRaiseTo,v.currentBet+Math.round((v.pot+v.toCall)*.5)));
+   if(Number.isSafeInteger(target)&&target>=v.minRaiseTo&&target>v.currentBet&&random()<chance)
+    return {type:'raise',amount:target/100,equity:1};
+  }
   // Complete the ordinary entry price, but never chase a preflop raise.
   const entry=v.phase==='preflop'&&v.raisesPreflop===0&&v.currentBet<=v.bb&&v.toCall<=v.bb;
   const type=!v.toCall?'check':(entry||v.outcome==='win')&&v.toCall<v.stack?'call':'fold';

@@ -7,8 +7,11 @@ exactly the engine's burn-card and deal order without changing the deck. They ch
 when free and call only when they will beat every remaining opponent outright.
 Before the flop, bots also pay the ordinary big-blind entry price regardless of
 outcome when nobody has raised. Losing, tied or unavailable outcomes otherwise
-cause a fold when facing a bet. Bots never
-raise or voluntarily go all-in, including by calling for their whole stack.
+cause a fold when facing a bet, apart from profit-funded return calls. With a winning
+outcome, bots usually follow the bet and occasionally make a legal raise: 12% for
+Tight, 20% for Balanced and 30% for Aggressive. Bots never voluntarily go all-in,
+including by calling for their whole stack. Deliberate losing return calls share
+a per-hand cap of 60% of the available return budget before the first such call.
 Only an outcome flag reaches the decision worker; future cards and opponents'
 cards are not added to player snapshots. This is privileged-information behavior
 for this virtual-credit prototype, not fair-play poker AI. Forced blinds and rake

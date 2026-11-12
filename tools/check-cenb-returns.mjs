@@ -7,11 +7,13 @@ import assert from 'node:assert/strict';
 const root=path.resolve('public/cenb'),out=path.resolve('artifacts');
 fs.mkdirSync(out,{recursive:true});
 const fixture={guard:{returnPercent:25,dailyLimit:50,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,today:0,week:0,month:0},bots:[{id:'b',name:'Demo',status:'Stopped',enabled:false,style:'Balanced',mode:'play',tableId:'auto',buyinBB:100,stopLoss:50,equity:120,total:20,session:20,hands:10,rakePaid:0,house:20,returned:5,returnAvailable:15}],tables:[],players:[],decisions:[],catalog:[],log:[],centerBalance:1000};
-let settings=[];
+fixture.bots.push({...fixture.bots[0],id:'b2',name:'SecondBot',enabled:true,status:'Looking for a table'});
+let settings=[],configurations=[];
 const server=http.createServer(async(req,res)=>{
  if(req.url.startsWith('/api/')){let raw='';for await(const c of req)raw+=c;let value=fixture;
   if(req.url==='/api/cenb/status')value={ready:true};
   if(req.url==='/api/cenb/bots/settings'){const body=JSON.parse(raw);settings.push(body);fixture.guard.returnPercent=body.returnPercent;value=fixture.guard;}
+  if(req.url==='/api/cenb/bots/configure'){const body=JSON.parse(raw);configurations.push(body);Object.assign(fixture.bots.find(b=>b.id===body.id),body);value={ok:true};}
   res.setHeader('content-type','application/json');res.end(JSON.stringify(value));return;
  }
  const name=req.url==='/'?'index.html':req.url.slice(1).replace(/^cenb\//,'');if(!['index.html','cenb.js','cenb.css','logo.webp','icon.png'].includes(name)){res.writeHead(404);res.end();return;}
@@ -33,6 +35,31 @@ try{
  await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await cdp('Page.navigate',{url:origin});
  for(let i=0;i<60;i++){if(await ev("document.querySelector('#returnPercent')?.value==='25'"))break;await sleep(100);}
  assert.equal(await ev("document.querySelector('#returnPercent').value"),'25');
+ assert.equal(await ev("document.querySelectorAll('.botRow').length"),2);
+ assert.equal(await ev("document.querySelectorAll('.botDetails:not([hidden])').length"),0);
+ assert.ok(await ev("document.querySelector('.botRow').textContent.includes('Demo')&&document.querySelector('.botRow').textContent.includes('€120.00')"),'collapsed row shows main bot data');
+ await ev("document.querySelector('.botRow').focus();document.querySelector('.botRow').click()");
+ assert.equal(await ev("document.activeElement.getAttribute('aria-expanded')"),'true','opening preserves keyboard focus');
+ assert.equal(await ev("document.querySelectorAll('.botDetails:not([hidden])').length"),1);
+ await ev("document.querySelector('[data-act=edit]').focus();document.querySelector('[data-act=edit]').click()");
+ assert.ok(await ev("!!document.querySelector('[data-edit]')"),'edit opens after focusing the button');
+ await ev("document.querySelector('[data-edit] [name=stopLoss]').value=75;document.querySelector('[data-edit] [name=stopLoss]').focus();document.activeElement.blur();__refresh()");
+ assert.equal(await ev("document.querySelector('[data-edit] [name=stopLoss]').value"),'75','unsaved configuration survives refresh even after blur');
+ await ev("document.querySelector('[data-edit]').requestSubmit()");
+ for(let i=0;i<40&&!configurations.length;i++)await sleep(100);
+ assert.equal(configurations[0]?.id,'b');assert.equal(configurations[0]?.stopLoss,'75');
+ await sleep(150);assert.equal(await ev("!!document.querySelector('[data-edit]')"),false);
+ assert.equal(await ev("document.querySelector('.botRow').getAttribute('aria-expanded')"),'true','save keeps bot details open');
+ await ev("document.querySelector('[data-id=b2] .botRow').click()");
+ assert.equal(await ev("document.querySelector('[data-id=b] .botRow').getAttribute('aria-expanded')"),'false');
+ assert.equal(await ev("document.querySelector('[data-id=b2] [data-act=edit]').disabled"),true,'running bot retains configuration guard');
+ await ev("document.querySelector('[data-id=b] .botRow').click();__refresh()");
+ assert.equal(await ev("document.querySelector('[data-id=b] .botRow').getAttribute('aria-expanded')"),'true','refresh keeps selected bot open');
+ await ev("document.querySelector('[data-id=b] [data-act=edit]').click();document.querySelector('[data-act=cancel]').click()");
+ assert.equal(await ev("!!document.querySelector('[data-edit]')"),false,'cancel closes edit form');
+ await ev("document.querySelector('[data-id=b] .botRow').click()");
+ assert.equal(await ev("document.querySelectorAll('.botDetails:not([hidden])').length"),0,'row can collapse again');
+ await ev("document.querySelector('[data-id=b] .botRow').click()");
  await ev("document.querySelector('[data-tab=limits]').click();document.querySelector('#returnRange').value=40;document.querySelector('#returnRange').dispatchEvent(new Event('input',{bubbles:true}))");
  assert.equal(await ev("document.querySelector('#returnPercent').value"),'40');
  await ev("__refresh()");assert.equal(await ev("document.querySelector('#returnPercent').value"),'40','unsaved edits survive refresh');
@@ -43,14 +70,16 @@ try{
  assert.deepEqual(settings,[{returnPercent:30}],'saves only return setting');
  await sleep(150);assert.equal(await ev("document.querySelector('#returnState').textContent"),'30% aktiv');
  assert.ok(await ev("document.querySelector('#botList').textContent.includes('€5.00')&&document.querySelector('#botList').textContent.includes('€15.00')"));
+ await ev("document.querySelector('[data-tab=bots]').click()");
  let shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'cenb-returns-desktop.png'),Buffer.from(shot.data,'base64'));
  await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await sleep(100);
  assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth+1'),true,'no horizontal overflow on mobile');
  shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'cenb-returns-mobile.png'),Buffer.from(shot.data,'base64'));
+ await ev("document.querySelector('[data-tab=limits]').click()");
  await ev("document.querySelector('#returnPercent').value=0;document.querySelector('#returnPercent').dispatchEvent(new Event('input'));document.querySelector('#returnsForm').requestSubmit()");
  for(let i=0;i<40&&settings.length<2;i++)await sleep(100);await sleep(100);
  assert.equal(await ev("document.querySelector('#returnState').textContent"),'I çaktivizuar');
  delete fixture.guard.returnPercent;await ev('__refresh()');assert.equal(await ev("document.querySelector('#returnControls').disabled"),true,'unsupported server cannot silently accept settings');
- assert.deepEqual(errors,[]);console.log('PASS: slider, numeric validation, save payload, unsaved edits, statistics, zero/off, old-server fallback and desktop/mobile layouts.');
+ assert.deepEqual(errors,[]);console.log('PASS: bot list summaries, expansion, switching, edit/save/cancel, focus, preserved drafts, return settings and desktop/mobile layouts.');
  await cdp('Browser.close');
 }finally{socket?.close();chrome.kill();server.close();}

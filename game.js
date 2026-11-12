@@ -332,7 +332,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    if(s.autoSitOut&&real-s.sitOutSince>=AWAY_CASHOUT_MS&&idle){cashOutSeat(t,i,'DISCONNECTED');changed=true;continue;}
    if(s.rebuyDeadline&&now>=s.rebuyDeadline&&idle){cashOutSeat(t,i,'REBUY_EXPIRED');changed=true;}
    else if(s.sittingOut&&now-s.sitOutSince>=SIT_OUT_MS&&idle){cashOutSeat(t,i,'SIT_OUT');changed=true;}
-   else if(t.phase==='waiting'){s.idleSince??=now;if(now-s.idleSince>=IDLE_TABLE_MS){cashOutSeat(t,i,'IDLE_TABLE');changed=true;}}
+   else if(t.phase==='waiting'){s.idleSince??=now;const waitingBot=s.isBot&&findUser(s.userId)?.bot?.enabled&&findUser(s.userId)?.bot?.waitForPlayers;if(!waitingBot&&now-s.idleSince>=IDLE_TABLE_MS){cashOutSeat(t,i,'IDLE_TABLE');changed=true;}}
    else delete s.idleSince;}
   if(LIVE.includes(t.phase)){if(changed)save();if(t.runout){if(now>=t.runout.at){runoutStep(t,now);save();}return;}// A player who just lost the connection still gets AWAY_GRACE_MS of their turn to come back.
   if(t.turn>=0&&(now>=t.deadline||t.seats[t.turn].autoSitOut&&now-t.turnStartedAt>=AWAY_GRACE_MS))act(t,t.seats[t.turn].userId,'fold',undefined,true);return;}

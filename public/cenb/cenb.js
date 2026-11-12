@@ -5,7 +5,7 @@ const eur=n=>'€'+Number(n||0).toLocaleString('en-GB',{minimumFractionDigits:2,
 const signed=n=>'<b class="'+(n>0?'up':n<0?'down':'')+'">'+(n>0?'+':'')+eur(n)+'</b>';
 const ago=t=>{const s=Math.round((Date.now()-t)/1000);return s<60?s+' sek':s<3600?Math.round(s/60)+' min':Math.round(s/3600)+' orë';};
 let token=null;try{token=sessionStorage.getItem('cenbToken');}catch{}
-let data=null,tab='bots',editing=null;
+let data=null,tab='bots',editing=null,expandedBot=null;
 
 function toast(text,bad=false){const t=$('#toast');t.textContent=text;t.className='show'+(bad?' bad':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.className='',3200);}
 async function api(path,body){
@@ -36,6 +36,7 @@ function configFields(c={},mix=false){
  const tables=data?.catalog||[],styles=data?.styles||{low:'Tight',medium:'Balanced',high:'Aggressive'},auto=(c.tableId??'auto')==='auto';
  return '<label>Stili<select name="risk">'+(mix?'<option value="mix">Të përziera</option>':'')+Object.entries(styles).map(([k,v])=>'<option value="'+k+'"'+((c.risk||(mix?'mix':'medium'))===k?' selected':'')+'>'+safe(v)+'</option>').join('')+'</select></label>'
   +'<label>Mënyra<select name="mode"><option value="play">Luan duar</option><option value="seat"'+(c.mode==='seat'?' selected':'')+'>Vetëm zë vend · nuk luan</option></select></label>'
+  +'<label>Kur niset<select name="waitForPlayers"><option value="false">Ulet kur ka lojtarë</option><option value="true"'+(c.waitForPlayers?' selected':'')+'>Ulet direkt · luan edhe me bota</option></select></label>'
   +'<label>Tavolina<select name="tableId" data-table><option value="auto"'+(auto?' selected':'')+'>Auto · zgjedh vetë ku duhet</option>'+tables.map(t=>'<option value="'+safe(t.id)+'"'+(c.tableId===t.id?' selected':'')+'>'+safe(t.name)+' · '+eur(t.sb)+'/'+eur(t.bb)+' · '+t.size+' vende</option>').join('')+'</select></label>'
   +'<label data-auto'+(auto?'':' class="hidden"')+'>Buy-in (big blinds)<input name="buyinBB" type="number" min="10" max="100" step="1" value="'+(c.buyinBB||100)+'"></label>'
   +'<label data-auto'+(auto?'':' class="hidden"')+'>Big blind max (€) · 0 pa limit<input name="maxBB" type="number" min="0" step="0.01" value="'+(c.maxBB||0)+'"></label>'
@@ -70,24 +71,36 @@ function renderKpis(){
 
 // ---- Bots ----
 const statusSq=s=>s.replace('Playing at','Luan te').replace('Looking for a table','Kërkon tavolinë').replace('Waiting for players','Pret lojtarë').replace('Stopped','I ndalur').replace('Loss limit reached','Arriti limitin e humbjes').replace('Win limit reached','Arriti limitin e fitimit').replace('Wallet smaller than the buy-in','Portofoli më i vogël se buy-in').replace(/House (daily|weekly|monthly) limit reached/,(m,p)=>'Limiti '+({daily:'ditor',weekly:'javor',monthly:'mujor'}[p])+' i shtëpisë');
-function renderBots(){
- const list=$('#botList');if(editing&&list.querySelector('[data-edit]')?.contains(document.activeElement))return;
+function renderBots(force=false){
+ const list=$('#botList');if(!force&&editing&&list.querySelector('[data-edit]'))return;
+ const focused=document.activeElement?.closest('#botList [data-act]'),focusId=focused?.closest('[data-id]')?.dataset.id,focusAct=focused?.dataset.act;
  $('#nBots').textContent=data.bots.length;
  list.innerHTML=data.bots.length?data.bots.map(b=>{const err=!b.enabled&&b.status!=='Stopped';
-  return '<article class="bot'+(b.seatedAt?' on':'')+(err?' err':'')+'" data-id="'+safe(b.id)+'"><div class="botHead"><span class="avatar">'+safe(b.name[0].toUpperCase())+'</span><div><strong>'+safe(b.name)+'</strong><small>'+safe(statusSq(b.status))+'</small></div><span class="pill'+(b.enabled?' on':err?' warn':'')+'">'+(b.enabled?'Ndezur':'Fikur')+'</span></div>'
-  +'<div class="tag">'+safe(b.style)+' · '+(b.mode==='seat'?'vetëm vend':'luan duar')+' · '+(b.tableId==='auto'?'Auto · '+b.buyinBB+' BB'+(b.maxBB>0?' · deri '+eur(b.maxBB)+' BB':''):safe(b.tableName)+' · '+eur(b.buyin))+' · humbje max '+eur(b.stopLoss)+(b.stopWin>0?' · fitim max '+eur(b.stopWin):'')+'</div>'
+  const open=expandedBot===b.id;
+  return '<article class="bot'+(b.seatedAt?' on':'')+(err?' err':'')+'" data-id="'+safe(b.id)+'" role="listitem"><button type="button" class="botRow" data-act="details" aria-expanded="'+open+'" aria-controls="bot-details-'+safe(b.id)+'">'
+  +'<span class="botIdentity"><span class="avatar">'+safe(b.name[0].toUpperCase())+'</span><span class="botName"><strong>'+safe(b.name)+'</strong><span class="pill'+(b.enabled?' on':err?' warn':'')+'">'+(b.enabled?'Ndezur':'Fikur')+'</span><small>'+safe(statusSq(b.status))+'</small></span></span>'
+  +'<span class="rowMetric"><small>Tavolina · stili</small><strong>'+safe(b.seatedAt||(b.tableId==='auto'?'Auto':b.tableName))+'</strong><span>'+safe(b.style)+' · '+(b.mode==='seat'?'vetëm vend':'luan duar')+'</span></span>'
+  +'<span class="rowMetric"><small>Portofol + stack</small><strong>'+eur(b.equity)+'</strong></span>'
+  +'<span class="rowMetric"><small>Kjo seancë</small>'+signed(b.session)+'</span>'
+  +'<span class="rowMetric"><small>Fitimi total</small>'+signed(b.total)+'</span>'
+  +'<span class="rowMetric"><small>Duar</small><strong>'+b.hands+'</strong></span>'
+  +'<span class="botChevron" aria-hidden="true">'+(open?'−':'+')+'</span></button>'
+  +'<div id="bot-details-'+safe(b.id)+'" class="botDetails"'+(open?'':' hidden')+'>'+(open?'<h2>Statistikat · '+safe(b.name)+'</h2><div class="tag">'+(b.tableId==='auto'?'Auto · '+b.buyinBB+' BB'+(b.maxBB>0?' · deri '+eur(b.maxBB)+' BB':''):safe(b.tableName)+' · '+eur(b.buyin))+' · humbje max '+eur(b.stopLoss)+(b.stopWin>0?' · fitim max '+eur(b.stopWin):'')+' · '+(b.waitForPlayers?'ulet direkt':'ulet kur ka lojtarë')+'</div>'
   +'<div class="stats"><div><small>Portofol + stack</small><b>'+eur(b.equity)+'</b></div><div><small>Kjo seancë</small>'+signed(b.session)+'</div><div><small>Që nga krijimi</small>'+signed(b.total)+'</div><div><small>Duar</small><b>'+b.hands+'</b></div><div><small>Rake</small><b>'+eur(b.rakePaid)+'</b></div><div><small>Shtëpia</small>'+signed(b.house)+'</div></div>'
   +'<div class="stats returnStats"><div><small>Kthyer te lojtarët</small><b>'+eur(b.returned)+'</b></div><div><small>Në dispozicion për kthim</small><b>'+eur(b.returnAvailable)+'</b></div></div>'
   +'<div class="botBtns">'+(b.enabled?'<button class="small danger" data-act="stop">■ Ndalo</button>':'<button class="small gold" data-act="start">▶ Nis</button>')+'<button class="small" data-act="edit"'+(b.enabled||b.seatedAt?' disabled title="Ndale botin dhe prit sa të ngrihet"':'')+'>Ndrysho</button><button class="small" data-act="topup"'+(b.seatedAt?' disabled':'')+'>+ Para</button><button class="small ghost" data-act="delete"'+(b.enabled||b.seatedAt?' disabled':'')+'>Fshi</button></div>'
-  +(editing===b.id?'<form class="edit grid" data-edit>'+configFields(b)+'<button class="gold">Ruaj</button><button type="button" class="ghost" data-act="cancel">Anulo</button></form>':'')+'</article>';}).join(''):'<div class="card empty">Nuk ka bota ende. Hap "Krijo".</div>';
+  +(b.enabled||b.seatedAt?'<p class="editHint">Për të ndryshuar konfigurimin, ndale botin dhe prit të largohet nga tavolina.</p>':'')
+  +(editing===b.id?'<form class="edit grid" data-edit>'+configFields(b)+'<button class="gold">Ruaj</button><button type="button" class="ghost" data-act="cancel">Anulo</button></form>':''):'')+'</div></article>';}).join(''):'<div class="card empty">Nuk ka bota ende. Hap "Krijo".</div>';
  const f=list.querySelector('[data-edit]');if(f)bindConfig(f);
+ if(focused){const row=[...list.querySelectorAll('[data-id]')].find(x=>x.dataset.id===focusId);row?.querySelector('[data-act="'+focusAct+'"]')?.focus({preventScroll:true});}
 }
 $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn)return;const id=btn.closest('[data-id]').dataset.id,act=btn.dataset.act,b=data.bots.find(x=>x.id===id);
  try{
-  if(act==='start'){await api('bots/status',{id,enabled:true});toast(b.name+' u nis');}
+  if(act==='details'){expandedBot=expandedBot===id?null:id;editing=null;renderBots(true);return;}
+  else if(act==='start'){await api('bots/status',{id,enabled:true});toast(b.name+' u nis');}
   else if(act==='stop'){await api('bots/status',{id,enabled:false});toast(b.name+' u ndal');}
-  else if(act==='edit'){editing=editing===id?null:id;renderBots();return;}
-  else if(act==='cancel'){editing=null;renderBots();return;}
+  else if(act==='edit'){editing=editing===id?null:id;renderBots(true);return;}
+  else if(act==='cancel'){editing=null;renderBots(true);return;}
   else if(act==='topup'){const v=prompt('Sa euro të shtohen te '+b.name+'? (nga kredia e qendrës)');if(!v)return;await api('bots/topup',{id,amount:v});toast('U shtuan '+eur(v));}
   else if(act==='delete'){if(!confirm('Të fshihet '+b.name+'? Paratë e tij kthehen te qendra.'))return;await api('bots/delete',{id});toast(b.name+' u fshi');}
   await refresh();
