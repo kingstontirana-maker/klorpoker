@@ -84,7 +84,7 @@ const LUCK=[
 ];
 
 // ---- Legends: original portraits (public/avatars/*.webp), shown first in the picker ----
-const LEGENDS=[["p01","Spartan"],["p02","Lion King"],["p03","Crowned"],["p04","Reaper"],["p05","Old King"],["p06","Ghost"],["p07","Queen of Spades"],["p08","Thunder"],["p09","Hooded Lion"],["p10","Shadow"],["p11","Chip Biter"],["p12","Viking"],["p13","Legion"],["p14","Gentleman"],["p15","High Roller"],["p16","The King"],["p17","Smoke"],["p18","Samurai"],["p19","Astronaut"]];
+const LEGENDS=[["p01","Spartan"],["p02","Lion King"],["p03","Crowned"],["p04","Reaper"],["p05","Old King"],["p06","Ghost"],["p07","Queen of Spades"],["p08","Thunder"],["p09","Hooded Lion"],["p10","Shadow"],["p11","Chip Biter"],["p12","Viking"],["p13","Legion"],["p14","Gentleman"],["p15","High Roller"],["p16","The King"],["p17","Smoke"],["p18","Samurai"],["p19","Astronaut"],["p20","Marble God"],["p21","Panther"],["p22","Raven"],["p23","Assassin"],["p24","Crowned Don"],["p25","Spade Queen"],["p26","Shieldmaiden"],["p27","Stone Emperor"],["p28","Panther Boss"],["p29","Desert Rider"],["p30","Card Shark"],["p31","Night Veil"],["p32","Iron Face"],["p33","Raven Dealer"],["p34","Old Wizard"],["p35","Half Machine"],["p36","Golden Rose"]];
 const photo=id=>`<img class="avatarPhoto" src="/avatars/${id}.webp" alt="" loading="lazy" decoding="async" draggable="false">`;
 
 const group=(name,list)=>list.map(([id,label,bg,glow,body])=>({id,name:label,group:name,svg:svg(bg,glow,body)}));

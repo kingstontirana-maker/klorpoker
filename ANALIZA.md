@@ -685,8 +685,9 @@ Pa botat dhe CENB-në. Provuar te demo, në një databazë provë.
 - **Testet:** `node --test` (çdo skedar në procesin e vet), 133/133. Me `--experimental-test-isolation=none` paketa ngec pas `integration.test.js`, sepse `cenb-routing.test.js` ngarkon serverin më parë. Kjo është problem testi, jo i platformës.
 
 ## Fotot e profilit "Legends"
-Nga 40 fotot e ChatGPT u shtuan 19 portrete origjinale (`public/avatars/p01–p19.webp`, katror deri 512 px, 13–47 KB secila). Te dritarja e zgjedhjes dalin si grupi i parë, "Legends". Avatarët e vjetër SVG mbeten, ndaj zgjedhjet ekzistuese të lojtarëve nuk ndryshojnë. U lanë jashtë:
+Nga 40 fotot e ChatGPT u shtuan 19 portrete origjinale (`public/avatars/p01–p19.webp`; më pas edhe 17 të tjera, p20–p36, gjithsej 36, katror deri 512 px, 13–47 KB secila). Te dritarja e zgjedhjes dalin si grupi i parë, "Legends". Avatarët e vjetër SVG mbeten, ndaj zgjedhjet ekzistuese të lojtarëve nuk ndryshojnë. U lanë jashtë:
 - personazhet me të drejta autori: Joker, Hulk, Don Corleone, Thomas Shelby;
 - një person real: Pablo Escobar;
 - fotot me logo makinash (Rolls-Royce);
 - fotot me fëmijë me çipa poker dhe cigare.
+Nga seria e dytë (19 foto katrore 1254 px) u shtuan 17 (p20–p36). U lanë jashtë Hulk dhe një portret që i ngjan qartë Pablo Escobar-it.
