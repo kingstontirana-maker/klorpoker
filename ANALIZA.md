@@ -673,3 +673,20 @@ Para flop-it përdor tabela duarsh sipas pozicionit dhe thellësisë së stack-u
   - asnjë tingull nuk planifikohet më shumë se 1 s përpara;
   - tingujt nuk luhen kur ora e audios është e ngrirë;
   - kur del nga tavolina ose fsheh faqen, ndalen të gjithë tingujt e mbetur.
+
+## Analiza para hapjes (13 nëntor)
+Pa botat dhe CENB-në. Provuar te demo, në një databazë provë.
+- **Ngarkesa:** 260 lojtarë njëkohësisht në 52 tavolina, për 6 minuta: 547 duar dhe 8 567 veprime, 0 gabime, 0 fold/check automatik, totali i parave i pandryshuar gjatë gjithë kohës.
+- **Rrëzim me forcë** me 52 duar në lojë: pas rinisjes çdo chip dhe çdo bast në pot u kthye në portofol, dhe totali mbeti i saktë deri në cent.
+- **Rregullat:** 200 000 showdown-e dhe 20 000 ndarje side pot-esh u krahasuan me një vlerësues të pavarur: 0 mospërputhje. Rake-u është 0 pa flop dhe 5% me flop.
+- **Përmirësimet:**
+  - Përditësimi live rindërtohet vetëm për lojtarët e tavolinës që ndryshoi (+ një rifreskim çdo sekondë). CPU-ja me 260 lojtarë ra nga 89% në rreth 50% të një bërthame, dhe koha mesatare e një veprimi nga 110–200 ms në 25 ms.
+  - Fjalëkalimi në hyrje kontrollohet pa bllokuar serverin (`crypto.scrypt` asinkron), që hyrjet e shumta në hapje të mos ngrijnë tavolinat.
+- **Testet:** `node --test` (çdo skedar në procesin e vet), 133/133. Me `--experimental-test-isolation=none` paketa ngec pas `integration.test.js`, sepse `cenb-routing.test.js` ngarkon serverin më parë. Kjo është problem testi, jo i platformës.
+
+## Fotot e profilit "Legends"
+Nga 40 fotot e ChatGPT u shtuan 19 portrete origjinale (`public/avatars/p01–p19.webp`, katror deri 512 px, 13–47 KB secila). Te dritarja e zgjedhjes dalin si grupi i parë, "Legends". Avatarët e vjetër SVG mbeten, ndaj zgjedhjet ekzistuese të lojtarëve nuk ndryshojnë. U lanë jashtë:
+- personazhet me të drejta autori: Joker, Hulk, Don Corleone, Thomas Shelby;
+- një person real: Pablo Escobar;
+- fotot me logo makinash (Rolls-Royce);
+- fotot me fëmijë me çipa poker dhe cigare.

@@ -83,8 +83,12 @@ const LUCK=[
  ['shoe','Horseshoe','#0f2a1a','#1d5a36',`<path d="M26 82q-14-30-6-48 8-18 30-18t30 18q8 18-6 48h-14q12-30 6-42-4-10-16-10t-16 10q-6 12 6 42z" fill="#e6c352"/><path d="M50 8" stroke="none"/><circle cx="24" cy="48" r="2.4" fill="#7a5f1c"/><circle cx="30" cy="30" r="2.4" fill="#7a5f1c"/><circle cx="76" cy="48" r="2.4" fill="#7a5f1c"/><circle cx="70" cy="30" r="2.4" fill="#7a5f1c"/><circle cx="50" cy="20" r="2.4" fill="#7a5f1c"/>`],
 ];
 
+// ---- Legends: original portraits (public/avatars/*.webp), shown first in the picker ----
+const LEGENDS=[["p01","Spartan"],["p02","Lion King"],["p03","Crowned"],["p04","Reaper"],["p05","Old King"],["p06","Ghost"],["p07","Queen of Spades"],["p08","Thunder"],["p09","Hooded Lion"],["p10","Shadow"],["p11","Chip Biter"],["p12","Viking"],["p13","Legion"],["p14","Gentleman"],["p15","High Roller"],["p16","The King"],["p17","Smoke"],["p18","Samurai"],["p19","Astronaut"]];
+const photo=id=>`<img class="avatarPhoto" src="/avatars/${id}.webp" alt="" loading="lazy" decoding="async" draggable="false">`;
+
 const group=(name,list)=>list.map(([id,label,bg,glow,body])=>({id,name:label,group:name,svg:svg(bg,glow,body)}));
-export const AVATARS=[...group('People',PEOPLE),...group('Rides',RIDES),...group('Money',LUXURY),...group('Animals',ANIMALS),...group('Luck',LUCK)];
+export const AVATARS=[...LEGENDS.map(([id,name])=>({id,name,group:'Legends',svg:photo(id)})),...group('People',PEOPLE),...group('Rides',RIDES),...group('Money',LUXURY),...group('Animals',ANIMALS),...group('Luck',LUCK)];
 const byId=new Map(AVATARS.map(a=>[a.id,a]));
 export const avatarExists=id=>byId.has(id);
 export const avatarSvg=id=>byId.get(id)?.svg||'';
