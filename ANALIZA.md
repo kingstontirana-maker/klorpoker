@@ -726,3 +726,14 @@ U provua te demo: dërgimi i €10 nga telefoni kaloi saktë (lojtari 120→130,
 - **Animimi:** basti nuk shfaqet më para se të mbërrijnë chipsat. Elementi mbetet i padukshëm derisa chipsat të arrijnë te lojtari, kështu që chipsat nuk duken më sikur hidhen dy herë. Ky ndreqje vlen edhe në kompjuter.
 - **Testi** `table-visuals.test.js` kontrollon tavolinat me 2, 4, 5, 6 dhe 9 vende, në tre madhësi ekrani, të ulur dhe jo. Asnjë element nuk duhet të mbivendoset me tjetrin.
 - **Skedarët:** `public/table-phone.css`, `phoneLayout()` dhe `feltBox()` te `public/table-visuals.js`, `FIT_H` te `public/app.js`. Në kompjuter tavolina mbetet siç ishte.
+
+## Shpejtësia: login dhe lobby (analizë dhe ndreqje)
+Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në demo:
+- **Login:** shkronjat vonoheshin sepse sfondi i dritares kishte blur (10 px) mbi një faqe me rreth 15 animacione që nuk ndalen. Telefoni duhej ta rillogariste blur-in në çdo kuadër. Tani sfondi është i errët pa blur, dhe animacionet pas dritares ndalen sa kohë ajo është e hapur. Kodi i tastierës zgjat 0–1 ms për shtypje.
+- **Lobby, shkaku 1:** lista e 164 tavolinave rindërtohej e tëra çdo ~4 s. Butoni nën gisht zëvendësohej dhe shtypja humbiste. Tani ndryshohet vetëm qeliza që ndryshon (`patchMarkup`), dhe butonat mbeten të njëjtit elementë.
+- **Lobby, shkaku 2:** funksioni `fmt` krijonte një formatues të ri numrash për çdo shumë. Tani përdoret një i vetëm.
+- **Lobby, shkaku 3:** në çdo rifreskim rishkruheshin dhjetëra atribute dhe tekste të pandryshuara, ndër to `body[data-view]`, që e detyronte shfletuesin të rillogariste stilin e gjithë faqes. Tani shkrimet që nuk ndryshojnë asgjë anashkalohen (`hidden`, `textContent`, `setAttribute`, `data-*`). Në 12 s qetësie, ndryshimet në DOM ranë nga mbi 200 në vetëm ato reale, p.sh. statusi i një tavoline.
+- **Lobby, rezultati:** detyrat e gjata ranë nga 5.6 s në rreth 2.5 s, faqja shkon me 47 fps në vend të 35, dhe prekja më e ngadaltë zgjat 250–430 ms në vend të 664 ms. Koha që mbetet është vizatimi i vetë faqes në mjedisin e testit pa GPU.
+- **Tavolina:** chati lexonte madhësinë e dritares në çdo përditësim. Tani e lexon vetëm kur vjen mesazh i ri, dhe koha e tij ra nga 1.2 s në 0.12 s. Lista e lobby-t nuk rifreskohet më kur je në tavolinë.
+- **Prekje:** "Hide full / Hide empty" kanë kuti 20 px dhe rresht 40 px të lartë. Lidhjet dhe kutia 18+ në login kanë zonë prekjeje 40 px.
+- **Skanimi:** u kontrolluan home, login, regjistrimi, lobby, tavolina, paneli i agjentit dhe i qendrës, në telefon, tablet dhe kompjuter. Nuk ka asnjë gabim JS, asnjë kërkesë të dështuar dhe asnjë faqe që lëviz anash. Paralajmërimi i zërit vjen vetëm sepse testi nuk e prek ekranin, dhe zëri ndizet me prekjen e parë siç duhet.
