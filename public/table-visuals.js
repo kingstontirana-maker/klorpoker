@@ -166,11 +166,16 @@ export function preActionFor(choice,toCall){if(choice==='checkFold')return toCal
 // right edge, so a long amount grows away from the nearest name plate.
 // Other table sizes use the six-seat spots: two players face each other, four sit around
 // the table with the side players halfway along the edge, and nine add a second player at
-// the top and one on each side of the bottom player. "slots" names the six-seat position
+// the top and one on each side of the bottom player; five split the top seat in two and
+// leave out the upper side seats. "slots" names the six-seat position
 // whose styling each seat borrows; "hero" is where the player sitting at the table appears.
 export function sizedLayout(base,size=6){
  if(size===2)return {seats:[base.seats[0],base.seats[3]],bets:[base.bets[0],base.bets[3]],dealer:[base.dealer[0],base.dealer[3]],slots:[0,3],hero:1};
  if(size===4){const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2,...a.slice(2)],four=l=>[l[0],mid(l[1],l[2]),l[3],mid(l[4],l[5])];return {seats:four(base.seats),bets:four(base.bets),dealer:four(base.dealer),slots:[0,1,3,5],hero:2};}
+ // Five: two players at the top, one low on each side and the player at the bottom.
+ if(size===5){const [top,,r2,bottom,l2]=base.seats,dx=v=>Math.max(13,Math.min(24,v)),tl=[top[0]-dx(20),top[1]],tr=[top[0]+dx(20),top[1]];
+  const toward=([x,y],kx,ky)=>[x+(50-x)*kx,y+(50-y)*ky];
+  return {seats:[tl,tr,r2,bottom,l2],bets:[toward(tl,.12,.46),toward(tr,.12,.46),base.bets[2],base.bets[3],base.bets[4]],dealer:[[tl[0]-8,tl[1]+15],[tr[0]+8,tr[1]+15],base.dealer[2],base.dealer[3],base.dealer[4]],slots:[0,0,2,3,4],hero:3};}
  if(size===9){const [top,r1,r2,bottom,l2,l1]=base.seats,dx=v=>Math.max(13,Math.min(24,v));
   const tl=[top[0]-dx(17),top[1]],tr=[top[0]+dx(17),top[1]],bl=[bottom[0]-dx(23),bottom[1]-1.5],br=[bottom[0]+dx(23),bottom[1]-1.5];
   const toward=([x,y],kx,ky,align)=>[x+(50-x)*kx,y+(50-y)*ky,...(align?[align]:[])];

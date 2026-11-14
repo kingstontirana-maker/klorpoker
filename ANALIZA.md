@@ -701,3 +701,9 @@ Te `public/staff-mobile.css`, vetëm për ekrane deri 760 px dhe vetëm për pan
 - Fushat kanë shkrim 16 px, që iPhone të mos zmadhojë faqen kur shtyp.
 
 U provua te demo: dërgimi i €10 nga telefoni kaloi saktë (lojtari 120→130, agjenti 980→970).
+
+## Tavolinat me stake të larta (katalogu v3)
+- 14 tavolina të reja, Texas Hold'em NL: Macau I–III (€100/€200, 5 vende), Singapore I–III (€50/€100, 5 vende), St. Moritz I (€40/€80, 6 vende), Gstaad I (€40/€80, 2 vende), Courchevel I–III (€30/€60, 5 vende), Mykonos I–III (€25/€50, 5 vende).
+- Në vend të tyre mbyllen 14 tavolina me stake të ulëta: Lisbon VII–VIII, Madrid IX–X, Milano X–XII, Paris X–XII, Barcelona IX–X, Amsterdam VII–VIII. Totali mbetet 164.
+- Ndryshimi bëhet një herë, kur niset serveri. Tavolinat e tjera dhe ato që ka krijuar qendra nuk preken.
+- Platforma tani ka edhe tavolina me 5 vende: dy lojtarë lart, një në çdo anë dhe lojtari vetë poshtë.

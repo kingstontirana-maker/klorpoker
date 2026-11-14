@@ -45,7 +45,7 @@ export const maxRaiseTo=(t,s)=>{const all=s.roundBet+s.stack;return gameOf(t)===
 // TDA: betting reopens for a player who already acted only when the raises
 // made since their action add up to at least one full raise.
 export const canRaise=(t,s)=>actionable(s)&&s.stack>toCall(t,s)&&(!s.acted||t.currentBet-(s.actedAt||0)>=t.minRaise);
-export const TABLE_SIZES=[2,4,6,9];
+export const TABLE_SIZES=[2,4,5,6,9];
 export function nextToAct(t,from=t.turn){const n=t.seats.length;for(let k=1;k<=n;k++){const i=((from+k)%n+n)%n,s=t.seats[i];if(actionable(s)&&(!s.acted||s.roundBet!==t.currentBet))return i;}return -1;}
 // Pots in the middle (bets of the current street are still in front of the
 // players). Side pots exist only above an all-in player's total contribution.
