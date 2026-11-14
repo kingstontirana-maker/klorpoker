@@ -233,7 +233,10 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .inspector .iCards{flex-wrap:nowrap}
 
 /* Lobby tabs: Texas Hold'em · Omaha · Tournaments */
-.lobbyTabs{display:flex;gap:6px;margin:0 0 14px;padding:5px;border-radius:14px;background:#0a1312;border:1px solid #263735;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.lobbyTabs{display:flex;gap:6px;margin:0 0 14px;padding:5px;border-radius:14px;background:#0a1312;border:1px solid #263735;width:max-content;max-width:100%;flex-wrap:wrap}
+/* Not a scroll box: a sideways-scrolling box here became its own graphics layer and pushed the
+   whole list of tables after it into a second layer as tall as the page (550 MB on a 3x phone),
+   which made phones blank the lobby or reload it while scrolling. */
 .lobbyTabs::-webkit-scrollbar{display:none}
 .lobbyTabs button{display:flex;align-items:center;gap:9px;padding:11px 18px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--muted);font-weight:700;font-size:14px;white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
 .lobbyTabs button i{font-style:normal;font-size:15px}
@@ -420,3 +423,8 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 .game .avatar:has(.avatarPhoto){overflow:hidden;background:#0b0b0c}
 /* Touch screens: "Hide full" / "Hide empty" are 40 px tall with a larger box. */
 @media (pointer:coarse){.lobbyCheck{min-height:40px}.lobbyCheck input{width:20px;height:20px}}
+/* Long lobby: rows off screen are not drawn at all until they come near it (the phone keeps
+   only a few rows in memory instead of all 164). The sizes are a row's real height (64 px on
+   wide screens, 118 px on average as a card on phones), so the page does not jump while scrolling. */
+.lobbyList .llRow{content-visibility:auto;contain-intrinsic-size:auto 64px}
+@media(max-width:760px){.lobbyList .llRow{contain-intrinsic-size:auto 118px}}

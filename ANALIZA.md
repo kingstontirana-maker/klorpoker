@@ -751,3 +751,9 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Renditja:** kur lojtari hyn në lobby, tavolinat me lojtarë dalin në krye, nga më e mbushura te më pak e mbushura. Pas tyre vijnë tavolinat bosh, sipas numrit.
 - **Pse renditja nuk lëviz:** merret në çastin kur hapet lobby-u dhe mbetet e njëjtë sa kohë lojtari qëndron aty, që rreshtat të mos lëvizin nën gisht. Rinis sa herë hapet lobby-u.
 - **Renditja me dorë:** lojtari mund ta ndryshojë duke prekur titujt e kolonave.
+
+## Lobby në telefon: faqja zhdukej gjatë scroll-it
+- **Shkaku:** shiriti i tab-eve (Texas Hold'em / Omaha / Tournaments) ishte një kuti që lëvizte anash. Chrome e bënte atë shtresë grafike më vete, dhe gjithë listën e 164 tavolinave pas tij e fuste në një shtresë të dytë sa e gjithë faqja (368×19 990 px). Në një telefon 3x kjo kërkonte rreth 550 MB memorie grafike. Kur memoria mbaronte gjatë scroll-it, telefoni e fshinte pamjen ose e rihapte faqen nga fillimi.
+- **Ndreqja:** tab-et nuk janë më kuti që lëviz anash; kur nuk nxënë, kalojnë në rresht të ri. Shtresa e dytë u zhduk, dhe sipërfaqja e vizatuar ra përgjysmë.
+- **Mbrojtje shtesë:** rreshtat jashtë ekranit nuk vizatohen fare (`content-visibility`). Lartësia e vlerësuar është e saktë (64 px në kompjuter, 118 px në telefon), që faqja të mos kërcejë.
+- **Faqet e tjera:** u kontrolluan paneli i agjentit dhe i qendrës, në telefon dhe kompjuter, dhe nuk kanë shtresa të tilla.
