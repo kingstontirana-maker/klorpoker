@@ -107,3 +107,30 @@ body.fitPhone .tableBet[data-align=flip] .chipStacks{flex-direction:row-reverse}
    shows, it only grows upward and never touches the cards. */
 body.fitPhone .game .pot,body.fitPhone .game .pot.settled{align-items:flex-end;transform:translate(-50%,calc(-100% + 6px))}
 body.fitPhone .game #potChips{height:auto;min-height:0;margin-bottom:1px}
+
+/* ---- Action buttons on a phone: larger pills, 10 px apart ---- */
+body.fitPhone .dockActions{right:24px;bottom:4px}
+body.fitPhone .actionButtons,body.fitPhone .preActions{gap:10px}
+body.fitPhone .actionButtons button,body.fitPhone .preActions label{width:88px;height:48px;border-radius:24px;font-size:15px;line-height:1.05;padding:0 8px}
+body.fitPhone .actionButtons button small{font-size:11px}
+body.fitPhone .preActions label{font-size:11.5px}
+
+/* ---- Choosing a bet: a horizontal bar slides up from the bottom edge ----
+   First tap on Bet / Raise opens it; the bar runs along the bottom of the screen
+   (close, preset sizes, all-in, slider, amount) and the Bet / Raise button stays on its
+   right to confirm. Fold and Check step aside until the bar is closed. */
+body.fitPhone .dock.sizing .betPicker{position:fixed;left:64px;right:122px;bottom:4px;top:auto;width:auto;height:48px;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:24px;background:#0a1411f7;border:1px solid #5ef0a866;box-shadow:0 -8px 30px #000c;z-index:76;animation:betBarUp .24s cubic-bezier(.2,.8,.2,1) both}
+@keyframes betBarUp{from{transform:translateY(130%);opacity:0}to{transform:none;opacity:1}}
+body.fitPhone .dock.sizing .sizingHead{order:-1;flex:none;display:flex}
+body.fitPhone .dock.sizing .sizingHead span{display:none}
+body.fitPhone .dock.sizing .sizingHead button{width:32px;height:32px;font-size:13px}
+body.fitPhone .dock.sizing .betPresets{display:flex;flex:none;gap:4px}
+body.fitPhone .dock.sizing .betPresets button{width:auto;min-width:40px;height:34px;padding:0 7px;font-size:12px;border-radius:17px}
+body.fitPhone .dock.sizing .betPicker #allIn{flex:none;height:34px;padding:0 10px;font-size:12px;border-radius:17px}
+body.fitPhone .dock.sizing .betSlider{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px}
+body.fitPhone .dock.sizing .betSlider input[type=range]{flex:1 1 auto;min-width:40px;width:auto}
+body.fitPhone .dock.sizing .betStep{flex:none;width:30px;height:30px;padding:0;border-radius:50%}
+body.fitPhone .dock.sizing .betValue input{width:66px;height:34px;font-size:14px;text-align:center}
+body.fitPhone .dock.sizing .actionButtons>button:not(#raise){display:none}
+/* The ✕ that closes the bet bar is red, so it reads clearly as "cancel the bet". */
+body.fitPhone .dock.sizing .sizingHead button{background:linear-gradient(180deg,#d2384b,#8d1d2c);border:1px solid #ff8a96aa;color:#fff;font-weight:800;box-shadow:0 0 0 2px #00000055,0 4px 12px #d2384b55}

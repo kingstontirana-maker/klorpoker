@@ -757,3 +757,13 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Ndreqja:** tab-et nuk janë më kuti që lëviz anash; kur nuk nxënë, kalojnë në rresht të ri. Shtresa e dytë u zhduk, dhe sipërfaqja e vizatuar ra përgjysmë.
 - **Mbrojtje shtesë:** rreshtat jashtë ekranit nuk vizatohen fare (`content-visibility`). Lartësia e vlerësuar është e saktë (64 px në kompjuter, 118 px në telefon), që faqja të mos kërcejë.
 - **Faqet e tjera:** u kontrolluan paneli i agjentit dhe i qendrës, në telefon dhe kompjuter, dhe nuk kanë shtresa të tilla.
+
+## Telefon: butonat e veprimit dhe shiriti i bastit
+- **Butonat Fold / Check / Call / Raise:** 88×48 px (më parë 78×40), 10 px larg njëri-tjetrit dhe 24 px nga buza djathtas. Testi i pozicioneve nuk gjen asnjë përplasje me lojtarët, në asnjë madhësi telefoni.
+- **Zgjedhja e bastit:** shtypja e parë e Bet/Raise nxjerr nga poshtë lart një shirit horizontal përgjatë fundit të ekranit, me:
+  - butonin ✕;
+  - shumat e gatshme (2.5×, 3×, 4× para flop-it; ⅓, ½, ¾, Pot pas tij);
+  - All-in;
+  - rrëshqitësin me −/+;
+  - shumën.
+- **Konfirmimi:** butoni në të djathtë e konfirmon bastin. Fold dhe Check fshihen derisa të mbyllet shiriti.

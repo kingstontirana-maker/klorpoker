@@ -119,7 +119,7 @@ test('phones in landscape: players around the felt, bets in front of them, nothi
    if(l.sides[i]==='t'&&!(seated&&i===l.hero))assert.ok(Math.abs(bx-x)<20&&by-y>Math.abs(bx-x)*3,'a top player bets (almost) straight below');});
   assert.ok(Math.abs(l.boardY-50)<.01,'the board stands in the middle of the felt');const [,bc]=[0,P([50,l.boardY])],bw=5*l.boardW+16;boxes.push(['board',[bc[0]-bw/2,bc[1]-l.boardW*.7,bc[0]+bw/2,bc[1]+l.boardW*.7]]);
   const pc=P([50,l.potY]);boxes.push(['pot',[pc[0]-62,pc[1]-11,pc[0]+62,pc[1]+11]]);
-  const fixed=[['toolbar',[W-216,0,W,36]],['back',[0,0,40,36]],['chat',[0,H-56,56,H]],...(seated?[['dock',[W-284,H-46,W-36,H-4]]]:[])];
+  const fixed=[['toolbar',[W-216,0,W,36]],['back',[0,0,40,36]],['chat',[0,H-56,56,H]],...(seated?[['dock',[W-308,H-52,W-24,H-4]]]:[])];
   const all=[...boxes,...fixed];
   for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length;j++){if(i>=boxes.length)continue;const a=all[i],b=all[j];if(/^hero/.test(a[0])&&/^hero/.test(b[0]))continue;
    assert.ok(!hit(a[1],b[1]),`${W}x${H} ${size} seats${seated?' (seated)':''}: ${a[0]} overlaps ${b[0]}`);}
