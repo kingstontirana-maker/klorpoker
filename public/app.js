@@ -522,11 +522,11 @@ let lobbySort={key:'id',dir:1},lobbyTab='holdem';try{const saved=sessionStorage.
 const LOBBY_LIVE=['preflop','flop','turn','river'];
 const stakeTier=bb=>bb<=.1?'micro':bb<=.5?'low':bb<=2?'mid':'high';
 function renderLobbyList(){if(!profile||!$('#lobbyTables'))return;
- const q=($('#lobbySearch')?.value||'').trim().toLowerCase(),size=Number($('#lobbySize')?.value)||0,stake=$('#lobbyStake')?.value||'',free=$('#lobbyFree')?.checked,live=$('#lobbyLive')?.checked,game=lobbyTab;
+ const q=($('#lobbySearch')?.value||'').trim().toLowerCase(),size=Number($('#lobbySize')?.value)||0,stake=$('#lobbyStake')?.value||'',hideFull=$('#lobbyHideFull')?.checked,hideEmpty=$('#lobbyHideEmpty')?.checked,game=lobbyTab;
  for(const g of ['holdem','omaha'])document.querySelectorAll('[data-tab-count="'+g+'"]').forEach(n=>n.textContent=profile.tables.filter(t=>(t.game||'holdem')===g).length);
  document.querySelectorAll('[data-lobby-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.lobbyTab===game)));$('.lobbyTools').hidden=game==='tournaments';
  if(game==='tournaments'){$('#lobbyTables').innerHTML='<div class="lobbyList llSoon"><div class="llSoonIcon" aria-hidden="true">🏆</div><h3>Tournaments</h3><p>No tournaments are scheduled right now. Sit & Go and scheduled tournaments will be listed here.</p><button type="button" class="primary" data-lobby-tab="holdem">Play cash tables ↗</button></div>';return;}
- const list=profile.tables.filter(t=>(!q||t.name.toLowerCase().includes(q)||String(t.id).includes(q.replace('#','')))&&(!size||t.size===size)&&(!stake||stakeTier(t.bb)===stake)&&(!free||t.players<t.size)&&(!live||LOBBY_LIVE.includes(t.phase))&&(t.game||'holdem')===game);
+ const list=profile.tables.filter(t=>(!q||t.name.toLowerCase().includes(q)||String(t.id).includes(q.replace('#','')))&&(!size||t.size===size)&&(!stake||stakeTier(t.bb)===stake)&&(!hideFull||t.players<t.size)&&(!hideEmpty||t.players>0)&&(t.game||'holdem')===game);
  const val={id:t=>Number(t.id)||0,name:t=>t.name.toLowerCase(),blinds:t=>t.bb,buyin:t=>t.minBuyin,players:t=>t.players,status:t=>LOBBY_LIVE.includes(t.phase)?1:0};
  list.sort((a,b)=>{const x=val[lobbySort.key](a),y=val[lobbySort.key](b);return ((x>y)-(x<y))*lobbySort.dir||(Number(a.id)-Number(b.id));});
  const mineAt=id=>(profile.myTables||[]).some(x=>x.id===id),canPlay=t=>!(profile.user.balance<=0&&!mineAt(t.id));
@@ -545,7 +545,10 @@ function renderLobbyList(){if(!profile||!$('#lobbyTables'))return;
     +'<span class="llAct" role="cell">'+(!seated&&t.players>=t.size&&ok?(wl?'<button class="ghostButton llWait on" data-wait="leave" data-wait-table="'+safe(t.id)+'" title="Leave the waiting list">#'+wl.position+' in line ✕</button>':'<button class="ghostButton llWait" data-wait="join" data-wait-table="'+safe(t.id)+'">Wait for a seat'+(t.waiting?' · '+t.waiting:'')+'</button>'):'')+'<button class="primary" '+(ok?'data-table="'+safe(t.id)+'"':'disabled title="Your credit is zero"')+'>'+(seated?'Go to table':t.players>=t.size?'Watch':'Open')+' <span>↗</span></button></span></div>';}).join('')
    :'<p class="llEmpty">'+(profile.tables.some(t=>(t.game||'holdem')===game)?'No table matches your search.':'No '+(game==='omaha'?'Omaha':'Texas Hold’em')+' tables yet.')+'</p>')+'</div>';}
 $('#lobbyTables').addEventListener('click',e=>{const s=e.target.closest('[data-sort]');if(!s)return;e.stopPropagation();const k=s.dataset.sort;lobbySort=lobbySort.key===k?{key:k,dir:-lobbySort.dir}:{key:k,dir:k==='players'||k==='status'?-1:1};renderLobbyList();},true);
-for(const id of ['#lobbySearch','#lobbySize','#lobbyStake','#lobbyFree','#lobbyLive'])$(id).addEventListener('input',renderLobbyList);
+for(const id of ['#lobbySearch','#lobbySize','#lobbyStake'])$(id).addEventListener('input',renderLobbyList);
+// Hide full / Hide empty: remembered on this device, applied on every lobby refresh.
+for(const id of ['lobbyHideFull','lobbyHideEmpty']){const box=$('#'+id);try{box.checked=localStorage.getItem('klor_'+id)==='1';}catch{}
+ box.addEventListener('change',()=>{try{localStorage.setItem('klor_'+id,box.checked?'1':'0');}catch{}renderLobbyList();});}
 // Lobby tabs: Texas Hold'em, Omaha and Tournaments (remembered for this browser tab).
 $('#lobby').addEventListener('click',e=>{const b=e.target.closest('[data-lobby-tab]');if(!b)return;lobbyTab=b.dataset.lobbyTab;try{sessionStorage.setItem('klorLobbyTab',lobbyTab);}catch{}renderLobbyList();});
 
