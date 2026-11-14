@@ -79,3 +79,4 @@
 }
 @media (max-width:760px){html body[data-view="management"] #ledger,html body[data-view="management"] #ledger .tableScroll{height:auto;max-height:none;overflow:visible}}
 @media (max-width:760px){html body[data-view="management"] #ledgerRows{max-height:none}}
+@media (max-width:760px){html body[data-view="management"] .panelNav .navItem>span.navIcon{width:22px;height:22px}html body[data-view="management"] .panelNav .navItem>span.navIcon .uiIcon{width:22px;height:22px}}

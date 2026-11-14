@@ -477,3 +477,10 @@ html{touch-action:manipulation}
 .dbPass{display:inline-flex;align-items:center;gap:8px;font:600 12px Inter,system-ui,sans-serif;color:#bfe9d0}
 .dbPass input{height:30px;width:260px;padding:0 8px;border-radius:6px;border:1px solid #2fe08c66;background:#04100b;color:#fff}
 .dbEditRow small{color:#8eaaa1;margin-left:8px}
+/* ---- Staff panel line icons (icons.js) ---- */
+.uiIcon{display:block;width:18px;height:18px;flex:none}
+.navItem>span.navIcon{display:inline-grid;place-items:center;width:20px;height:20px;font-size:0;color:#7fb79c;transition:color .2s}
+.navItem:hover>span.navIcon{color:#cfeee0}
+.navItem.active>span.navIcon{color:#75e4b4}
+.statCard i .uiIcon{width:18px;height:18px}
+.statCard i:has(.uiIcon){display:inline-grid;place-items:center;padding:6px}

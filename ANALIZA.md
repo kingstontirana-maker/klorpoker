@@ -861,3 +861,12 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Kontrolli i parave:** totali i tij rritet me të njëjtën shumë, kështu që mbetet "OK" dhe çdo euro mbetet e gjurmueshme deri te krijimi i saj (Database → ledger → `MINT`).
 - **Në panel:** karta e portofolit te qendra shkruan "Unlimited · credit is created when needed · €X created in all", dhe lart djathtas shfaqet "∞ Unlimited". Depozitat crypto nuk presin më për mungesë krediti te qendra.
 - **Testuar në demo:** qendra me €999,000 dërgoi €2,000,000. U krijuan €1,001,000 (`MINT`) dhe kontrolli i parave mbeti OK me totalin €2,001,000.
+
+## Panelet e stafit: ikona të reja
+- Simbolet e vjetra (◈ ♙ ▤ ⚑ ↔ 📈 ％ ₮ ▦ ◉ ☰ ⛨ ⛁ ☷ ⚙ ◎) u zëvendësuan me një set të vetëm ikonash me vija të holla (SVG, `public/icons.js`), secila sipas kuptimit të tab-it:
+  - Overview: paneli; llogaritë: njerëz; Player report: dokument me grafik; Chat reports: flamur;
+  - Credit history: orë me shigjetë; Revenue: grafik në rritje; Rake: %; Crypto: portofol;
+  - Tables: tavolinë ovale; Live inspection: sy; Hand history: letra;
+  - Fair play: mburojë; Database: cilindër; Activity log: listë; Settings: rrëshqitës; My account: profil.
+- Edhe kartat e Overview-t dhe të raporteve përdorin të njëjtat ikona (portofol, ∞, njerëz, transferim, %, letra, orë).
+- Vlen për qendrën, adminin, menaxherin dhe agjentin, në kompjuter dhe në menunë poshtë te telefoni. Paneli i lojtarit nuk ndryshoi.
