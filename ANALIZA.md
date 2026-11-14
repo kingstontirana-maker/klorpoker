@@ -911,3 +911,14 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Botat në tavolinë nuk preken.** Për t'i përfshirë: "Ndalo të gjithë", prit sa të mbarojnë duart, pastaj "Rikrediti botat".
 - **Kontrolli:** qendra nuk preket. Limitet e shtëpisë (ditë/javë/muaj) nuk ndryshojnë nga këto lëvizje të brendshme (`cenbFlow`). Kontrolli i parave mbetet i saktë, dhe çdo rikreditim shënohet si `CENB_RESTORE`.
 - **Testuar në demo:** pas lojës, botat kishin €15.19, €14.88 dhe €15.00. U kthyen të tre te €15.00, dhe teprica (€0.07) shkoi te kuleta. Testi automatik mbulon edhe rastin kur kredia nuk mjafton.
+
+## Email-et e verifikimit nga kutia jonë (pa Resend)
+- **Dërgimi:** kodi OTP i regjistrimit (6 shifra, 10 minuta) dërgohet nga serveri ynë, nga kutia **support@suprempoker.com**, me SMTP. Klienti SMTP është i shkruar te `mailer.js` vetëm me `net/tls` të Node-it: pa biblioteka dhe pa shërbim të jashtëm.
+- **Variablat në Coolify:**
+  - `SMTP_USER=support@suprempoker.com`;
+  - `SMTP_PASS=<fjalëkalimi i kutisë>`;
+  - opsionale: `SMTP_HOST` (paracaktuar `smtp.hostinger.com`), `SMTP_PORT` (465), `EMAIL_FROM` (paracaktuar "Suprem Poker <support@…>"), `EMAIL_REPLY_TO`.
+- **Pamja e email-it:** logo, kodi i madh, "Never share it with anyone" dhe adresa e support-it. Ka pjesë HTML dhe tekst të thjeshtë, që të mos bjerë në spam.
+- **Testet:** një server SMTP i simuluar provon hyrjen, dërguesin, marrësin, përmbajtjen dhe refuzimin e fjalëkalimit të gabuar.
+- **Shënim:** rreshtat e mëparshëm te ky skedar që përmendin Resend nuk vlejnë më.
+- **Përkohësisht nga Gmail:** `SMTP_HOST=smtp.gmail.com`, `SMTP_USER=<adresa>@gmail.com` dhe `SMTP_PASS=<App Password me 16 shkronja>`, që kërkon 2-Step Verification te Google. Adresa e pyetjeve në email është ajo nga e cila dërgohet, ose `SUPPORT_EMAIL` nëse vendoset. Gmail lejon rreth 500 email-e në ditë. Kur të blihet kutia support@, ndryshohen vetëm këto variabla.
