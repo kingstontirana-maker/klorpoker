@@ -104,14 +104,14 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   removeInactive(t);
   const real=Date.now();for(const s of t.seats)if(s&&!s.sittingOut&&real-(s.lastSeen??real)>PRESENT_MS)markAway(t,s);
   if(t.seats.filter(s=>eligible(t,s)).length<2){clearTable(t);return false;}
-  t.hand++;t.phase='preflop';t.board=[];t.pot=0;t.currentBet=0;t.minRaise=t.bb;t.deck=deck();t.lastResult=null;t.lastAggressor=-1;
+  t.hand++;t.handRake=db.rakePercent;t.phase='preflop';t.board=[];t.pot=0;t.currentBet=0;t.minRaise=t.bb;t.deck=deck();t.lastResult=null;t.lastAggressor=-1;
   // The button never moves onto a player who still has to post to enter.
   const canButton=s=>eligible(t,s)&&!s.mustPost,anyButton=t.seats.some(canButton);
   const size=t.seats.length;let x=t.button;for(let k=1;k<=size;k++){x=(x+1+size)%size;if(anyButton?canButton(t.seats[x]):eligible(t,t.seats[x])){t.button=x;break;}}
   t.runout=null;
   for(const s of t.seats)if(s){Object.assign(s,{cards:[],committed:0,roundBet:0,folded:false,allIn:false,acted:false,actedAt:0,lastAction:null,inHand:eligible(t,s)});if(s.inHand)s.timeBank=Math.min(TIME_BANK_MAX,(s.timeBank??TIME_BANK_START)+TIME_BANK_REFILL);}
   const order=[];for(let i=1;i<=size;i++){const p=(t.button+i)%size;if(t.seats[p]?.inHand)order.push(p);}
-  t.record={tableId:t.id,table:t.name,game:gameOf(t),hand:t.hand,sb:clean(t.sb),bb:clean(t.bb),rakePercent:db.rakePercent,startedAt:Date.now(),button:t.button+1,players:order.map(p=>({seat:p+1,userId:t.seats[p].userId,username:t.seats[p].username,...(t.seats[p].isBot?{bot:true}:{}),stack:clean(t.seats[p].stack)})),actions:[],board:[]};
+  t.record={tableId:t.id,table:t.name,game:gameOf(t),hand:t.hand,sb:clean(t.sb),bb:clean(t.bb),rakePercent:t.handRake,startedAt:Date.now(),button:t.button+1,players:order.map(p=>({seat:p+1,userId:t.seats[p].userId,username:t.seats[p].username,...(t.seats[p].isBot?{bot:true}:{}),stack:clean(t.seats[p].stack)})),actions:[],board:[]};
   for(let c=0;c<GAMES[gameOf(t)].hole;c++)for(const pos of order)t.seats[pos].cards.push(t.deck.pop());
   for(const p of t.record.players)p.cards=[...t.seats[p.seat-1].cards];
   visual(t,'deal',{button:t.button});
@@ -166,7 +166,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   collect(t);t.runout=null;
   const players=t.seats.flatMap((s,i)=>s?.inHand?[{...s,position:(i-t.button-1+t.seats.length)%t.seats.length}]:[]);
   // Rake is a flat percentage of the contested pot; there is no per-hand cap.
-  const game=gameOf(t),result=distribute(players,t.board,db.rakePercent,Infinity,t.board.length>=3,game);
+  const game=gameOf(t),result=distribute(players,t.board,t.handRake??db.rakePercent,Infinity,t.board.length>=3,game);
   for(const s of t.seats)if(s&&result.payments[s.id])s.stack+=result.payments[s.id];
   const byId=id=>t.seats.find(s=>s?.id===id);
   const winnerIds=[...new Set(result.pots.filter(p=>!p.refunded).flatMap(p=>p.winners))];

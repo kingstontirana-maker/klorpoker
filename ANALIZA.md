@@ -788,3 +788,19 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - Letrat e lojtarit vetë kanë tani lartësi 60 px (më parë 51); letrat e kundërshtarëve nuk ndryshuan.
 - Chipsat e tua dhe butoni D dalin pak më larg (8 px), që të mos prekin letrat.
 - Testi i pozicioneve e kontrollon madhësinë e re.
+
+## Kontroll i hierarkisë dhe rake-ut
+- **Rolet:** CENTER → ADMIN → AGENT → USER. Çdo rol krijon vetëm rolin poshtë tij. Roli që dërgohet në kërkesë injorohet, dhe vendos vetëm serveri.
+- **Kredia:**
+  - kredia lëviz vetëm mes prindit dhe fëmijës direkt (send/return), asnjëherë dy nivele më poshtë dhe asnjëherë në rrjetin e dikujt tjetër;
+  - shuma duhet të jetë > 0, e plotë në cent dhe jo më e madhe se bilanci;
+  - qendra nis me €1,000,000, nuk ka asnjë mënyrë për të krijuar para nga hiçi, dhe kontrolli i parave e krahason totalin vazhdimisht.
+- **Përqindjet:** agjenti merr % e tij nga rake-u i lojtarëve të vet, admini merr (% e adminit − % e agjentit), dhe qendra merr pjesën tjetër. Përqindja e agjentit nuk mund të kalojë atë të adminit, dhe kur admini ulet, agjentët ulen me të. Pjesët nën 1 cent mbahen dhe paguhen kur mblidhen.
+- **Rake:** merret vetëm kur dora arrin flop-in ("no flop no drop"). Bastet e pathirrura nuk preken. Ndarja bëhet sipas asaj që ka paguar çdo lojtar.
+- **Testi në demo:** 24 veprime të ndaluara u provuan nga çdo rol, dhe të 24 u bllokuan.
+- **Defekt i rregulluar:** përqindja e rake-ut merret në fillim të dorës. Më parë, nëse qendra e ndryshonte gjatë dorës, rake-u i paguar ndryshonte nga ai i shkruar te historiku.
+- **Pika të hapura (vendim biznesi):**
+  - rake-u nuk ka kufi maksimal;
+  - stafi mund të tërheqë kredi nga portofoli i një lojtari pa pëlqimin e tij;
+  - qendra mund të tërheqë edhe nga lojtarët me depozitë crypto;
+  - stafi mund të ndryshojë fjalëkalimin e lojtarit dhe të hyjë si ai (shënohet në log).

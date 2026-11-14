@@ -203,3 +203,12 @@ test('a seat at a table that cannot deal is released after ten minutes',()=>{
  e.tickTable(t,Date.now()+9*60000);assert.ok(t.seats[0],'still seated before ten minutes');
  e.tickTable(t,Date.now()+10*60000+1000);assert.equal(t.seats[0],null);assert.equal(user(0).balance,wallet+10000);
 });
+
+test('rake: a hand pays the percentage it started with, even if the centre changes it meanwhile',async()=>{
+ const {createEngine,LIVE}=await import('./game.js');
+ const db={users:[{id:'c',username:'c',role:'CENTER',balance:0},{id:'a',username:'a',role:'USER',balance:100000},{id:'b',username:'b',role:'USER',balance:100000}],ledger:[],rakePercent:5,tables:[]};
+ const e=createEngine({db}),t=e.makeTable('1','T',100,200,'holdem',2);e.sit(t,db.users[1],0,100,[t]);e.sit(t,db.users[2],1,100,[t]);e.startHand(t);
+ db.rakePercent=0;// changed during the hand
+ for(let g=0;g<40&&LIVE.includes(t.phase);g++){if(t.runout){e.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];e.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
+ const rake=db.ledger.find(x=>x.type==='RAKE');assert.ok(rake,'rake was taken at 5%');assert.equal(rake.amount,Math.floor(400*5/100));
+});
