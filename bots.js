@@ -208,7 +208,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   if(p==='/api/bots')return list();
   if(p==='/api/bots/guard')return guardInfo();
   if(p==='/api/bots/overview'){const tables=[...runtime.values()].filter(t=>t.seats.some(Boolean)).map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,humans:humansAt(t),bots:botsAt(t),waiting:t.waitlist?.length||0,live:LIVE.includes(t.phase)})).sort((a,b)=>b.humans-a.humans);
-   return {bots:list(),guard:guardInfo(),fill:fillInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
+   return {cenbRake:(Number(db.cenbRake)||0)/100,bots:list(),guard:guardInfo(),fill:fillInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
     catalog:[...runtime.values()].map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,free:freeAt(t),bots:botsAt(t),humans:humansAt(t),min:engine.buyinLimits(t).min/100,max:engine.buyinLimits(t).max/100}))};}
   if(p==='/api/bots/names'){
    const names=(Array.isArray(body.names)?body.names:String(body.names??'').split(/[\s,;]+/)).map(n=>String(n).trim()).filter(Boolean);
@@ -230,6 +230,10 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   // Return every bot's credit to the centre: all bots stop; the ones at a table leave when
   // their hand ends and are emptied then (tick below). The bot accounts stay, with €0.
   if(p==='/api/bots/reclaim'){let stopped=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});stopped++;}db.botReclaim=true;const r=reclaim();save();return {ok:true,stopped,...r};}
+  // Rake the bots paid is kept by CENB; CENB sends it (all or part) to the centre by hand.
+  if(p==='/api/bots/sendrake'){const pool=Number(db.cenbRake)||0,n=body.amount===undefined||body.amount===''||body.amount===null?pool:cents(body.amount,'Amount');
+   if(!(n>0))fail('There is no bot rake to send');if(n>pool)fail('CENB holds only €'+(pool/100).toFixed(2)+' of bot rake');const c=center();if(!c)fail('No center account');
+   db.cenbRake=pool-n;c.balance+=n;db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',to:c.id,amount:n,time:Date.now()});save();return {ok:true,sent:n/100,left:db.cenbRake/100};}
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);

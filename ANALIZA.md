@@ -895,3 +895,9 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - lojtarët që kishin hyrë një herë nga telefoni i dikujt tjetër.
 - **Rregulli i ri:** bllokohet vetëm kur nga kjo pajisje është ulur në këtë tavolinë, në këtë moment, një llogari tjetër. Mesazhi tani thotë që duhet të ngrihesh fillimisht me atë llogari.
 - **Fair play:** historiku i pajisjeve mbetet te raporti i qendrës, ku llogaritë që ndajnë pajisje shënohen për kontroll.
+
+## CENB: rake-u i botave mbetet te CENB
+- **Ku shkon rake-u:** pjesa e rake-ut që e paguajnë botat nuk shkon më te qendra. Mbetet te CENB, te `cenbRake` te settings, dhe çdo dorë shënon te ledger-i `botRake` dhe `cenb`. Qendra merr vetëm rake-un e lojtarëve të vërtetë, pas pjesës së stafit.
+- **Dërgimi te qendra:** te CENB, karta "Rake nga botat te CENB" tregon shumën që mban CENB, me butonin "Dërgo te qendra". Ti vendos sa: të gjithë ose një pjesë. Çdo dërgim shënohet si `CENB_RAKE` dhe te log-u i CENB, dhe nuk mund të dërgohet më shumë se sa ka CENB.
+- **Kontrolli i parave:** rake-u që mban CENB numërohet në kontroll, kështu që totali mbetet i saktë.
+- **Testuar në demo:** €0.26 rake nga botat mbetën te CENB. U dërguan €0.10, pastaj pjesa tjetër. Kërkesa për më shumë u refuzua, dhe kontrolli i parave mbeti OK.

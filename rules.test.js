@@ -212,3 +212,12 @@ test('rake: a hand pays the percentage it started with, even if the centre chang
  for(let g=0;g<40&&LIVE.includes(t.phase);g++){if(t.runout){e.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];e.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
  const rake=db.ledger.find(x=>x.type==='RAKE');assert.ok(rake,'rake was taken at 5%');assert.equal(rake.amount,Math.floor(400*5/100));
 });
+
+test('rake paid by bots stays with CENB; the centre gets only the players\' rake',async()=>{
+ const {createEngine,LIVE}=await import('./game.js');
+ const db={users:[{id:'c',username:'c',role:'CENTER',balance:0},{id:'h',username:'human',role:'USER',parentId:'c',balance:100000},{id:'b',username:'bot1',role:'USER',parentId:'c',isBot:true,balance:100000}],ledger:[],rakePercent:5,tables:[]};
+ const e=createEngine({db}),t=e.makeTable('1','T',100,200,'holdem',2);e.sit(t,db.users[1],0,100,[t]);e.sit(t,db.users[2],1,100,[t]);e.startHand(t);
+ for(let g=0;g<40&&LIVE.includes(t.phase);g++){if(t.runout){e.tickTable(t,t.runout.at+1);continue;}const s=t.seats[t.turn];e.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
+ const rake=db.ledger.find(x=>x.type==='RAKE');assert.ok(rake);const fromBot=rake.allocations.filter(a=>a.bot).reduce((n,a)=>n+a.amount,0);
+ assert.ok(fromBot>0);assert.equal(db.cenbRake,fromBot,'the bot\'s part stays with CENB');assert.equal(db.users[0].balance,rake.amount-fromBot,'the centre gets the human\'s part');assert.equal(rake.cenb,fromBot);
+});

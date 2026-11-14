@@ -62,7 +62,7 @@ function renderKpis(){
   ['Ky muaj',signed(g.month),g.monthlyLimit>0?'Limit '+eur(g.monthlyLimit)+meter(g.month,g.monthlyLimit):meter(0,0)],
   ['Botat','<b>'+playing+' <small class="muted">/ '+on+' / '+b.length+'</small></b>','<span>në tavolinë / ndezur / gjithsej</span>'],
   ['Lojtarë që luajnë me bota','<b>'+humans+'</b>','<span>lojtarë të vërtetë në tavolina me bota</span>'],
-  ['Rake nga botat','<b>'+eur(rake)+'</b>','<span>kthehet te qendra · gjithsej '+(house>=0?'+':'')+eur(house)+'</span>'],
+  ['Rake nga botat te CENB','<b>'+eur(data.cenbRake||0)+'</b>','<span>mbetet te CENB · gjithsej nga botat '+eur(rake)+'</span><button type="button" id="sendRake" class="mini"'+((data.cenbRake||0)>0?'':' disabled')+'>Dërgo te qendra</button>'],
   ['Kthyer te lojtarët','<b>'+eur(b.reduce((n,x)=>n+(x.returned||0),0))+'</b>','<span>Objektivi '+Number(g.returnPercent||0)+'% · në dispozicion '+eur(b.reduce((n,x)=>n+(x.returnAvailable||0),0))+'</span>'],
   ['Kredia e qendrës','<b>'+eur(data.centerBalance)+'</b>','<span>nga këtu financohen botat</span>'],
  ].map(([k,v,s])=>'<div class="kpi"><small>'+k+'</small>'+v.replace(/^<b class/,'<b class')+s+'</div>').join('');
@@ -107,6 +107,9 @@ $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn
  }catch(err){toast(err.message,true);}};
 $('#botList').onsubmit=async e=>{e.preventDefault();const id=e.target.closest('[data-id]').dataset.id;try{await api('bots/configure',{id,...formBody(e.target)});editing=null;toast('U ruajt');await refresh();}catch(err){toast(err.message,true);}};
 $('#reclaimAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat dhe t\'i kthehet qendrës gjithë kredia e tyre?\n\nBotat që janë në një dorë ngrihen sapo të mbarojë dora, dhe kredia e tyre kthehet vetë pas kësaj. Llogaritë e botave mbeten, me €0.'))return;try{const r=await api('bots/reclaim');toast('U kthyen €'+r.returned.toLocaleString('en-US',{minimumFractionDigits:2})+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}};
+document.addEventListener('click',async e=>{if(!e.target.closest('#sendRake'))return;const pool=data.cenbRake||0;if(!(pool>0))return;
+ const v=prompt('Sa rake të dërgohet te qendra? CENB ka '+eur(pool)+'.\nLëre bosh për të gjithë shumën.',String(pool));if(v===null)return;
+ try{const r=await api('bots/sendrake',v.trim()===''?{}:{amount:Number(v.replace(',','.'))});toast(eur(r.sent)+' u dërguan te qendra · mbeten '+eur(r.left));await refresh();}catch(err){toast(err.message,true);}});
 $('#stopAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;try{const r=await api('bots/stopall');toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}};
 $('#startAll').onclick=async()=>{try{const r=await api('bots/startall');toast(r.started+' bota u nisën');await refresh();}catch(err){toast(err.message,true);}};
 

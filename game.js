@@ -184,9 +184,10 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   t.phase='finished';setTurn(t,-1);
   for(let i=0;i<t.seats.length;i++)if(t.seats[i]?.leaveAfterHand)cashOutSeat(t,i,'LEFT');
   for(const s of t.seats)if(s&&s.stack<t.bb&&!s.rebuyDeadline){s.rebuyAvailableAt=t.lastResult.at+RESULT_REVEAL_MS;s.rebuyDeadline=s.rebuyAvailableAt+REBUY_WINDOW_MS;}
-  // Rake is split at once: each admin/agent receives its percentage of the rake its
-  // players paid (revenue share), the centre keeps the rest. The split is stored.
-  if(result.totalRake){const allocations=Object.entries(result.rakeContributions).map(([userId,amount])=>({userId,amount,...(t.seats.find(s=>s?.userId===userId)?.isBot?{bot:true}:{})})),botRake=allocations.filter(a=>a.bot).reduce((n,a)=>n+a.amount,0),split=rakeShares(db,allocations);db.users.find(u=>u.role==='CENTER').balance+=split.center;for(const sh of split.shares){const r=findUser(sh.userId);if(r)r.balance+=sh.amount;}for(const [id,c] of Object.entries(split.carry)){const r=findUser(id);if(r)r.shareCarry=c;}db.ledger.push({id:uid(),type:'RAKE',tableId:t.id,hand:t.hand,amount:result.totalRake,allocations,...(botRake?{botRake}:{}),...(split.shares.length?{shares:split.shares}:{}),time:Date.now()});}
+  // Rake is split at once: each admin/manager/agent receives its percentage of the rake its
+  // players paid (revenue share). The rake bots paid stays with CENB (db.cenbRake) until
+  // CENB sends it to the centre; the centre keeps the rest. The split is stored.
+  if(result.totalRake){const allocations=Object.entries(result.rakeContributions).map(([userId,amount])=>({userId,amount,...(t.seats.find(s=>s?.userId===userId)?.isBot?{bot:true}:{})})),botRake=allocations.filter(a=>a.bot).reduce((n,a)=>n+a.amount,0),split=rakeShares(db,allocations),toCenb=Math.min(botRake,split.center);db.users.find(u=>u.role==='CENTER').balance+=split.center-toCenb;if(toCenb)db.cenbRake=(db.cenbRake||0)+toCenb;for(const sh of split.shares){const r=findUser(sh.userId);if(r)r.balance+=sh.amount;}for(const [id,c] of Object.entries(split.carry)){const r=findUser(id);if(r)r.shareCarry=c;}db.ledger.push({id:uid(),type:'RAKE',tableId:t.id,hand:t.hand,amount:result.totalRake,allocations,...(botRake?{botRake,cenb:toCenb}:{}),...(split.shares.length?{shares:split.shares}:{}),time:Date.now()});}
   save();onSettle();
  }
 
