@@ -109,6 +109,12 @@ const showSound=()=>{$('#soundToggle').setAttribute('aria-pressed',String(visual
 // Sound exists only at the table, for players: the home page, sign-in, lobby and every
 // management panel stay silent. Turning it on plays nothing by itself.
 const atTable=()=>document.body.dataset.view==='table'&&profile?.user.role==='USER';
+// No zooming at the table. iPhone Safari ignores user-scalable=no for pinches and a quick
+// double tap, and a zoomed table cannot be played (the canvas is already fitted to the
+// screen). Pinch gestures are refused at the table, and if the page still ends up zoomed it
+// is set back to its normal scale.
+for(const type of ['gesturestart','gesturechange'])document.addEventListener(type,e=>{if(document.body.dataset.view==='table')e.preventDefault();},{passive:false});
+window.visualViewport?.addEventListener('resize',()=>{if(document.body.dataset.view!=='table'||!(visualViewport.scale>1.01))return;const m=document.querySelector('meta[name=viewport]');if(!m)return;const c=m.content;m.content=c.replace(/maximum-scale=[\d.]+/,'maximum-scale=1.0');requestAnimationFrame(()=>{m.content=c;});});
 // Phones allow audio only on the tap that ends (touchend/click), so every kind of tap
 // is listened to; once the audio really runs nothing more happens. After the phone
 // pauses audio (background, call), the next tap at the table resumes it.

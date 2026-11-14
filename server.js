@@ -290,6 +290,25 @@ function openInspectStream(req,res){const token=(req.headers.authorization||'').
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.webp':'image/webp','.m4a':'audio/mp4'};
 const SECURITY_HEADERS={'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()','cross-origin-opener-policy':'same-origin',
  'content-security-policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
+// Static files. Every page load used to download everything again (~900 KB): "no-cache"
+// made browsers ask each time and the answer was always the whole file, uncompressed.
+// Now: an ETag lets an unchanged file come back as "304 Not Modified"; files linked with
+// ?v= (stamped from their modification time in index.html) are kept for a year, because a
+// change gives them a new address (the page itself is never stored, so it always has the
+// newest addresses);
+// text is sent gzip-compressed, compressed once per version.
+const zlib=await import('node:zlib');const gzipped=new Map();
+const TEXT=new Set(['.js','.css','.html','.json','.svg','.webmanifest','.txt','.map']);
+function sendStatic(req,res,f,name,contents,url){if(typeof contents==='string')contents=Buffer.from(contents);
+ const ext=path.extname(f),st=fs.statSync(f),tag='W/"'+st.size.toString(36)+'-'+Math.round(st.mtimeMs).toString(36)+(name==='index.html'?'-'+require_hash(contents):'')+'"';
+ const headers={'content-type':MIME[ext]||'application/octet-stream','etag':tag,'vary':'Accept-Encoding',
+  'cache-control':name.endsWith('index.html')?'no-store':url.searchParams.has('v')?'public, max-age=31536000, immutable':'no-cache'};
+ if(req.headers['if-none-match']===tag){res.writeHead(304,headers);res.end();return;}
+ if(TEXT.has(ext)&&contents.length>1024&&/\bgzip\b/.test(req.headers['accept-encoding']||'')){
+  const key=f+'|'+tag;let z=gzipped.get(key);if(!z){z=zlib.gzipSync(contents,{level:9});gzipped.set(key,z);if(gzipped.size>400)gzipped.delete(gzipped.keys().next().value);}
+  res.writeHead(200,{...headers,'content-encoding':'gzip','content-length':z.length});res.end(req.method==='HEAD'?undefined:z);return;}
+ res.writeHead(200,{...headers,'content-length':contents.length});res.end(req.method==='HEAD'?undefined:contents);}
+const require_hash=buf=>crypto.createHash('sha1').update(buf).digest('base64url').slice(0,10);
 export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost')
  if(url.pathname.startsWith('/api/')){checkOwner();if(replaced)fail('The server is restarting. Please try again in a moment.',503);}const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
  const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Login required',401);roleCheck(u,'CENTER','ADMIN','AGENT');
@@ -304,7 +323,7 @@ let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'publi
  // Stamp stylesheet and script links with their modification time so phones and
  // browsers always fetch the newest version after a change.
  if(name==='index.html')contents=String(contents).replace(/(\/[\w.-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
- res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream','cache-control':name.endsWith('index.html')?'no-store':'no-cache'});res.end(contents);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
+ sendStatic(req,res,f,name,contents,url);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
 server.on('error',err=>{console.error('[Suprem Poker] server cannot start:',err.message);process.exit(1);});
 server.listen(PORT,()=>console.log(`Suprem Poker http://localhost:${PORT}`));
 // Set after everything started, so a failed start still stops the process.

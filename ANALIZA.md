@@ -767,3 +767,19 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - rrëshqitësin me −/+;
   - shumën.
 - **Konfirmimi:** butoni në të djathtë e konfirmon bastin. Fold dhe Check fshihen derisa të mbyllet shiriti.
+
+## Login më i shpejtë, pa zmadhim në tavolinë, shuma e plotë te raise
+- **Login:** serveri përgjigjet shpejt (login 50–160 ms, gjendja 5–15 ms). Ngadalësia vinte nga shkarkimi: çdo hapje e faqes shkarkonte gjithçka nga e para (~900 KB), sepse skedarët nuk kishin "gjurmë" (ETag) dhe dërgoheshin pa kompresim.
+  - Tani skedarët e pandryshuar kthehen si "304 Not Modified".
+  - Skedarët me `?v=` ruhen në telefon për një vit (adresa ndryshon vetë sa herë ndryshon skedari).
+  - Teksti dërgohet i kompresuar me gzip: `app.js` ra nga 144 në 46 KB.
+  - Faqja HTML nuk ruhet kurrë, që të ketë gjithmonë adresat më të reja.
+- **Matur në telefon (CPU 4 herë më i ngadaltë, rrjet celular):**
+  - vizita e përsëritur: 85 KB në vend të 859 KB, dhe faqja hapet për rreth 1.3 s në vend të 2 s;
+  - nga login te lobby: rreth 0.8–0.9 s.
+- **Zmadhimi në tavolinë:** iPhone-i nuk e respekton `user-scalable=no` për pinch dhe prekjen e dyfishtë, dhe zmadhon vetë fushat me shkronja nën 16 px. Tani:
+  - prekja e dyfishtë nuk zmadhon kudo (`touch-action:manipulation`);
+  - në tavolinë pinch-i i iPhone-it refuzohet;
+  - nëse faqja zmadhohet gjithsesi, kthehet vetë në madhësinë normale;
+  - fusha e shumës dhe chati kanë shkronja 16 px.
+- **Shuma te raise:** fusha është 86 px e gjerë (më parë 66 px), pa shigjetat e numrave, kështu që del i plotë edhe "12345.67".

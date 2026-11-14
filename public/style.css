@@ -428,3 +428,6 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
    wide screens, 118 px on average as a card on phones), so the page does not jump while scrolling. */
 .lobbyList .llRow{content-visibility:auto;contain-intrinsic-size:auto 64px}
 @media(max-width:760px){.lobbyList .llRow{contain-intrinsic-size:auto 118px}}
+
+/* A quick double tap never zooms the page (pinch zoom outside the table stays possible). */
+html{touch-action:manipulation}
