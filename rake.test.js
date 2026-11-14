@@ -109,3 +109,16 @@ test('a hand with rake credits the agent, the admin and the centre at once',()=>
  const now=Date.now(),r=revenueReport(db,users[1],{},now);assert.equal(r.totals.earned,admin);assert.equal(r.totals.paidToNetwork,agent);
  assert.equal(revenueReport(db,users[0],{},now).totals.earned,center);assert.equal(revenueReport(db,users[2],{},now).totals.earned,agent);
 });
+
+test('rake with managers: admin → manager → agent → player, each gets its percentage minus the one below',async()=>{
+ const {rakeShares}=await import('./rake.js');
+ const users=[{id:'c',role:'CENTER'},{id:'ad',role:'ADMIN',parentId:'c',share:50},{id:'m',role:'MANAGER',parentId:'ad',share:30},{id:'ag',role:'AGENT',parentId:'m',share:20},{id:'p',role:'USER',parentId:'ag'},
+  {id:'old',role:'AGENT',parentId:'ad',share:25},{id:'q',role:'USER',parentId:'old'},{id:'greedy',role:'AGENT',parentId:'m',share:90},{id:'r',role:'USER',parentId:'greedy'}];
+ const pay=(alloc)=>{const s=rakeShares({users:users.map(u=>({...u}))},alloc);return {center:s.center,...Object.fromEntries(s.shares.map(x=>[x.userId,x.amount]))};};
+ // €1.00 of rake from p: agent 20%, manager 30−20=10%, admin 50−30=20%, centre 50%
+ assert.deepEqual(pay([{userId:'p',amount:100}]),{center:50,ag:20,m:10,ad:20});
+ // an older agent directly under an admin still works: agent 25%, admin 25%, centre 50%
+ assert.deepEqual(pay([{userId:'q',amount:100}]),{center:50,old:25,ad:25});
+ // a share above the one above it is capped there: agent 90% → 30% (its manager's)
+ assert.deepEqual(pay([{userId:'r',amount:100}]),{center:50,greedy:30,ad:20});
+});

@@ -46,7 +46,7 @@ export function createDbEditor({db,store,save,fail,uid,hash,secret,runtime,makeT
    const v=clean(values),username=String(v.username||'').trim(),password=String(values?.password||'');
    if(!/^[a-zA-Z0-9_]{3,24}$/.test(username))fail('Username: 3–24 characters, letters, numbers or _');
    if(db.users.some(x=>x.username.toLowerCase()===username.toLowerCase()))fail('That username is taken');
-   if(!['ADMIN','AGENT','USER'].includes(v.role))fail('Role must be ADMIN, AGENT or USER');
+   if(!['ADMIN','MANAGER','AGENT','USER'].includes(v.role))fail('Role must be ADMIN, MANAGER, AGENT or USER');
    const parent=db.users.find(x=>x.id===v.parentId);if(!parent)fail('parentId must be an existing account');
    if(password.length<8||!/[A-Za-z]/.test(password)||!/\d/.test(password))fail('Give the new account a password: at least 8 characters, letters and numbers');
    const balance=Number.isSafeInteger(v.balance)&&v.balance>0?v.balance:0,salt=secret();
@@ -58,7 +58,7 @@ export function createDbEditor({db,store,save,fail,uid,hash,secret,runtime,makeT
   const v=clean(values),next={...user};
   for(const [k,x] of Object.entries(v)){if(LOCKED_USER.has(k)||k==='parent_id')continue;next[k]=x;}
   if(next.username!==user.username){const n=String(next.username||'').trim();if(!/^[a-zA-Z0-9_]{3,24}$/.test(n))fail('Username: 3–24 characters, letters, numbers or _');if(db.users.some(x=>x!==user&&x.username.toLowerCase()===n.toLowerCase()))fail('That username is taken');next.username=n;}
-  if(user.role==='CENTER'&&next.role!=='CENTER')fail('The center account keeps its role');if(next.role!==user.role&&next.role==='CENTER')fail('There is only one center');if(!['CENTER','ADMIN','AGENT','USER'].includes(next.role))fail('Unknown role');
+  if(user.role==='CENTER'&&next.role!=='CENTER')fail('The center account keeps its role');if(next.role!==user.role&&next.role==='CENTER')fail('There is only one center');if(!['CENTER','ADMIN','MANAGER','AGENT','USER'].includes(next.role))fail('Unknown role');
   if(next.parentId!==user.parentId){if(user.role==='CENTER')fail('The center has no parent');let p=db.users.find(x=>x.id===next.parentId),i=0;if(!p)fail('parentId must be an existing account');for(;p&&i<50;p=db.users.find(x=>x.id===p.parentId),i++)if(p.id===user.id)fail('An account cannot be placed below itself');}
   if(!Number.isSafeInteger(next.balance)||next.balance<0)fail('balance is in cents: a whole number, 0 or more');
   if('share' in next&&next.share!=null&&!(Number(next.share)>=0&&Number(next.share)<=100))fail('share must be 0–100');

@@ -42,14 +42,14 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false,includeBots=
  // The member directly under the report's root on the way up from a player.
  const viaCache=new Map();
  const via=pid=>{if(viaCache.has(pid))return viaCache.get(pid);let u=byId.get(pid),prev=null,i=0;while(u&&u.id!==root.id&&i++<50){prev=u;u=byId.get(u.parentId);}const v=u?prev:null;viaCache.set(pid,v);return v;};
- const upline=pid=>{const p=byId.get(pid),agent=p&&byId.get(p.parentId),admin=agent&&byId.get(agent.parentId);return {agent:agent?.role==='AGENT'?agent.username:null,admin:admin?.role==='ADMIN'?admin.username:agent?.role==='ADMIN'?agent.username:null};};
+ const upline=pid=>{const out={agent:null,manager:null,admin:null};for(let u=byId.get(byId.get(pid)?.parentId),i=0;u&&i<10;u=byId.get(u.parentId),i++){if(u.role==='AGENT')out.agent??=u.username;else if(u.role==='MANAGER')out.manager??=u.username;else if(u.role==='ADMIN')out.admin??=u.username;else break;}return out;};
  const tableOf=id=>db.tables.find(t=>t.id===id)||{};
  const bucketMonth=days>92,bucketOf=d=>bucketMonth?d.slice(0,7):d;
  const series=new Map();if(bucketMonth){for(let d=from;d<=to;d=addDays(d,1))series.set(d.slice(0,7),{key:d.slice(0,7),rake:0,hands:0});}else for(let d=from;d<=to;d=addDays(d,1))series.set(d,{key:d,rake:0,hands:0});
  const hours=Array.from({length:24},(_,h)=>({hour:h,rake:0,hands:0}));
  const children=new Map(),players=new Map(),tables=new Map(),recent=[],rows=[];
  const isBot=botCheck(db);let botRake=0;const BOTS={id:'_bots',username:'Bots (house)',role:'BOTS'};
- for(const c of db.users.filter(u=>u.parentId===root.id&&u.role!=='CENTER'&&!u.isBot))children.set(c.id,{id:c.id,username:c.username,role:c.role,share:['ADMIN','AGENT'].includes(c.role)?pct(c.share):null,rake:0,earned:0,hands:new Set(),players:new Set()});
+ for(const c of db.users.filter(u=>u.parentId===root.id&&u.role!=='CENTER'&&!u.isBot))children.set(c.id,{id:c.id,username:c.username,role:c.role,share:STAFF.includes(c.role)?pct(c.share):null,rake:0,earned:0,hands:new Set(),players:new Set()});
  let total=0,hands=0,prevTotal=0,prevHands=0,earned=0,prevEarned=0,paid=0;const activePlayers=new Set();
  for(const x of rakes){
   const d=dayFmt.format(x.time),cur=d>=from&&d<=to,prev=d>=pFrom&&d<=pTo;if(!cur&&!prev)continue;
@@ -70,14 +70,14 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false,includeBots=
    if(!a.pid){const k='_legacy';const c=children.get(k)||children.set(k,{id:null,username:'Unattributed (before detailed records)',role:'LEGACY',rake:0,hands:new Set(),players:new Set()}).get(k);c.rake+=a.amount;c.hands.add(x.id);continue;}
    activePlayers.add(a.pid);
    const c=children.get(a.v.id)||children.set(a.v.id,{id:a.v.id==='_bots'?null:a.v.id,username:a.v.username,role:a.v.role,rake:0,hands:new Set(),players:new Set()}).get(a.v.id);c.rake+=a.amount;c.hands.add(x.id);c.players.add(a.pid);
-   const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:byId.get(a.pid)?.username||a.pid,...(a.bot?{agent:null,admin:null,bot:true}:upline(a.pid)),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
-   if(detail&&rows.length<20000)rows.push({time:x.time,table:t.name,hand:x.hand??null,player:p.username,agent:p.agent,admin:p.admin,amount:a.amount});
+   const p=players.get(a.pid)||players.set(a.pid,{id:a.pid,username:byId.get(a.pid)?.username||a.pid,...(a.bot?{agent:null,manager:null,admin:null,bot:true}:upline(a.pid)),rake:0,hands:0}).get(a.pid);p.rake+=a.amount;p.hands++;
+   if(detail&&rows.length<20000)rows.push({time:x.time,table:t.name,hand:x.hand??null,player:p.username,agent:p.agent,manager:p.manager,admin:p.admin,amount:a.amount});
   }
   recent.push({time:x.time,table:t.name,tableId:x.tableId,hand:x.hand??null,amount:sum,parts:parts.map(a=>({player:a.pid?byId.get(a.pid)?.username||a.pid:null,amount:a.amount}))});
  }
  const share=n=>total?Math.round(n/total*1000)/10:0;
  const path=[];for(let u=root,i=0;u&&i<50;u=byId.get(u.parentId),i++){path.unshift({id:u.id,username:u.username,role:u.role});if(u.id===viewer.id)break;}
- return {from,to,days,bucket:bucketMonth?'month':'day',root:{id:root.id,username:root.username,role:root.role,share:['ADMIN','AGENT'].includes(root.role)?pct(root.share):null},path,
+ return {from,to,days,bucket:bucketMonth?'month':'day',root:{id:root.id,username:root.username,role:root.role,share:STAFF.includes(root.role)?pct(root.share):null},path,
   totals:{rake:total,earned,paidToNetwork:paid,...(root.role==='CENTER'?{botRake,includeBots:!!includeBots}:{}),hands,players:activePlayers.size,tables:tables.size,avgPerHand:hands?Math.round(total/hands):0},
   previous:{from:pFrom,to:pTo,rake:prevTotal,earned:prevEarned,hands:prevHands},
   series:[...series.values()],hours,
@@ -93,16 +93,21 @@ export function revenueReport(db,viewer,{from,to,scope,detail=false,includeBots=
 // rounded down for the agent and the admin, so the remainder (and any rounding)
 // stays with the centre and the rake is always split exactly.
 export const pct=v=>{const n=Number(v);return Number.isFinite(n)?Math.min(100,Math.max(0,Math.round(n*100)/100)):0;};
+// Staff roles from the top: the centre opens admins, admins open managers, managers open
+// agents and agents open players. Older networks may still have an agent directly under an
+// admin; every rule below follows the real chain, whatever its length.
+export const STAFF=['ADMIN','MANAGER','AGENT'];
 export function rakeShares(db,allocations=[]){
  // Shares are counted in 1/10000 of a cent; what is below a cent is carried on
  // the account (shareCarry) and paid as soon as it adds up, so over time every
  // admin and agent gets exactly its percentage even on micro-stakes.
  const byId=new Map(db.users.map(u=>[u.id,u])),units=new Map(),total=allocations.reduce((n,a)=>n+a.amount,0);
  for(const a of allocations){
-  const player=byId.get(a.userId),agent=player&&byId.get(player.parentId),admin=agent&&byId.get(agent.parentId);
-  const adminBp=admin?.role==='ADMIN'?Math.round(pct(admin.share)*100):0,agentBp=agent?.role==='AGENT'?Math.min(Math.round(pct(agent.share)*100),adminBp):0;
-  if(agentBp)units.set(agent.id,(units.get(agent.id)||0)+a.amount*agentBp);
-  if(adminBp>agentBp)units.set(admin.id,(units.get(admin.id)||0)+a.amount*(adminBp-agentBp));
+  // The staff above the player, nearest first (agent, manager, admin). Each one's percentage
+  // is capped by the one above it; each earns its percentage minus the one below it.
+  const chain=[];for(let u=byId.get(byId.get(a.userId)?.parentId),i=0;u&&STAFF.includes(u.role)&&i<10;u=byId.get(u.parentId),i++)chain.push(u);
+  const bp=new Array(chain.length);for(let i=chain.length-1;i>=0;i--){const own=Math.round(pct(chain[i].share)*100);bp[i]=i===chain.length-1?own:Math.min(own,bp[i+1]);}
+  for(let i=0;i<chain.length;i++){const part=bp[i]-(i>0?bp[i-1]:0);if(part>0)units.set(chain[i].id,(units.get(chain[i].id)||0)+a.amount*part);}
  }
  const shares=[],carry={};let paid=0;
  for(const [id,u] of units){const all=u+(byId.get(id).shareCarry||0);let cents=Math.min(Math.floor(all/10000),total-paid);cents=Math.max(0,cents);carry[id]=all-cents*10000;paid+=cents;if(cents)shares.push({userId:id,role:byId.get(id).role,amount:cents});}

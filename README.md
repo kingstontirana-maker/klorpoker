@@ -73,7 +73,7 @@ Open http://localhost:3000. First-run center username is **center**. If `CENTER_
 ## Supported
 
 - 6-max no-limit Hold'em; shuffled 52-card deck via `crypto.randomInt`; hole cards; flop/turn/river; blinds; rotating dealer; betting; folds; calls; raises; all-in; turn order; hand evaluation (including wheel); side pots; ties and odd chip distribution; rake cap, no flop/no drop.
-- Server-side game authority; authenticated users and role hierarchy: Center → Admin → Agent → User; virtual-credit wallet transfers; table lobby; hand event history; polling-based state updates (1.3 seconds); multi-table in a single Node process.
+- Server-side game authority; authenticated users and role hierarchy: Center → Admin → Manager → Agent → User; virtual-credit wallet transfers; table lobby; hand event history; polling-based state updates (1.3 seconds); multi-table in a single Node process.
 
 ## Important limitations / required before production
 

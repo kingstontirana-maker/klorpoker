@@ -830,3 +830,10 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - **Activity log dhe meta:** vetëm lexim, sepse log-u regjistron edhe ndryshimet e bëra këtu.
 - **Gjatë editimit:** rifreskimi live ndalon, që të mos e mbishkruajë formularin.
 - **Testet:** `db-edit.test.js`, plus 33 veprime të provuara në demo nëpërmjet API-së.
+
+## Hierarkia me menaxher
+- **Hierarkia e re:** Qendra → Admin → **Menaxher** → Agjent → Lojtar. Qendra hap admina, admini hap menaxherë, menaxheri hap agjentë dhe agjenti hap lojtarë. Kredia lëviz vetëm një nivel poshtë ose lart, dhe askush nuk e kapërcen një nivel.
+- **Përqindjet:** menaxheri nuk mund ta kalojë adminin, dhe agjenti nuk mund ta kalojë menaxherin. Kur ulet një përqindje, ulen automatikisht të gjithë ata poshtë që e kalojnë.
+- **Rake-u:** sipas zinxhirit të vërtetë. Shembull: admin 50%, menaxher 30%, agjent 20%. Agjenti merr 20%, menaxheri 30−20 = 10%, admini 50−30 = 20% dhe qendra 50%.
+- **Rrjetet e vjetra:** agjentët që janë ende direkt nën një admin vazhdojnë të funksionojnë (agjenti merr %-in e tij, admini diferencën). Mund të zhvendosen nën një menaxher nga tab-i Database, duke ndryshuar `parentId`.
+- **Raportet:** te raporti i të ardhurave ka edhe kolonën Manager, si në tabelë ashtu edhe në CSV.
