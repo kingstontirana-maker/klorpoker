@@ -718,6 +718,11 @@ U provua te demo: dërgimi i €10 nga telefoni kaloi saktë (lojtari 120→130,
   - kur ai vend përplaset me diçka, vija kthehet pak.
 - **Butoni D** zë vendin e parë të lirë pranë lojtarit.
 - **Butonat Fold / Call / Raise:** në telefon dalin si kapsula të ulëta në buzën e poshtme të ekranit, që të mos mbulojnë asnjë lojtar.
-- **Shkalla:** kanavaca e telefonit është 400 px e lartë (më parë 365), prandaj gjithçka ka hapësirë dhe del rreth 8% më e vogël.
+- **Board-i** qëndron saktë në mes të tavolinës, dhe pot-i menjëherë sipër tij.
+- **Shkalla:** kanavaca e telefonit është 420 px e lartë (më parë 365). Lojtarët ulen mbi buzë, 19 px jashtë tavolinës.
+- **Chipsat:**
+  - pot-i tregon chipsat pranë shumës;
+  - çdo bast tregon deri në 2 kolona chipsash pranë shumës (më parë në telefon dilte vetëm shuma).
+- **Animimi:** basti nuk shfaqet më para se të mbërrijnë chipsat. Elementi mbetet i padukshëm derisa chipsat të arrijnë te lojtari, kështu që chipsat nuk duken më sikur hidhen dy herë. Ky ndreqje vlen edhe në kompjuter.
 - **Testi** `table-visuals.test.js` kontrollon tavolinat me 2, 4, 5, 6 dhe 9 vende, në tre madhësi ekrani, të ulur dhe jo. Asnjë element nuk duhet të mbivendoset me tjetrin.
 - **Skedarët:** `public/table-phone.css`, `phoneLayout()` dhe `feltBox()` te `public/table-visuals.js`, `FIT_H` te `public/app.js`. Në kompjuter tavolina mbetet siç ishte.

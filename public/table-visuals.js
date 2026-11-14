@@ -37,7 +37,12 @@ export class TableVisuals {
   constructor(root){this.root=root;this.lastSeq=0;this.tableId=null;this.hand=0;this.generation=0;this.queue=Promise.resolve();this.scheduled=0;this.clockOffset=0;this.lastSync=0;this.state=null;this.sound=false;this.motion=true;this.audio=null;this.timeoutSoundKey='';}
   reset(){this.generation++;this.silence();this.root.querySelector('#chipFlights').replaceChildren();this.root.querySelectorAll('.effectActive').forEach(n=>n.classList.remove('effectActive'));this.queue=Promise.resolve();this.scheduled=0;this.turnPending=false;this.lastSeq=0;this.tableId=null;this.state=null;}
   update(t){const initial=this.tableId!==t.id||t.hand<this.hand;this.clockOffset=t.serverNow-Date.now();this.lastSync=Date.now();this.state=t;this.tick();if(initial){this.reset();this.tableId=t.id;this.state=t;this.lastSeq=t.visualEvents?.at(-1)?.seq||0;this.hand=t.hand;return;}if(t.hand!==this.hand){this.generation++;this.root.querySelector('#chipFlights').replaceChildren();this.queue=Promise.resolve();this.scheduled=0;}const events=freshEvents(t.visualEvents||[],this.lastSeq,t.hand);this.lastSeq=Math.max(this.lastSeq,t.visualEvents?.at(-1)?.seq||0);this.hand=t.hand;for(const event of events)this.enqueue(event,t);}
-  enqueue(event,t){if(Date.now()+this.clockOffset-event.at>7000)return;const generation=this.generation;const slots=(event.type==='street'||event.type==='board')&&this.motion&&!document.hidden?this.boardSlots(event):[];slots.forEach(s=>s.classList.add('pendingReveal'));if(slots.length)setTimeout(()=>slots.forEach(s=>s.classList.remove('pendingReveal')),6000);this.scheduled++;this.queue=this.queue.then(async()=>{if(generation!==this.generation||!this.motion||document.hidden)return;await this.play(event,t,generation);}).catch(()=>{}).finally(()=>{slots.forEach(s=>s.classList.remove('pendingReveal'));this.scheduled=Math.max(0,this.scheduled-1);if(!this.scheduled&&this.turnPending){this.turnPending=false;this.beep('turn');}});}
+  enqueue(event,t){if(Date.now()+this.clockOffset-event.at>7000)return;const generation=this.generation;
+    // A bet is drawn in front of the player only once its chips have flown there: until
+    // then the stack is kept invisible, so it never shows first and then flies in again.
+    const betNode=event.type==='bet'&&event.amount>0&&this.motion&&!document.hidden?this.betSpot(this.root.querySelector(`[data-seat-user="${event.userId||''}"]`)):null,landing=betNode?.classList?betNode:null;
+    if(landing){landing.classList.add('incoming');landing.dataset.flights=String((Number(landing.dataset.flights)||0)+1);setTimeout(()=>{landing.classList.remove('incoming');landing.dataset.flights='0';},6000);}
+    const landed=()=>{if(!landing)return;const left=Math.max(0,(Number(landing.dataset.flights)||1)-1);landing.dataset.flights=String(left);if(!left)landing.classList.remove('incoming');};const slots=(event.type==='street'||event.type==='board')&&this.motion&&!document.hidden?this.boardSlots(event):[];slots.forEach(s=>s.classList.add('pendingReveal'));if(slots.length)setTimeout(()=>slots.forEach(s=>s.classList.remove('pendingReveal')),6000);this.scheduled++;this.queue=this.queue.then(async()=>{if(generation!==this.generation||!this.motion||document.hidden)return;await this.play(event,t,generation);}).catch(()=>{}).finally(()=>{landed();slots.forEach(s=>s.classList.remove('pendingReveal'));this.scheduled=Math.max(0,this.scheduled-1);if(!this.scheduled&&this.turnPending){this.turnPending=false;this.beep('turn');}});}
   // Leaving a table stops every sound still waiting to play.
   silence(){for(const n of this.playing||[])try{n.stop();}catch{}this.playing=new Set();this.lastSound=null;this.clock=null;}
   track(n,end){(this.playing??=new Set()).add(n);n.onended=()=>this.playing.delete(n);try{n.stop(end);}catch{}}
@@ -185,7 +190,7 @@ export function sizedLayout(base,size=6){
  return {...base,slots:[0,1,2,3,4,5],hero:3};
 }
 // ---- Phones in landscape: the players sit around the table ----
-// The canvas is FIT_H (400) px tall; the felt leaves 80 px above it, 85 px below it and
+// The canvas is FIT_H (420) px tall; the felt leaves 96 px above it, 85 px below it and
 // 70 px on each side (feltBox). Every player is a pod built on the avatar: the cards stand
 // half out above the photo (shown cards come in front of the photo and the plate), the
 // plate with the name and the credit sits under it, the action tag on the seam.
@@ -196,15 +201,16 @@ export function sizedLayout(base,size=6){
 // the dealer button sits beside the pod. Vertically, from the top: the top players
 // (pods end 57 px under the avatar), their bets, the pot, the board, your cards, you.
 // fw/fh: felt size in px. Coordinates are % of the felt, like the other layouts. The work
-// is done in a frame 27 px wider on each side and 30 px higher than the felt.
+// is done in a frame 27 px wider on each side and 46 px higher than the felt. The board
+// stands in the exact middle of the felt and the pot right above it.
 export const PHONE_POD={up:40,down:57,half:42};
-const PHONE_SPREAD={2:0,4:88,5:75,6:74,9:74};
+const PHONE_SPREAD={2:0,4:88,5:80,6:79,9:77};
 export function phoneLayout(size=6,feltW=726,feltH=235,seated=false){
- const ox=27,oy=30,fw=feltW+2*ox,fh=feltH+45,n=Math.max(1,size-1),cx=fw/2,cy=oy+feltH/2,b=feltH/2-3;
- const heroY=fh-13,boardW=50,boardY=162.5,potY=116.5;
- // the track: the edge of the felt pushed out by 3 px (a stadium), walked from the
+ const OUT=19,ox=27,oy=46,fw=feltW+2*ox,fh=feltH+oy+15,n=Math.max(1,size-1),cx=fw/2,cy=oy+feltH/2,b=feltH/2+OUT;
+ const heroY=fh-13,boardW=50,boardY=cy,potY=cy-boardW*.7-14;
+ // the track: the edge of the felt pushed out by OUT px (the players sit on the rail) (a stadium), walked from the
  // bottom middle through the left, the top and the right; angles are seen from the middle
- const r=feltH/2+3,half=feltW/2-feltH/2,path=[];
+ const r=feltH/2+OUT,half=feltW/2-feltH/2,path=[];
  for(let i=0;i<=1440;i++){const t=i/1440*2*Math.PI;let x=-Math.sin(t),y=Math.cos(t);// direction from the middle
   // where that direction meets the stadium
   let px,py;
@@ -222,7 +228,7 @@ export function phoneLayout(size=6,feltW=726,feltH=235,seated=false){
   seats.push(pc(x,y));const side=i===hero?'b':y<cy-b*.88?'t':x<cx?'l':x>cx?'r':'t';sides.push(side);inner.push(x>cx?'left':'right');
   slots.push(i===hero?3:side==='t'?0:side==='l'?(y<cy?5:4):(y<cy?1:2));
   if(i===hero&&seated){bets.push([...pc(x-52,y-50),'end']);dealer.push(pc(x+62,y-44));return;}
-  if(i===hero){bets.push(pc(x,y-PHONE_POD.up-14));dealer.push(pc(x+56,y-30));return;}
+  if(i===hero){bets.push([...pc(x,y-PHONE_POD.up-14),'chips']);dealer.push(pc(x+56,y-30));return;}
   bets.push(null);dealer.push(null);
  });
  // Bets: straight under the players of the top row; for everyone else on the straight line
@@ -231,19 +237,23 @@ export function phoneLayout(size=6,feltW=726,feltH=235,seated=false){
  // under the centre) and of the plate (±42 px, 16…57 px under it), 3 px apart. If that spot
  // touches the board, the pot, another player or a bet already placed, the line turns a
  // little (12°, 24°, then 36°) until it is free.
- const box=(x,y,l,t,r,b2)=>[x-l,y-t,x+r,y+b2],hit=(p,q)=>p[0]<q[2]&&q[0]<p[2]&&p[1]<q[3]&&q[1]<p[3];
+ const box=(x,y,l,t,r,b2)=>[x-l,y-t,x+r,y+b2],hit=(p,q)=>p[0]<q[2]-1&&q[0]<p[2]-1&&p[1]<q[3]-1&&q[1]<p[3]-1;
  const pod=(x,y,i)=>i===hero?box(x,y,56,71,56,76):box(x,y,PHONE_POD.half,PHONE_POD.up,PHONE_POD.half,PHONE_POD.down);
- const pods=spots.map(([x,y],i)=>pod(x,y,i));
- const taken=[box(cx,boardY,boardW*2.5+8,boardW*.7,boardW*2.5+8,boardW*.7),box(cx,potY,40,12,40,12),...pods];
+ // each player as two boxes: the photo with its cards, and the plate under it
+ const pods=spots.map(([x,y],i)=>i===hero?[pod(x,y,i)]:[[x-36,y-PHONE_POD.up,x+36,y+16],[x-42,y+16,x+42,y+PHONE_POD.down]]);
+ const taken=[box(cx,boardY,boardW*2.5+8,boardW*.7,boardW*2.5+8,boardW*.7),box(cx,potY,62,11,62,11),...pods.flat()];
  const clearOf=(x,y,me)=>!hit(me,[x-39,y-PHONE_POD.up-3,x+39,y+19])&&!hit(me,[x-45,y+16,x+45,y+PHONE_POD.down+3]);
- const along=(x,y,ux,uy)=>{for(let d=20;d<220;d+=2){const bx=x+ux*d,by=y+uy*d;if(clearOf(x,y,box(bx,by,33,9,33,9)))return [bx,by,ux,uy];}return [x+ux*220,y+uy*220,ux,uy];};
+ // A bet is its chips with the amount beside them: the chips sit exactly on the point, the
+ // amount beside them: on the top row away from the middle, everywhere else toward it.
+ const betBox=(bx,by,flip,m=0)=>flip?box(bx,by,80+m,9+m,19+m,9+m):box(bx,by,19+m,9+m,80+m,9+m);
+ const along=(x,y,ux,uy,flip)=>{for(let d=20;d<220;d+=2){const bx=x+ux*d,by=y+uy*d;if(clearOf(x,y,betBox(bx,by,flip)))return [bx,by,ux,uy];}return [x+ux*220,y+uy*220,ux,uy];};
  const order=spots.map((s,i)=>i).filter(i=>i!==hero).sort((p,q)=>spots[p][1]-spots[q][1]);
- const heroBet=bets[hero];if(heroBet){const hx=heroBet[0]*feltW/100+ox,hy=heroBet[1]*feltH/100+oy;taken.push(seated?[hx-66,hy-9,hx,hy+9]:box(hx,hy,33,9,33,9));}
- for(const i of order){const [x,y]=spots[i];let pick=null;const base=sides[i]==='t'?Math.PI/2:Math.atan2(cy-y,cx-x);
+ const heroBet=bets[hero];if(heroBet){const hx=heroBet[0]*feltW/100+ox,hy=heroBet[1]*feltH/100+oy;taken.push(seated?[hx-84,hy-9,hx,hy+9]:betBox(hx,hy,false));}
+ for(const i of order){const [x,y]=spots[i];let pick=null;const flip=sides[i]==='t'?x<cx-1:x>cx+1,base=sides[i]==='t'?Math.PI/2:Math.atan2(cy-y,cx-x);
   for(const g of [0,.21,-.21,.42,-.42,.63,-.63]){
-   const [bx,by,ux,uy]=along(x,y,Math.cos(base+g),Math.sin(base+g)),me=box(bx,by,33,9,33,9);
-   pick??=[bx,by,ux,uy];if(!taken.some(t=>t!==pods[i]&&hit(t,me))){pick=[bx,by,ux,uy];break;}}
-  bets[i]=pc(pick[0],pick[1]);dealer[i]=[pick[2],pick[3]];taken.push(box(pick[0],pick[1],34,10,34,10));}
+   const [bx,by,ux,uy]=along(x,y,Math.cos(base+g),Math.sin(base+g),flip),me=betBox(bx,by,flip);
+   pick??=[bx,by,ux,uy];if(!taken.some(t=>!pods[i].includes(t)&&hit(t,me))){pick=[bx,by,ux,uy];break;}}
+  bets[i]=[...pc(pick[0],pick[1]),flip?'flip':'chips'];dealer[i]=[pick[2],pick[3]];taken.push(betBox(pick[0],pick[1],flip,1));}
  // The dealer button: beside the pod, turned off the bet direction, at the first angle
  // where it touches no other player, bet, the board or the pot.
  spots.forEach(([x,y],i)=>{if(i===hero)return;const [ux,uy]=dealer[i];let best=null;
@@ -271,9 +281,9 @@ export function seatLayout(portrait=false,phone=false,narrow=false){
 }
 // Felt size from the free stage area; text and cards never scale with it.
 export function feltBox(width,height,portrait=false,phone=false){
- // The canvas is at least 730×400 (see FIT_H in app.js); the players sit on the edge of the
- // felt (phoneLayout), so it leaves 80 px above it, 85 px below it and 70 px on each side.
- if(phone&&!portrait){const w=Math.max(200,width-140),h=Math.max(120,height-165);return {width:w,height:h,top:80,minStage:height,ratio:w/h};}
+ // The canvas is at least 730×420 (see FIT_H in app.js); the players sit on the rail of the
+ // felt (phoneLayout), so it leaves 96 px above it, 85 px below it and 70 px on each side.
+ if(phone&&!portrait){const w=Math.max(200,width-140),h=Math.max(120,height-181);return {width:w,height:h,top:96,minStage:height,ratio:w/h};}
  // Short screens (phones in landscape, small phones) use tighter margins.
  const short=portrait?height<620:height<=560;
  const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?50:78),bottom=portrait?(short?80:92):(short?48:92),side=portrait?50:(short?14:36);

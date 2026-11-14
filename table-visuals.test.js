@@ -106,19 +106,19 @@ test('tables for 2 and 4 players put one spot on the table for every seat',()=>{
 test('phones in landscape: players around the felt, bets in front of them, nothing overlaps',async()=>{
  const {phoneLayout,PHONE_POD}=await import('./public/table-visuals.js');
  const hit=(a,b)=>a[0]<b[2]-1&&b[0]<a[2]-1&&a[1]<b[3]-1&&b[1]<a[3]-1;
- for(const [W,H] of [[866,400],[730,410],[867,400]])for(const size of [2,4,5,6,9])for(const seated of [false,true]){
-  const fw=W-140,fh=H-165,l=phoneLayout(size,fw,fh,seated),P=([x,y])=>[70+x*fw/100,80+y*fh/100];
+ for(const [W,H] of [[909,420],[747,420],[745,420]])for(const size of [2,4,5,6,9])for(const seated of [false,true]){
+  const fw=W-140,fh=H-181,l=phoneLayout(size,fw,fh,seated),P=([x,y])=>[70+x*fw/100,96+y*fh/100];
   for(const key of ['seats','bets','dealer','slots','sides','inner'])assert.equal(l[key].length,size,key+' for '+size);
   const [hx]=P(l.seats[l.hero]);assert.ok(Math.abs(hx-W/2)<1,'you sit in the middle at the bottom');
   const boxes=[];
   l.seats.forEach((s,i)=>{const [x,y]=P(s);
    if(seated&&i===l.hero)boxes.push(['heroCards',[x-48,y-69,x+48,y-18]],['hero',[x-55,y-28,x+55,y+75]]);
    else boxes.push(['photo'+i,[x-36,y-PHONE_POD.up,x+36,y+16]],['plate'+i,[x-42,y+16,x+42,y+PHONE_POD.down]]);
-   const [bx,by]=P(l.bets[i]),a=l.bets[i][2],bl=a==='end'?bx-66:a==='start'?bx:bx-33;boxes.push(['bet'+i,[bl,by-9,bl+66,by+9]]);
+   const [bx,by]=P(l.bets[i]),a=l.bets[i][2],bb=a==='chips'?[bx-19,bx+80]:a==='flip'?[bx-80,bx+19]:a==='end'?[bx-84,bx]:a==='start'?[bx,bx+84]:[bx-42,bx+42];boxes.push(['bet'+i,[bb[0],by-9,bb[1],by+9]]);
    const [dx,dy]=P(l.dealer[i]);boxes.push(['dealer'+i,[dx-11,dy-11,dx+11,dy+11]]);
    if(l.sides[i]==='t'&&!(seated&&i===l.hero))assert.ok(Math.abs(bx-x)<20&&by-y>Math.abs(bx-x)*3,'a top player bets (almost) straight below');});
-  const [,bc]=[0,P([50,l.boardY])],bw=5*l.boardW+16;boxes.push(['board',[bc[0]-bw/2,bc[1]-l.boardW*.7,bc[0]+bw/2,bc[1]+l.boardW*.7]]);
-  const pc=P([50,l.potY]);boxes.push(['pot',[pc[0]-38,pc[1]-11,pc[0]+38,pc[1]+11]]);
+  assert.ok(Math.abs(l.boardY-50)<.01,'the board stands in the middle of the felt');const [,bc]=[0,P([50,l.boardY])],bw=5*l.boardW+16;boxes.push(['board',[bc[0]-bw/2,bc[1]-l.boardW*.7,bc[0]+bw/2,bc[1]+l.boardW*.7]]);
+  const pc=P([50,l.potY]);boxes.push(['pot',[pc[0]-62,pc[1]-11,pc[0]+62,pc[1]+11]]);
   const fixed=[['toolbar',[W-216,0,W,36]],['back',[0,0,40,36]],['chat',[0,H-56,56,H]],...(seated?[['dock',[W-284,H-46,W-36,H-4]]]:[])];
   const all=[...boxes,...fixed];
   for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length;j++){if(i>=boxes.length)continue;const a=all[i],b=all[j];if(/^hero/.test(a[0])&&/^hero/.test(b[0]))continue;

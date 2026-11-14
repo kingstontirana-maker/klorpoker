@@ -143,6 +143,8 @@ body[data-view="table"] header button,body[data-view="table"] #balanceTag{paddin
 .game .sidePots span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#a8cdb7}.game .sidePots b{color:var(--gold-soft);margin-left:3px}
 .tableBet{position:absolute;left:var(--bx);top:var(--by);transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;z-index:6;pointer-events:none}
 .tableBet[hidden]{display:none}
+/* Kept invisible while its chips are still flying in (see TableVisuals.enqueue). */
+.tableBet.incoming{visibility:hidden}
 .tableBet[data-align=start]{transform:translate(0,-50%)}.tableBet[data-align=end]{transform:translate(-100%,-50%)}
 /* Narrow upright windows: the pot shows its amount only, a little lower, so the top
    player's bet has room under their name. */

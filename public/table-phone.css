@@ -11,9 +11,18 @@
    PHONE_POD in table-visuals.js holds the same measures (40 px above the centre,
    48 px below, 42 px to each side); keep the two in step. */
 body.fitPhone .tableStage{--board-w:50px;--me-hole-h:51px;--me-hole-w:36px}
+/* The board in the exact middle of the felt, the pot right above it (phoneLayout). */
 body.fitPhone .game .community{top:var(--board-y,50%);gap:4px}
 body.fitPhone .game .pot,body.fitPhone .game .pot.settled{top:var(--pot-y,30%);flex-direction:row;gap:0}
-body.fitPhone .game #potChips{display:none}
+/* Chips are always drawn as chips: in the pot (beside the amount) and in every bet. */
+body.fitPhone .game .pot,body.fitPhone .game .pot.settled{align-items:center;gap:5px}
+body.fitPhone .game #potChips{display:flex;align-items:flex-end;height:22px;min-height:22px;width:auto;position:static}
+body.fitPhone .game #potChips .chipStacks,body.fitPhone .tableBet .chipStacks{display:inline-flex;align-items:flex-end;gap:1px;height:auto;min-width:0;transform:none}
+body.fitPhone .game #potChips .chipColumn,body.fitPhone .tableBet .chipColumn{display:inline-block;width:18px;height:calc(13px + var(--chip-count)*2px)}
+body.fitPhone .game #potChips .chipColumn:nth-child(n+4),body.fitPhone .tableBet .chipColumn:nth-child(n+3){display:none}
+body.fitPhone .game #potChips .pokerChip,body.fitPhone .tableBet .pokerChip{width:18px;height:13px;bottom:calc(var(--chip-level)*2px)}
+body.fitPhone .game #potChips .pokerChip:before,body.fitPhone .tableBet .pokerChip:before{inset:2px}
+body.fitPhone .game #potChips .pokerChip b,body.fitPhone .tableBet .pokerChip b{display:none}
 body.fitPhone .game #potValue{font-size:13px;line-height:16px;padding:2px 10px}
 body.fitPhone .tableBet{gap:3px}
 body.fitPhone .tableBet .betAmount{font-size:11px;padding:3px 7px}
@@ -85,3 +94,11 @@ body.fitPhone .game .seat[data-side]:not(.me) .winBadge{top:calc(50% + 44px)}
 body.fitPhone .game .seat[data-side]:not(.me) .seatCards:has(.face){top:calc(50% - 26px)}
 body.fitPhone .game .seat[data-side]:not(.me) .seatCards{top:-11px}
 body.fitPhone .game .seat[data-side]:not(.me) .seatCards:has(.face){top:calc(50% - 26px)}
+
+/* A bet's chips sit exactly on its spot (straight in front of the player); the amount sits
+   beside them, on the outer side. One chip column is 18 px wide, two are 37 px. */
+body.fitPhone .tableBet[data-align=chips]{transform:translate(-9px,-50%)}
+body.fitPhone .tableBet[data-align=chips]:has(.chipColumn+.chipColumn){transform:translate(-18.5px,-50%)}
+body.fitPhone .tableBet[data-align=flip]{flex-direction:row-reverse;transform:translate(calc(-100% + 9px),-50%)}
+body.fitPhone .tableBet[data-align=flip]:has(.chipColumn+.chipColumn){transform:translate(calc(-100% + 18.5px),-50%)}
+body.fitPhone .tableBet[data-align=flip] .chipStacks{flex-direction:row-reverse}
