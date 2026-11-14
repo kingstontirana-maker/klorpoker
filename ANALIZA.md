@@ -901,3 +901,13 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Dërgimi te qendra:** te CENB, karta "Rake nga botat te CENB" tregon shumën që mban CENB, me butonin "Dërgo te qendra". Ti vendos sa: të gjithë ose një pjesë. Çdo dërgim shënohet si `CENB_RAKE` dhe te log-u i CENB, dhe nuk mund të dërgohet më shumë se sa ka CENB.
 - **Kontrolli i parave:** rake-u që mban CENB numërohet në kontroll, kështu që totali mbetet i saktë.
 - **Testuar në demo:** €0.26 rake nga botat mbetën te CENB. U dërguan €0.10, pastaj pjesa tjetër. Kërkesa për më shumë u refuzua, dhe kontrolli i parave mbeti OK.
+
+## CENB: kredia qarkullon brenda CENB ("Rikrediti botat")
+- **Butoni i ri te CENB:** "↺ Rikrediti botat". Çdo bot që nuk është në tavolinë kthehet te kredia me të cilën u financua:
+  - botat që fituan u japin atyre që humbën;
+  - rake-u që paguan vetë botat (i mbajtur te kuleta e CENB) u kthehet atyre;
+  - ajo që mbetet plus shkon te **kuleta e CENB**, që mund të dërgohet te qendra me "Dërgo te qendra".
+- **Kur kredia nuk mjafton** (botat kanë humbur ndaj lojtarëve): çdo bot merr të njëjtën përqindje të financimit të vet.
+- **Botat në tavolinë nuk preken.** Për t'i përfshirë: "Ndalo të gjithë", prit sa të mbarojnë duart, pastaj "Rikrediti botat".
+- **Kontrolli:** qendra nuk preket. Limitet e shtëpisë (ditë/javë/muaj) nuk ndryshojnë nga këto lëvizje të brendshme (`cenbFlow`). Kontrolli i parave mbetet i saktë, dhe çdo rikreditim shënohet si `CENB_RESTORE`.
+- **Testuar në demo:** pas lojës, botat kishin €15.19, €14.88 dhe €15.00. U kthyen të tre te €15.00, dhe teprica (€0.07) shkoi te kuleta. Testi automatik mbulon edhe rastin kur kredia nuk mjafton.

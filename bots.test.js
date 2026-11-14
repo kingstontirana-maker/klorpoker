@@ -401,3 +401,13 @@ test('the center has no credit limit: a bot budget above its wallet creates the 
  const mint=db.ledger.find(x=>x.type==='MINT');assert.ok(mint,'credit was created');assert.equal(mint.amount,500000000-1000000);
  assert.equal(center.balance,0,'the centre gave out everything it had plus what it created');assert.equal(total(),db.moneyTotal,'the money check total follows');
 });
+
+test('Rikrediti botat: bots go back to their funding, winners pay losers, the rest stays in the CENB wallet',()=>{
+ const {center,db,manager}=world();const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbRake||0);
+ manager.route('/api/bots/create',{name:'BotA',budget:100,tableId:'1',buyin:40,stopLoss:30},center);manager.route('/api/bots/create',{name:'BotB',budget:100,tableId:'1',buyin:40,stopLoss:30},center);
+ const [a,b]=db.users.filter(u=>u.isBot);a.balance=13000;b.balance=6000;db.cenbRake=1500;// A won 30, B lost 40, bots paid 15 rake
+ const before=total(),r=manager.route('/api/bots/restore',{},center);
+ assert.deepEqual([a.balance,b.balance],[10000,10000],'both back to €100');assert.equal(db.cenbRake,500,'€5 left over stays in the CENB wallet');assert.equal(r.full,true);assert.equal(total(),before,'nothing created or lost');
+ a.balance=7000;b.balance=5000;db.cenbRake=0;// not enough: €120 for €200 of funding
+ manager.route('/api/bots/restore',{},center);assert.deepEqual([a.balance,b.balance],[6000,6000],'the same share for each');assert.equal(db.cenbRake,0);
+});

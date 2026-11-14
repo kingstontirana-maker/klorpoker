@@ -78,7 +78,9 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  let rakeSeen=0,rakeTotal=0,rakeMap=new Map(),oldCounted=false;
  function botRake(){const ids=new Set(bots().map(u=>u.id)),count=x=>{if(x.type!=='RAKE')return;for(const a of x.allocations||[])if(a.bot||ids.has(a.userId)){rakeTotal+=a.amount;const r=rakeMap.get(a.userId)||{rake:0,hands:0};r.rake+=a.amount;r.hands++;rakeMap.set(a.userId,r);}};if(!oldCounted){oldCounted=true;for(const x of olderRake?.()||[])count(x);}for(;rakeSeen<db.ledger.length;rakeSeen++)count(db.ledger[rakeSeen]);return rakeTotal;}
  // The house result: bot chips plus the rake bots paid, which goes back to the center.
- const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake();
+ // db.cenbFlow: credit moved from the CENB wallet to the bots minus credit moved from the bots
+// to the wallet (Rikrediti botat). Those moves stay inside CENB and never change the house result.
+const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake()-(Number(db.cenbFlow)||0);
  function periods(now=Date.now()){
   const k=keys(now);let value=null,changed=false;
   for(const [p,,name] of PERIODS)if(g[p]!==k[p]){value??=houseValue();g[p]=k[p];g[p+'Start']=value;changed=true;
@@ -231,6 +233,18 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   // their hand ends and are emptied then (tick below). The bot accounts stay, with €0.
   if(p==='/api/bots/reclaim'){let stopped=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});stopped++;}db.botReclaim=true;const r=reclaim();save();return {ok:true,stopped,...r};}
   // Rake the bots paid is kept by CENB; CENB sends it (all or part) to the centre by hand.
+  // Re-credit the bots: the money inside CENB circulates. Every bot that is not at a table goes
+  // back to the credit it was funded with: bots that won give to bots that lost, and the rake the
+  // bots paid (kept in the CENB wallet) goes back to them too. What is left over is the profit and
+  // stays in the CENB wallet. If there is not enough, every bot gets the same share of its funding.
+  if(p==='/api/bots/restore'){const free=bots().filter(b=>!seatOf(b)),seated=bots().length-free.length,wallet=Number(db.cenbRake)||0;
+   if(!free.length)fail(seated?'Every bot is at a table: press "Ndalo të gjithë", wait for the hands to end, then try again':'There are no bots');
+   const pool=free.reduce((n,b)=>n+b.balance,0)+wallet,need=free.reduce((n,b)=>n+Math.max(0,b.bot.funded||0),0);
+   const ratio=need>0&&pool<need?pool/need:1;let given=0;
+   for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);b.balance=target;b.bot.baseline=target;given+=target;}
+   const nextWallet=pool-given;db.cenbFlow=(Number(db.cenbFlow)||0)+(wallet-nextWallet);db.cenbRake=nextWallet;
+   db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,walletBefore:wallet,walletAfter:nextWallet,time:Date.now()});save();
+   return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:nextWallet/100,walletChange:(nextWallet-wallet)/100};}
   if(p==='/api/bots/sendrake'){const pool=Number(db.cenbRake)||0,n=body.amount===undefined||body.amount===''||body.amount===null?pool:cents(body.amount,'Amount');
    if(!(n>0))fail('There is no bot rake to send');if(n>pool)fail('CENB holds only €'+(pool/100).toFixed(2)+' of bot rake');const c=center();if(!c)fail('No center account');
    db.cenbRake=pool-n;c.balance+=n;db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',to:c.id,amount:n,time:Date.now()});save();return {ok:true,sent:n/100,left:db.cenbRake/100};}
