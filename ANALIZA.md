@@ -812,3 +812,21 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Vetëm lexim:** nuk ka asnjë mënyrë për të ndryshuar të dhëna nga ky tab. Kërkimi trajtohet si vlerë, kurrë si SQL, dhe emri i tabelës pranohet vetëm nëse ekziston.
 - **Sekretet nuk dalin kurrë nga serveri:** passHash, salt, çelësat e sesioneve (shfaqen vetëm 6 shenjat e para) dhe çdo fushë me emër si password, secret, token, private, seed ose mnemonic dalin si ••••••.
 - Vetëm qendra e hap (admini, agjenti dhe lojtari marrin 403). Shumat janë në cent (100 = €1), siç ruhen në databazë.
+
+## Database: ndryshim, shtim dhe fshirje (qendra)
+- Te tab-i Database, butoni ✎ ndryshon një rresht, 🗑 e fshin dhe "+ Add row" shton një rresht të ri. Çdo ruajtje kërkon konfirmim dhe regjistrohet te Activity log (kush, çfarë, kur), pa fjalëkalime.
+- **Si ruhen ndryshimet:** përdoruesit, tavolinat, settings dhe transaksionet e fundit ndryshohen në memorien e serverit, se përndryshe do mbishkruheshin. Duart, lojtarët e duarve dhe raportet e chatit ndryshohen drejt në SQLite.
+- **Rregulla mbrojtëse:**
+  - **Bilancet:** çdo ndryshim ose fshirje regjistrohet si transaksion ADJUST, dhe totali i kontrollit të parave lëviz me të. Kontrolli mbetet OK dhe çdo euro gjurmohet.
+  - **Llogaritë:**
+    - llogaria e qendrës nuk fshihet dhe nuk ul rolin;
+    - një llogari me llogari poshtë saj, ose një lojtar i ulur në tavolinë, nuk fshihet;
+    - emrat mbeten unikë, dhe askush nuk vendoset poshtë vetes;
+    - fjalëkalimet dhe salt-et nuk shfaqen e nuk shkruhen këtu, ndërsa llogaria e re merr fjalëkalimin që shkruhet në formular.
+  - **Tavolinat:** ndryshohen, shtohen ose fshihen vetëm kur janë bosh.
+  - **Settings:** rake-u 0–15%, vlerat në JSON të vlefshëm, dhe settings që i duhen serverit nuk fshihen.
+  - **Transaksionet:** korrigjohen, por nuk shtohen e nuk fshihen.
+  - **Sesionet:** vetëm fshihen, dhe kjo e nxjerr atë pajisje.
+  - **Activity log dhe meta:** vetëm lexim, sepse log-u regjistron edhe ndryshimet e bëra këtu.
+- **Gjatë editimit:** rifreskimi live ndalon, që të mos e mbishkruajë formularin.
+- **Testet:** `db-edit.test.js`, plus 33 veprime të provuara në demo nëpërmjet API-së.

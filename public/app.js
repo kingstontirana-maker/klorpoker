@@ -797,24 +797,59 @@ const auditDetail=d=>Object.entries(d||{}).filter(([k])=>!['userId','id'].includ
 async function loadAudit(more){try{const d=await api('audit',{actor:$('#auditActor').value,action:$('#auditAction').value,before:more?auditBeforeId:undefined}),rows=d.rows.map(r=>'<tr><td>'+new Date(r.at).toLocaleString('en-GB')+'</td><td><strong>'+safe(r.actor||'')+'</strong></td><td>'+safe(auditNames[r.action]||r.action)+'</td><td>'+safe(r.target||'–')+'</td><td class="muted">'+auditDetail(r.details)+'</td></tr>').join('');$('#auditRows').innerHTML=(more?$('#auditRows').innerHTML:'')+rows;if(!more&&!d.rows.length)$('#auditRows').innerHTML='<tr><td colspan="5" class="muted">Nothing found.</td></tr>';if(d.rows.length)auditBeforeId=d.rows.at(-1).id;$('#auditMore').hidden=!d.more;}catch(err){toast(err.message);}}
 $('#auditFilter').onsubmit=e=>{e.preventDefault();loadAudit();};$('#auditMore').onclick=()=>loadAudit(true);
 
-// ---- Database (centre): every table, live, read-only ----
-const dbView={table:'users',offset:0,q:'',timer:null,busy:false,open:new Set()};const DB_PAGE=50;
+// ---- Database (centre): every table, live; rows can be changed, added and deleted ----
+// While a row is being edited or added, the live refresh pauses so nothing overwrites the form.
+const dbView={table:'users',offset:0,q:'',timer:null,busy:false,open:new Set(),page:null,rule:null,editing:null,adding:false};const DB_PAGE=50;
+const DB_KEYCOL={users:'id',game_tables:'id',settings:'key',ledger:'seq'};
+// Columns that are shown but never written from here.
+const DB_LOCKED={users:['id','salt','passHash','parent_id'],game_tables:['id'],settings:['key'],ledger:['seq'],sessions:[],hands:[],hand_players:[],chat_reports:['id'],audit:[],meta:[]};
+const dbKeyOf=i=>{const p=dbView.page,col=DB_KEYCOL[p.table];return col?p.rows[i][p.columns.indexOf(col)]:p.rowids[i];};
+const dbLocked=c=>(DB_LOCKED[dbView.table]||[]).includes(c);
 function stopDatabase(){clearTimeout(dbView.timer);dbView.timer=null;}
-async function loadDatabase(){stopDatabase();if(panelPage!=='database'||profile?.user.role!=='CENTER')return;
- if(!document.hidden&&!dbView.busy){dbView.busy=true;try{
+function renderDatabase(){const p=dbView.page,rule=dbView.rule||{};if(!p)return;
+ const actions=rule.update||rule.delete;
+ setMarkup($('#dbHeadRow'),'<tr>'+(actions?'<th class="dbAct"></th>':'')+p.columns.map(c=>'<th>'+safe(c)+(dbLocked(c)?' <i class="dbLock" title="Not editable here">🔒</i>':'')+'</th>').join('')+'</tr>');
+ const cell=(v,k)=>{if(v===null||v===undefined)return '<td class="dbNull">NULL</td>';const s=String(v),long=s.length>60,open=dbView.open.has(k);return '<td'+(long?' class="dbLong'+(open?' open':'')+'" data-db-cell="'+safe(k)+'"':'')+'>'+safe(s)+'</td>';};
+ const input=(c,v)=>dbLocked(c)||v==='••••••'?'<td class="dbRO">'+safe(v==null?'NULL':String(v))+'</td>':'<td><textarea class="dbInput" data-col="'+safe(c)+'" rows="1" spellcheck="false">'+safe(v==null?'':String(v))+'</textarea></td>';
+ let body='';
+ if(dbView.adding){body+='<tr class="dbEditRow"><td class="dbAct"><button type="button" class="dbBtn ok" data-db-save="new" title="Add">✓</button><button type="button" class="dbBtn" data-db-cancel title="Cancel">✕</button></td>'+p.columns.map(c=>dbLocked(c)&&!(dbView.table==='settings'&&c==='key')||(dbView.table==='users'&&['salt','passHash','parent_id','id'].includes(c))?'<td class="dbRO">auto</td>':'<td><textarea class="dbInput" data-col="'+safe(c)+'" rows="1" spellcheck="false" placeholder="'+safe(c)+'"></textarea></td>').join('')+'</tr>';
+  if(dbView.table==='users')body+='<tr class="dbEditRow"><td class="dbAct"></td><td colspan="'+p.columns.length+'"><label class="dbPass">Password for the new account <input type="text" id="dbNewPass" autocomplete="new-password" placeholder="at least 8 characters, letters and numbers"></label> <small>Fill username, role (ADMIN, AGENT or USER), parentId and balance (cents).</small></td></tr>';}
+ body+=p.rows.map((r,i)=>{const key=dbKeyOf(i),editing=dbView.editing!==null&&String(dbView.editing)===String(key);
+  const act=actions?'<td class="dbAct">'+(editing?'<button type="button" class="dbBtn ok" data-db-save="'+safe(key)+'" title="Save">✓</button><button type="button" class="dbBtn" data-db-cancel title="Cancel">✕</button>':(rule.update?'<button type="button" class="dbBtn" data-db-edit="'+safe(key)+'" title="Edit">✎</button>':'')+(rule.delete?'<button type="button" class="dbBtn del" data-db-del="'+safe(key)+'" title="Delete">🗑</button>':''))+'</td>':'';
+  return '<tr'+(editing?' class="dbEditRow" data-row="'+i+'"':'')+'>'+act+r.map((v,j)=>editing?input(p.columns[j],v):cell(v,key+':'+p.columns[j])).join('')+'</tr>';}).join('');
+ if(!p.rows.length&&!dbView.adding)body='<tr><td class="muted" colspan="'+(p.columns.length+1)+'">'+(dbView.q?'No row matches this search.':'This table is empty.')+'</td></tr>';
+ setMarkup($('#dbRows'),body);
+ $('#dbAdd').hidden=!rule.insert;$('#dbAdd').disabled=dbView.adding;
+ $('#dbRules').textContent=rule.update||rule.insert||rule.delete?'Editable: '+[rule.update&&'change',rule.insert&&'add',rule.delete&&'delete'].filter(Boolean).join(' · ')+'. Every change is saved in the Activity log.':dbView.table==='audit'?'Read-only: the activity log records every change, including the ones made here.':'Read-only table.';}
+async function loadDatabase(force){stopDatabase();if(panelPage!=='database'||profile?.user.role!=='CENTER')return;
+ const paused=dbView.editing!==null||dbView.adding;
+ if((force||!paused)&&!document.hidden&&!dbView.busy){dbView.busy=true;try{
   const [list,page]=await Promise.all([api('db/tables',{}),api('db/rows',{table:dbView.table,offset:dbView.offset,limit:DB_PAGE,q:dbView.q})]);
   setMarkup($('#dbTables'),list.tables.map(t=>'<button type="button" role="tab" aria-selected="'+(t.name===dbView.table)+'" data-db-table="'+safe(t.name)+'">'+safe(t.name)+'<b>'+t.rows.toLocaleString('en-US')+'</b></button>').join(''));
-  setMarkup($('#dbHeadRow'),'<tr>'+page.columns.map(c=>'<th>'+safe(c)+'</th>').join('')+'</tr>');
-  const cell=(v,k)=>{if(v===null||v===undefined)return '<td class="dbNull">NULL</td>';const s=String(v),long=s.length>60,open=dbView.open.has(k);return '<td'+(long?' class="dbLong'+(open?' open':'')+'" data-db-cell="'+safe(k)+'" title="Tap to '+(open?'shrink':'expand')+'"':'')+'>'+safe(s)+'</td>';};
-  setMarkup($('#dbRows'),page.rows.length?page.rows.map((r,i)=>'<tr>'+r.map((v,j)=>cell(v,(r[0]??i)+':'+page.columns[j])).join('')+'</tr>').join(''):'<tr><td class="muted" colspan="'+Math.max(1,page.columns.length)+'">'+(dbView.q?'No row matches this search.':'This table is empty.')+'</td></tr>');
+  dbView.rule=list.tables.find(t=>t.name===dbView.table)?.edit||{};dbView.page=page;renderDatabase();
   const from=page.total?page.offset+1:0,to=Math.min(page.total,page.offset+page.rows.length);
   $('#dbInfo').textContent=page.table+' · '+page.total.toLocaleString('en-US')+' rows'+(dbView.q?' matching “'+dbView.q+'”':'')+' · '+page.columns.length+' columns · newest first';
   $('#dbPage').textContent=from+'–'+to+' of '+page.total.toLocaleString('en-US');$('#dbPrev').disabled=page.offset<=0;$('#dbNext').disabled=to>=page.total;
   $('#dbLive').classList.remove('off');$('#dbLive').lastChild.textContent='Live · '+new Date(page.serverNow).toLocaleTimeString('en-GB');
  }catch(err){$('#dbLive').classList.add('off');$('#dbLive').lastChild.textContent='Not updating';if(err.status===404){dbView.table='users';dbView.offset=0;}}finally{dbView.busy=false;}}
- if(panelPage==='database')dbView.timer=setTimeout(loadDatabase,2000);}
-$('#dbTables').addEventListener('click',e=>{const b=e.target.closest('[data-db-table]');if(!b||b.dataset.dbTable===dbView.table)return;dbView.table=b.dataset.dbTable;dbView.offset=0;dbView.q='';$('#dbSearch').value='';dbView.open.clear();$('#dbRows').replaceChildren();markupCache.delete($('#dbRows'));loadDatabase();});
-$('#dbPrev').onclick=()=>{dbView.offset=Math.max(0,dbView.offset-DB_PAGE);loadDatabase();};$('#dbNext').onclick=()=>{dbView.offset+=DB_PAGE;loadDatabase();};
-{let t;$('#dbSearch').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{dbView.q=$('#dbSearch').value.trim();dbView.offset=0;loadDatabase();},300);});}
-$('#dbRows').addEventListener('click',e=>{const c=e.target.closest('[data-db-cell]');if(!c)return;const k=c.dataset.dbCell;if(dbView.open.has(k))dbView.open.delete(k);else dbView.open.add(k);c.classList.toggle('open');});
+ if(paused&&!force){$('#dbLive').classList.add('off');$('#dbLive').lastChild.textContent='Paused while editing';}
+ if(panelPage==='database')dbView.timer=setTimeout(()=>loadDatabase(),2000);}
+const dbReset=()=>{dbView.editing=null;dbView.adding=false;};
+$('#dbTables').addEventListener('click',e=>{const b=e.target.closest('[data-db-table]');if(!b||b.dataset.dbTable===dbView.table)return;if((dbView.editing!==null||dbView.adding)&&!confirm('Leave without saving your change?'))return;dbReset();dbView.table=b.dataset.dbTable;dbView.offset=0;dbView.q='';$('#dbSearch').value='';dbView.open.clear();$('#dbRows').replaceChildren();markupCache.delete($('#dbRows'));loadDatabase(true);});
+$('#dbPrev').onclick=()=>{dbReset();dbView.offset=Math.max(0,dbView.offset-DB_PAGE);loadDatabase(true);};$('#dbNext').onclick=()=>{dbReset();dbView.offset+=DB_PAGE;loadDatabase(true);};
+{let t;$('#dbSearch').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{dbReset();dbView.q=$('#dbSearch').value.trim();dbView.offset=0;loadDatabase(true);},300);});}
+$('#dbAdd').onclick=()=>{dbView.editing=null;dbView.adding=true;renderDatabase();$('#dbRows .dbInput')?.focus();};
+$('#dbRows').addEventListener('click',async e=>{
+ const c=e.target.closest('[data-db-cell]');if(c){const k=c.dataset.dbCell;if(dbView.open.has(k))dbView.open.delete(k);else dbView.open.add(k);c.classList.toggle('open');return;}
+ const ed=e.target.closest('[data-db-edit]');if(ed){dbView.adding=false;dbView.editing=ed.dataset.dbEdit;renderDatabase();$('#dbRows .dbEditRow .dbInput')?.focus();return;}
+ if(e.target.closest('[data-db-cancel]')){dbReset();renderDatabase();loadDatabase(true);return;}
+ const del=e.target.closest('[data-db-del]');if(del){const key=del.dataset.dbDel;if(!confirm('Delete this row from '+dbView.table+' ('+key+')? This cannot be undone.'))return;
+  try{await api('db/edit',{table:dbView.table,action:'delete',key});toast('Row deleted');}catch(err){toast(err.message);}loadDatabase(true);return;}
+ const sv=e.target.closest('[data-db-save]');if(!sv)return;const isNew=sv.dataset.dbSave==='new',row=sv.closest('tr'),values={};
+ if(isNew){for(const i of row.querySelectorAll('.dbInput'))if(i.value.trim()!=='')values[i.dataset.col]=i.value;const pass=$('#dbNewPass');if(pass)values.password=pass.value;}
+ else{const idx=Number(row.dataset.row),orig=dbView.page.rows[idx];for(const i of row.querySelectorAll('.dbInput')){const j=dbView.page.columns.indexOf(i.dataset.col),before=orig[j]==null?'':String(orig[j]);if(i.value!==before)values[i.dataset.col]=i.value===''&&orig[j]==null?null:i.value;}
+  if(!Object.keys(values).length){dbReset();renderDatabase();return;}
+  if(!confirm('Save '+Object.keys(values).length+' change'+(Object.keys(values).length>1?'s':'')+' in '+dbView.table+'?\n\n'+Object.entries(values).map(([k,v])=>k+' → '+String(v).slice(0,80)).join('\n')))return;}
+ sv.disabled=true;try{await api('db/edit',{table:dbView.table,action:isNew?'insert':'update',key:isNew?undefined:sv.dataset.dbSave,values});toast(isNew?'Row added':'Saved');dbReset();}catch(err){toast(err.message);sv.disabled=false;return;}
+ loadDatabase(true);});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&panelPage==='database')loadDatabase();});

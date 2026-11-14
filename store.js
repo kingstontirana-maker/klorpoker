@@ -166,7 +166,7 @@ export function openStore(file){
    const where=q?' WHERE '+text.map(c=>'CAST("'+c+'" AS TEXT) LIKE ?').join(' OR '):'',args=q?text.map(()=>'%'+q+'%'):[];
    const order=cols.includes('seq')?'seq':cols.includes('at')?'at':cols.includes('started_at')?'started_at':'rowid';
    const total=sql.prepare('SELECT COUNT(*) AS n FROM "'+table+'"'+where).get(...args).n;
-   const rows=sql.prepare('SELECT '+quoted+' FROM "'+table+'"'+where+' ORDER BY '+order+' DESC LIMIT ? OFFSET ?').all(...args,Math.max(1,Math.min(200,limit)),Math.max(0,offset));
+   const rows=sql.prepare('SELECT rowid AS __rowid,'+quoted+' FROM "'+table+'"'+where+' ORDER BY '+order+' DESC LIMIT ? OFFSET ?').all(...args,Math.max(1,Math.min(200,limit)),Math.max(0,offset));
    const SECRET=/^(passhash|salt|key)$|password|secret|token|private|mnemonic|seed|apikey|api_key|xprv/i,mask=v=>v==null||v===''?v:'••••••';
    const clean=(k,v)=>{if(SECRET.test(k)&&!(table!=='sessions'&&k==='key'))return mask(v);if(v&&typeof v==='object'){if(Array.isArray(v))return v.map((x,i)=>clean(String(i),x));return Object.fromEntries(Object.entries(v).map(([a,b])=>[a,clean(a,b)]));}return v;};
    const JSONCOL=new Set(['data']),out=[],extra=new Set();
@@ -176,7 +176,14 @@ export function openStore(file){
      row[c]=clean(c,v);}
     out.push(row);}
    const shown=[...cols.filter(c=>!(JSONCOL.has(c)&&out.every(r=>!(c in r)))),...[...extra].filter(c=>!cols.includes(c))];
-   return {table,total,offset,columns:shown,rows:out.map(r=>shown.map(c=>{const v=r[c];return v===undefined?null:typeof v==='object'&&v!==null?JSON.stringify(v).slice(0,4000):typeof v==='string'?v.slice(0,4000):v;}))};},
+   return {table,total,offset,columns:shown,real:this.realColumns(table),rowids:rows.map(r=>r.__rowid),rows:out.map(r=>shown.map(c=>{const v=r[c];return v===undefined?null:typeof v==='object'&&v!==null?JSON.stringify(v).slice(0,4000):typeof v==='string'?v.slice(0,4000):v;}))};},
+  // Writes for the Database tab (db-edit.js). Table and column names are checked against
+  // the real schema before they reach SQL; values are always bound parameters.
+  realColumns(table){return sql.prepare('PRAGMA table_xinfo("'+table+'")').all().filter(c=>!c.hidden).map(c=>c.name);},
+  rawGet(table,id,keyCol){if(!this.browseTables().some(t=>t.name===table)||!['rowid','seq'].includes(keyCol))return null;return sql.prepare('SELECT rowid AS __rowid,* FROM "'+table+'" WHERE '+keyCol+'=?').get(id)||null;},
+  rawSet(table,id,keyCol,row){const cols=this.realColumns(table),keys=Object.keys(row).filter(k=>cols.includes(k));if(!keys.length||!['rowid','seq'].includes(keyCol))return;transaction(()=>sql.prepare('UPDATE "'+table+'" SET '+keys.map(k=>'"'+k+'"=?').join(',')+' WHERE '+keyCol+'=?').run(...keys.map(k=>row[k]),id));},
+  rawInsert(table,row){const cols=this.realColumns(table),keys=Object.keys(row).filter(k=>cols.includes(k));if(!keys.length)throw Object.assign(Error('Fill in at least one column'),{status:400});return Number(transaction(()=>sql.prepare('INSERT INTO "'+table+'"('+keys.map(k=>'"'+k+'"').join(',')+') VALUES('+keys.map(()=>'?').join(',')+')').run(...keys.map(k=>row[k])).lastInsertRowid));},
+  rawDelete(table,id){if(!this.browseTables().some(t=>t.name===table))return;transaction(()=>sql.prepare('DELETE FROM "'+table+'" WHERE rowid=?').run(id));},
   close(){sql.close();},
  };
  return store;
