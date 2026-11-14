@@ -8,12 +8,16 @@ const root=path.resolve('public/cenb'),out=path.resolve('artifacts');
 fs.mkdirSync(out,{recursive:true});
 const fixture={guard:{returnPercent:25,dailyLimit:50,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,today:0,week:0,month:0},bots:[{id:'b',name:'Demo',status:'Stopped',enabled:false,style:'Balanced',mode:'play',tableId:'auto',buyinBB:100,stopLoss:50,equity:120,total:20,session:20,hands:10,rakePaid:0,house:20,returned:5,returnAvailable:15}],tables:[],players:[],decisions:[],catalog:[],log:[],centerBalance:1000};
 fixture.bots.push({...fixture.bots[0],id:'b2',name:'SecondBot',enabled:true,status:'Looking for a table'});
-let settings=[],configurations=[];
+fixture.fill={settings:{emptySeats:1,buyinMinPercent:35,buyinMaxPercent:90,budgetPercent:200,stopLossPercent:100,stopWinPercent:0,risk:'mix',mode:'play'},names:['FillName_01','FillName_02'],tables:{}};
+fixture.catalog=[{id:'small',name:'Test Small',size:2,free:2,min:10,max:100,bb:1,sb:.5},{id:'large',name:'Test Large',size:6,free:6,min:100,max:1000,bb:10,sb:5}];
+let settings=[],configurations=[],fillRequests=[],nameRequests=[];
 const server=http.createServer(async(req,res)=>{
  if(req.url.startsWith('/api/')){let raw='';for await(const c of req)raw+=c;let value=fixture;
   if(req.url==='/api/cenb/status')value={ready:true};
   if(req.url==='/api/cenb/bots/settings'){const body=JSON.parse(raw);settings.push(body);fixture.guard.returnPercent=body.returnPercent;value=fixture.guard;}
   if(req.url==='/api/cenb/bots/configure'){const body=JSON.parse(raw);configurations.push(body);Object.assign(fixture.bots.find(b=>b.id===body.id),body);value={ok:true};}
+  if(req.url==='/api/cenb/bots/names'){const body=JSON.parse(raw);nameRequests.push(body);fixture.fill.names=body.names.split(/\s+/).filter(Boolean);value={ok:true,names:fixture.fill.names};}
+  if(req.url==='/api/cenb/bots/fill'){const body=JSON.parse(raw);fillRequests.push(body);value={ok:true,added:1,funded:100,tables:[{id:body.tableId,name:'Test Small',added:1,emptySeats:Number(body.emptySeats)}]};}
   res.setHeader('content-type','application/json');res.end(JSON.stringify(value));return;
  }
  const name=req.url==='/'?'index.html':req.url.slice(1).replace(/^cenb\//,'');if(!['index.html','cenb.js','cenb.css','logo.webp','icon.png'].includes(name)){res.writeHead(404);res.end();return;}
@@ -76,10 +80,34 @@ try{
  assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth+1'),true,'no horizontal overflow on mobile');
  shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'cenb-returns-mobile.png'),Buffer.from(shot.data,'base64'));
  await ev("document.querySelector('[data-tab=limits]').click()");
+ await ev("document.querySelector('[data-tab=fill]').click()");
+ assert.equal(await ev("document.querySelector('#fillTable').options.length"),3);
+ await ev("document.querySelector('#botNames').value='FillName_01\\nFillName_02\\nFillName_03';document.querySelector('#botNames').dispatchEvent(new Event('input',{bubbles:true}));__refresh()");
+ assert.ok(await ev("document.querySelector('#botNames').value.includes('FillName_03')"),'unsaved name list survives polling');
+ await ev("document.querySelector('#fillForm').requestSubmit()");assert.equal(fillRequests.length,0,'unsaved names must be saved first');
+ await ev("document.querySelector('#botNamesForm').requestSubmit()");
+ for(let i=0;i<40&&!nameRequests.length;i++)await sleep(100);await sleep(150);
+ assert.equal(fixture.fill.names.length,3);
+ await ev("document.querySelector('#fillTable').value='small';document.querySelector('#fillTable').dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#fillForm [name=buyinMinPercent]').value=95;document.querySelector('#fillForm [name=buyinMinPercent]').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#fillForm').requestSubmit()");
+ assert.equal(fillRequests.length,0,'inverted buy-in range is rejected');
+ await ev("document.querySelector('#fillForm [name=buyinMinPercent]').value=30;document.querySelector('#fillForm [name=buyinMinPercent]').dispatchEvent(new Event('input',{bubbles:true}));__refresh()");
+ assert.equal(await ev("document.querySelector('#fillForm [name=buyinMinPercent]').value"),'30','unsaved percentages survive refresh');
+ await ev("document.querySelector('#fillForm').requestSubmit();document.querySelector('#fillForm').requestSubmit()");
+ for(let i=0;i<40&&!fillRequests.length;i++)await sleep(100);await sleep(150);
+ assert.equal(fillRequests.length,1,'double submit sends one fill request');assert.equal(fillRequests[0].tableId,'small');assert.equal(fillRequests[0].buyinMinPercent,'30');
+ assert.ok(await ev("document.querySelector('#fillResult').textContent.includes('Test Small')"));
+ assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth+1'),true,'fill panel fits mobile');
+ shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'cenb-fill-mobile.png'),Buffer.from(shot.data,'base64'));
+ await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await sleep(100);
+ shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'cenb-fill-desktop.png'),Buffer.from(shot.data,'base64'));
+ await ev("document.querySelector('#fillTable').value='all';document.querySelector('#fillForm').requestSubmit()");
+ for(let i=0;i<40&&fillRequests.length<2;i++)await sleep(100);await sleep(150);
+ assert.equal(fillRequests[1].tableId,'all');
+ await ev("document.querySelector('[data-tab=limits]').click()");
  await ev("document.querySelector('#returnPercent').value=0;document.querySelector('#returnPercent').dispatchEvent(new Event('input'));document.querySelector('#returnsForm').requestSubmit()");
  for(let i=0;i<40&&settings.length<2;i++)await sleep(100);await sleep(100);
  assert.equal(await ev("document.querySelector('#returnState').textContent"),'I çaktivizuar');
  delete fixture.guard.returnPercent;await ev('__refresh()');assert.equal(await ev("document.querySelector('#returnControls').disabled"),true,'unsupported server cannot silently accept settings');
- assert.deepEqual(errors,[]);console.log('PASS: bot list summaries, expansion, switching, edit/save/cancel, focus, preserved drafts, return settings and desktop/mobile layouts.');
+ assert.deepEqual(errors,[]);console.log('PASS: bot list, edit/save, names, percentage ranges, single/all-table fill, duplicate-submit protection, preserved drafts, returns and desktop/mobile layouts.');
  await cdp('Browser.close');
 }finally{socket?.close();chrome.kill();server.close();}

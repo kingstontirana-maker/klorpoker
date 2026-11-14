@@ -11,6 +11,7 @@ export {handStrength,rangeEquity,preflopRank,STYLES};
 
 // Bots carry ordinary names; only CENB sees which players are bots.
 const OLD_SUFFIX=' [BOT]';
+const MAX_BOTS=1000;
 
 // Server-only view: public information plus the actual runout outcome flag.
 export function botView(t,s,profileOf=()=>null){
@@ -109,16 +110,17 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  // ---- Where a bot sits ----
  const humansAt=t=>t.seats.filter(isHuman).length,botsAt=t=>t.seats.filter(s=>s&&!isHuman(s)).length,freeAt=t=>t.seats.filter(s=>!s).length;
  const crowd=t=>t.seats.length===2?2:Math.ceil(t.seats.length*.67);
- const perTable=t=>Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
+ const fillPolicy=t=>db.botFill?.tables?.[t.id];
+ const perTable=t=>fillPolicy(t)?Math.max(0,t.seats.length-fillPolicy(t).emptySeats-humansAt(t)):Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
- const canJoin=(t,b)=>stakeOk(t,b)&&(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2)&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ const canJoin=(t,b)=>stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
   options.sort((a,b)=>b.score-a.score);return options[0]?.t||null;
  }
- const shouldLeave=(t,b,s)=>(!humansAt(t)&&!b.bot.waitForPlayers)||t.waitlist?.length||t.waitOffer||(t.seats.length>2&&!freeAt(t))||humansAt(t)>=crowd(t)||botsAt(t)>perTable(t)||!stakeOk(t,b)||s.stack<t.bb||s.rebuyDeadline;
+ const shouldLeave=(t,b,s)=>t.waitlist?.length||t.waitOffer||(fillPolicy(t)?botsAt(t)>perTable(t):(!humansAt(t)&&!b.bot.waitForPlayers)||(t.seats.length>2&&!freeAt(t))||humansAt(t)>=crowd(t)||botsAt(t)>perTable(t))||!stakeOk(t,b)||s.stack<t.bb||s.rebuyDeadline;
 
  // ---- Managing bots ----
  function rakeByBot(){botRake();return rakeMap;}
@@ -145,20 +147,71 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   }
   Object.assign(b.bot,{risk,mode,waitForPlayers:wait===true||wait==='true',stopLoss,stopWin,error:null});
  }
- function create(u,name,amount,body){
-  if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=100)fail('Maximum 100 bots');
+ function create(u,name,amount,body,batch=false){
+  if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');
   if(amount>u.balance)fail('The center does not have enough credit for this budget');
   const b={id:crypto.randomUUID(),username:name,role:'USER',isBot:true,parentId:u.id,balance:amount,createdAt:Date.now(),bot:{enabled:false,funded:amount,baseline:amount,hands:0}};
-  periods();configure(b,body);u.balance-=amount;db.users.push(b);moveStarts(amount);audit('BOT_FUND',b,amount);return b;
+  if(!batch)periods();configure(b,body);u.balance-=amount;db.users.push(b);moveStarts(amount);audit('BOT_FUND',b,amount);return b;
  }
- function freshName(){for(let i=0;i<200;i++){const n=FIRST[Math.floor(random()*FIRST.length)],t=TAIL[Math.floor(random()*TAIL.length)],name=(random()<.5?n[0].toUpperCase()+n.slice(1):n)+t+(t&&random()<.6?'':Math.floor(10+random()*89));if(name.length<=18&&!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))return name;}fail('Could not find a free name');}
+ function freshName(){if(db.botNames?.length){const name=db.botNames.find(n=>!db.users.some(x=>x.username.toLowerCase()===n.toLowerCase()));if(!name)fail('Nuk ka më emra të lirë në listë');return name;}for(let i=0;i<200;i++){const n=FIRST[Math.floor(random()*FIRST.length)],t=TAIL[Math.floor(random()*TAIL.length)],name=(random()<.5?n[0].toUpperCase()+n.slice(1):n)+t+(t&&random()<.6?'':Math.floor(10+random()*89));if(name.length<=18&&!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))return name;}fail('Could not find a free name');}
+ const fillDefaults={emptySeats:1,buyinMinPercent:35,buyinMaxPercent:90,budgetPercent:200,stopLossPercent:100,stopWinPercent:0,risk:'mix',mode:'play'};
+ const fillInfo=()=>({settings:{...fillDefaults,...db.botFill?.settings},names:db.botNames||[],tables:db.botFill?.tables||{}});
+ function fillTables(body,u){
+  const c={...fillDefaults,...db.botFill?.settings,...body};
+  for(const [key,min,max] of [['emptySeats',0,9],['buyinMinPercent',10,100],['buyinMaxPercent',10,100],['budgetPercent',100,1000],['stopLossPercent',1,1000],['stopWinPercent',0,1000]]){
+   c[key]=Number(c[key]);if(!Number.isFinite(c[key])||c[key]<min||c[key]>max||(key==='emptySeats'&&!Number.isInteger(c[key])))fail('Vlerë e pavlefshme: '+key);
+  }
+  if(c.buyinMinPercent>c.buyinMaxPercent)fail('Përqindja minimale nuk mund të jetë mbi maksimalen');
+  if(!['mix',...Object.keys(STYLES)].includes(c.risk)||!['play','seat'].includes(c.mode))fail('Konfigurim i pavlefshëm');
+  const tables=c.tableId==='all'?[...runtime.values()]:[runtime.get(String(c.tableId))];
+  if(!tables.length||tables.some(t=>!t))fail('Zgjidh një tavolinë të vlefshme');
+  const result=periods();for(const [p,limit] of PERIODS)if(g[limit]>0&&result[p]<=-g[limit])fail('Limiti i shtëpisë është arritur');
+  const pool=(db.botNames||[]).map(name=>({name,b:db.users.find(x=>x.username.toLowerCase()===name.toLowerCase())})).filter(x=>!x.b||x.b.isBot&&!x.b.bot.enabled&&!seatOf(x.b));
+  const jobs=[],reports=[];let funding=0,newBots=0;
+  for(const t of tables){
+   const emptySeats=Math.min(c.emptySeats,t.seats.length),needed=Math.max(0,freeAt(t)-emptySeats);
+   const skipped=t.waitlist?.length||t.waitOffer?'Ka lojtarë në pritje':g.maxBB>0&&t.bb>g.maxBB?'Mbi limitin e blind-it':null;
+   const report={id:t.id,name:t.name,emptySeats,added:0,excess:Math.max(0,botsAt(t)-Math.max(0,t.seats.length-emptySeats-humansAt(t))),skipped};reports.push(report);
+   if(skipped)continue;
+   const limits=engine.buyinLimits(t),min=Math.max(limits.min,Math.ceil(limits.max*c.buyinMinPercent/100)),max=Math.min(limits.max,Math.floor(limits.max*c.buyinMaxPercent/100));
+   for(let i=0;i<needed;i++){
+    const person=pool.shift();if(!person)fail('Shto emra në listë: nuk ka mjaft emra të lirë për mbushjen');
+    const buyin=min+Math.floor(random()*(max-min+1)),budget=Math.max(buyin,Math.round(buyin*c.budgetPercent/100));
+    const config={tableId:t.id,buyin:buyin/100,stopLoss:Math.max(1,Math.round(buyin*c.stopLossPercent/100))/100,stopWin:Math.round(buyin*c.stopWinPercent/100)/100,waitForPlayers:true,mode:c.mode,risk:c.risk==='mix'?['low','medium','high'][jobs.length%3]:c.risk};
+    const topup=Math.max(0,budget-(person.b?.balance||0));funding+=topup;if(!person.b)newBots++;
+    jobs.push({t,person,budget,topup,config,report});
+   }
+  }
+  if(bots().length+newBots>MAX_BOTS)fail('Mbushja do të tejkalojë kufirin prej '+MAX_BOTS+' botësh');
+  if(!Number.isSafeInteger(funding)||funding>u.balance)fail('Kredia virtuale e qendrës nuk mjafton për mbushjen');
+  db.botFill??={tables:{}};db.botFill.tables??={};
+  db.botFill.settings=Object.fromEntries(Object.keys(fillDefaults).map(k=>[k,c[k]]));
+  for(const report of reports)if(!report.skipped)db.botFill.tables[report.id]={emptySeats:report.emptySeats};
+  for(const job of jobs){const {t,person,budget,topup,config,report}=job;let b=person.b;
+   if(!b)b=create(u,person.name,budget,config,true);
+   else{if(topup){u.balance-=topup;b.balance+=topup;b.bot.funded+=topup;moveStarts(topup);audit('BOT_FUND',b,topup);}configure(b,config);}
+   b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.error=null;
+   engine.sit(t,b,t.seats.findIndex(s=>!s),config.buyin,[...runtime.values()]);
+   if(c.mode==='seat')engine.sitOut(t,b,true);
+   audit('BOT_MANAGE',b,0,{enabled:true,fill:true});report.added++;
+  }
+  // Excess bots leave between hands through the normal seating policy.
+  save();return {ok:true,added:jobs.length,funded:funding/100,tables:reports};
+ }
  const stop=(b,reason,at)=>{b.bot.enabled=false;b.bot.error=reason||null;if(at)try{engine.leave(at.t,b);}catch{}save();};
  function route(p,body,u){if(!p.startsWith('/api/bots'))return undefined;if(u?.role!=='CENTER')fail('Only the center can manage bots',403);
   if(p==='/api/bots')return list();
   if(p==='/api/bots/guard')return guardInfo();
   if(p==='/api/bots/overview'){const tables=[...runtime.values()].filter(t=>t.seats.some(Boolean)).map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,humans:humansAt(t),bots:botsAt(t),waiting:t.waitlist?.length||0,live:LIVE.includes(t.phase)})).sort((a,b)=>b.humans-a.humans);
-   return {bots:list(),guard:guardInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
-    catalog:[...runtime.values()].map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,min:engine.buyinLimits(t).min/100,max:engine.buyinLimits(t).max/100}))};}
+   return {bots:list(),guard:guardInfo(),fill:fillInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
+    catalog:[...runtime.values()].map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,free:freeAt(t),bots:botsAt(t),humans:humansAt(t),min:engine.buyinLimits(t).min/100,max:engine.buyinLimits(t).max/100}))};}
+  if(p==='/api/bots/names'){
+   const names=(Array.isArray(body.names)?body.names:String(body.names??'').split(/[\s,;]+/)).map(n=>String(n).trim()).filter(Boolean);
+   if(names.length>1000||names.some(n=>!/^[a-zA-Z0-9_]{3,18}$/.test(n)))fail('Emrat: 3–18 shkronja, numra ose _, deri në 1000 emra');
+   if(new Set(names.map(n=>n.toLowerCase())).size!==names.length)fail('Lista ka emra të përsëritur');
+   db.botNames=names;save();return {ok:true,names};
+  }
+  if(p==='/api/bots/fill')return fillTables(body,u);
   if(p==='/api/bots/settings'){
    if(body.returnPercent!==undefined){const n=Number(body.returnPercent);if(!Number.isFinite(n)||n<0||n>100)fail('Return percentage must be 0–100');}
    const next={};for(const [k,label] of [['dailyLimit','The daily limit'],['weeklyLimit','The weekly limit'],['monthlyLimit','The monthly limit'],['maxBB','The highest big blind']])if(body[k]!==undefined&&body[k]!==''){const n=Math.round(Number(body[k])*100);if(!Number.isSafeInteger(n)||n<0)fail(label+' must be 0 or more');next[k]=n;}
@@ -167,7 +220,8 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
    Object.assign(g,next);save();return guardInfo();}
   if(p==='/api/bots/create'){const b=create(u,String(body.name||'').trim(),cents(body.budget,'Budget'),body);save();return {ok:true,id:b.id};}
   if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');if(each*n>u.balance)fail('The center does not have enough credit for this budget');
-   if(bots().length+n>100)fail('Maximum 100 bots');const made=[];for(let i=0;i<n;i++)made.push(create(u,freshName(),each,{...body,risk:body.risk==='mix'?['low','medium','high'][i%3]:body.risk}).id);save();return {ok:true,ids:made};}
+   if(db.botNames?.length&&db.botNames.filter(name=>!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase())).length<n)fail('Nuk ka mjaft emra të lirë në listë');
+   if(bots().length+n>MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');const made=[];for(let i=0;i<n;i++)made.push(create(u,freshName(),each,{...body,risk:body.risk==='mix'?['low','medium','high'][i%3]:body.risk}).id);save();return {ok:true,ids:made};}
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);

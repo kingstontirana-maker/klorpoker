@@ -121,6 +121,7 @@ function renderOthers(){
  $('#logList').innerHTML=table(['Kur','Veprimi','Detaje','Adresa'],data.log.map(l=>'<tr><td>'+new Date(l.at).toLocaleString('en-GB')+'</td><td>'+safe(l.action)+'</td><td>'+safe(l.detail)+'</td><td class="muted">'+safe(l.ip)+'</td></tr>'),'Asnjë veprim ende.');
  $('#passForm').classList.toggle('hidden',!!data.signIn?.fromServer);
  renderReturns();
+ renderFill();
  const f=$('#limitsForm');if(!f.contains(document.activeElement))for(const k of ['dailyLimit','weeklyLimit','monthlyLimit','maxBB','maxPerTable'])f[k].value=data.guard[k];
 }
 $('#limitsForm').onsubmit=async e=>{e.preventDefault();try{await api('bots/settings',Object.fromEntries(new FormData(e.target)));toast('Limitet u ruajtën');await refresh();}catch(err){toast(err.message,true);}};
@@ -142,6 +143,42 @@ function renderReturns(){
 returnsForm.onsubmit=async e=>{e.preventDefault();if(!returnsForm.reportValidity())return;const button=$('#saveReturns');button.disabled=true;
  try{const result=await api('bots/settings',{returnPercent:Number(percentInput.value)});if(!Object.hasOwn(result,'returnPercent'))throw Error('Serveri nuk e konfirmoi përqindjen. Përditëso serverin e pokerit.');delete returnsForm.dataset.dirty;data.guard={...data.guard,...result};renderReturns();toast('Përqindja e kthimit u ruajt');await refresh();}
  catch(err){toast(err.message,true);}finally{button.disabled=false;}
+};
+
+const fillForm=$('#fillForm'),namesForm=$('#botNamesForm'),namesInput=$('#botNames');
+function fillEstimate(){
+ const f=fillForm.elements,empty=Number(f.emptySeats.value),lo=Number(f.buyinMinPercent.value),hi=Number(f.buyinMaxPercent.value),budget=Number(f.budgetPercent.value)/100;
+ const tables=(data?.catalog||[]).filter(t=>f.tableId.value==='all'||t.id===f.tableId.value);
+ let count=0,min=0,max=0;
+ for(const t of tables){const n=Math.max(0,(t.free??t.size)-Math.min(empty,t.size));count+=n;min+=n*Math.max(t.min,t.max*lo/100)*budget;max+=n*t.max*hi/100*budget;}
+ $('#fillEstimate').textContent=count+' vende për t’u mbushur në '+tables.length+' tavolina. Buxheti i botëve: rreth '+eur(min)+' – '+eur(max)+' kredi virtuale. Botët ekzistues të ripërdorur mund të kërkojnë më pak financim.';
+ const names=namesInput.value.split(/[\s,;]+/).filter(Boolean);$('#botNamesCount').textContent=names.length+' emra në listë · '+(data?.fill?.names?.length||0)+' të ruajtur';
+}
+function renderFill(){
+ if(!data)return;
+ const supported=!!data.fill;$('#fillControls').disabled=!supported||fillForm.dataset.busy==='1';$('#saveBotNames').disabled=!supported||namesForm.dataset.busy==='1';
+ const select=$('#fillTable'),signature=JSON.stringify((data.catalog||[]).map(t=>[t.id,t.name]));
+ if(select.dataset.catalog!==signature){const current=select.value;select.innerHTML='<option value="all">Të gjitha tavolinat</option>'+(data.catalog||[]).map(t=>'<option value="'+safe(t.id)+'">'+safe(t.name)+' · '+t.size+' vende</option>').join('');select.value=[...select.options].some(o=>o.value===current)?current:'all';select.dataset.catalog=signature;}
+ if(!fillForm.dataset.dirty)for(const [k,v] of Object.entries(data.fill?.settings||{}))if(fillForm.elements.namedItem(k))fillForm.elements.namedItem(k).value=v;
+ if(!namesForm.dataset.dirty)namesInput.value=(data.fill?.names||[]).join('\n');
+ $('#botNamesSaved').textContent=supported?(data.fill.names?.length||0)+' emra të ruajtur në server.':'Përditëso dhe rinis serverin që të aktivizohen këto opsione.';
+ fillEstimate();
+}
+fillForm.addEventListener('input',()=>{fillForm.dataset.dirty='1';fillEstimate();});
+fillForm.addEventListener('change',()=>{fillForm.dataset.dirty='1';fillEstimate();});
+namesInput.addEventListener('input',()=>{namesForm.dataset.dirty='1';fillEstimate();});
+namesForm.onsubmit=async e=>{e.preventDefault();if(namesForm.dataset.busy)return;namesForm.dataset.busy='1';$('#saveBotNames').disabled=true;
+ try{const r=await api('bots/names',{names:namesInput.value});if(!Array.isArray(r.names))throw Error('Serveri nuk e konfirmoi listën');data.fill.names=r.names;delete namesForm.dataset.dirty;toast('Lista e emrave u ruajt');await refresh();}
+ catch(err){toast(err.message,true);}finally{delete namesForm.dataset.busy;renderFill();}
+};
+fillForm.onsubmit=async e=>{e.preventDefault();if(fillForm.dataset.busy||!fillForm.reportValidity())return;
+ if(namesForm.dataset.dirty)return toast('Ruaj fillimisht listën e emrave',true);
+ const body=Object.fromEntries(new FormData(fillForm));if(Number(body.buyinMinPercent)>Number(body.buyinMaxPercent))return toast('Minimumi i buy-in nuk mund të jetë mbi maksimumin',true);
+ fillForm.dataset.busy='1';$('#fillControls').disabled=true;$('#fillResult').textContent='Po mbushen tavolinat…';
+ try{const r=await api('bots/fill',body);if(!Array.isArray(r.tables)||!Number.isInteger(r.added))throw Error('Serveri nuk e konfirmoi mbushjen');
+  $('#fillResult').textContent=r.added+' bota u ulën · financim '+eur(r.funded)+' kredi virtuale.\n'+r.tables.map(t=>t.name+': '+(t.skipped?'u anashkalua · '+t.skipped:t.added+' bota u shtuan · '+t.emptySeats+' vende bosh të synuara'+(t.excess?' · '+t.excess+' bota të tepërt largohen ndërmjet duarve':''))).join('\n');
+  delete fillForm.dataset.dirty;toast('Mbushja përfundoi');await refresh();
+ }catch(err){$('#fillResult').textContent=err.message;toast(err.message,true);}finally{delete fillForm.dataset.busy;renderFill();}
 };
 
 async function refresh(first=false){

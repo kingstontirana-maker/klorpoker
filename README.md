@@ -25,6 +25,20 @@ can still cost credits. Existing wallet and house loss limits remain active.
 
 ## Launch
 
+CENB → **Mbush tavolinat** configures virtual-credit experiments with one-click
+seating for one table or the whole catalog. Save up to 1000 unique bot names,
+choose 0–9 empty seats per table, then select a buy-in interval as a percentage
+of each table's maximum. Funding, loss and win limits are percentages of each
+bot's sampled buy-in. Stopped, unseated named bots are reused before creating
+their replacement; only any missing wallet funding is transferred from Center.
+All required names and credit are checked before seating starts. Repeat fills
+only add missing seats. Queues, house loss limits and the stake ceiling still
+apply; per-table fill targets replace the usual bots-per-table cap. Excess bots
+leave between hands when the empty-seat target is raised. The catalog includes
+164 tables and 851 seats, so the account limit is now 1000 bots. Names, percentage
+settings and table targets persist in SQLite. Existing seated bots keep their
+buy-in and playing configuration; the fill form configures bots it seats.
+
 Center/CENB can set `returnPercent` (0–100, default 0) through
 `/api/bots/settings` or the existing CENB `bots/settings` proxy. This permits
 occasional losing calls against humans, funded only by earned net profit, never

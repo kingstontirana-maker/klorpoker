@@ -21,15 +21,36 @@
   <div id="banner" class="banner hidden"></div>
   <section class="kpis" id="kpis"></section>
   <nav class="tabs" id="tabs">
-   <button data-tab="bots" class="on">Botat <em id="nBots">0</em></button><button data-tab="new">Krijo</button><button data-tab="tables">Tavolinat <em id="nTables">0</em></button><button data-tab="players">Lojtarët</button><button data-tab="moves">Vendimet</button><button data-tab="limits">Limitet</button><button data-tab="log">Aktiviteti</button>
+   <button data-tab="bots" class="on">Botat <em id="nBots">0</em></button><button data-tab="fill">Mbush tavolinat</button><button data-tab="new">Krijo</button><button data-tab="tables">Tavolinat <em id="nTables">0</em></button><button data-tab="players">Lojtarët</button><button data-tab="moves">Vendimet</button><button data-tab="limits">Limitet</button><button data-tab="log">Aktiviteti</button>
   </nav>
   <section data-pane="bots"><p class="botListHelp">Kliko një bot për statistikat, veprimet dhe konfigurimin.</p><div class="bots" id="botList" role="list" aria-label="Lista e botëve"></div></section>
+  <section data-pane="fill" class="hidden"><div class="split">
+   <form class="card" id="fillForm"><h2>Mbush tavolinat me një klikim</h2><p>Eksperiment me kredi virtuale. Botat ulen direkt me emrat e listës dhe konfigurim sipas tavolinës. Vendimet gjatë lojës mbeten sipas konfigurimit ekzistues.</p>
+    <fieldset id="fillControls"><div class="grid">
+     <label>Tavolina<select name="tableId" id="fillTable"><option value="all">Të gjitha tavolinat</option></select></label>
+     <label>Vende që lihen bosh për tavolinë<input name="emptySeats" type="number" min="0" max="9" step="1" value="1" required></label>
+     <label>Buy-in minimal (% e maksimumit)<input name="buyinMinPercent" type="number" min="10" max="100" step="1" value="35" required></label>
+     <label>Buy-in maksimal (% e maksimumit)<input name="buyinMaxPercent" type="number" min="10" max="100" step="1" value="90" required></label>
+     <label>Buxheti (% e buy-in)<input name="budgetPercent" type="number" min="100" max="1000" step="1" value="200" required></label>
+     <label>Limit humbjeje (% e buy-in)<input name="stopLossPercent" type="number" min="1" max="1000" step="1" value="100" required></label>
+     <label>Limit fitimi (% e buy-in) · 0 pa limit<input name="stopWinPercent" type="number" min="0" max="1000" step="1" value="0" required></label>
+     <label>Stili<select name="risk"><option value="mix">Të përziera</option><option value="low">Tight</option><option value="medium">Balanced</option><option value="high">Aggressive</option></select></label>
+     <label>Mënyra<select name="mode"><option value="play">Luan duar</option><option value="seat">Vetëm zë vend</option></select></label>
+    </div><p class="fillHelp">Çdo bot merr një buy-in brenda intervalit të zgjedhur. Në tavolinë me maksimum 100 kredi, 35–90% do të thotë 35–90 kredi. Mbushja përdor vendet bosh që zgjedh këtu, në vend të kufirit të zakonshëm të botëve për tavolinë. Kur X tejkalon madhësinë e tavolinës, ajo lihet bosh. Tavolinat me listë pritjeje ose mbi limitin e blind-it anashkalohen.</p>
+    <p class="returnExample" id="fillEstimate"></p><button class="gold" id="fillSubmit">Mbush dhe nis botat</button></fieldset>
+    <p id="fillResult" role="status" aria-live="polite"></p>
+   </form>
+   <form class="card" id="botNamesForm"><h2>Lista jote e emrave</h2><p>Një emër për rresht. Pranohen 3–18 shkronja, numra ose _. Emrat e llogarive të tjera anashkalohen. Botat e ndalur të kësaj liste ripërdoren kur janë jashtë tavolinave.</p>
+    <label for="botNames">Emrat<textarea id="botNames" name="names" rows="12" spellcheck="false" placeholder="TestBot_01&#10;TestBot_02&#10;TestBot_03"></textarea></label>
+    <p id="botNamesCount" class="fillHelp"></p><button class="gold" id="saveBotNames">Ruaj listën</button><p id="botNamesSaved" role="status" aria-live="polite"></p>
+   </form>
+  </div></section>
   <section data-pane="new" class="hidden"><div class="split">
    <form class="card" id="createOne"><h2>Një bot</h2><p>Paratë dalin nga kredia e qendrës. Boti krijohet i ndalur.</p><div class="grid">
     <label>Emri<input name="name" pattern="[a-zA-Z0-9_]{3,18}" placeholder="p.sh. marco_88" required></label>
     <label>Buxheti (€)<input name="budget" type="number" min="0.01" step="0.01" required></label>
     <div data-config style="display:contents"></div></div><p></p><button class="gold">Krijo botin</button></form>
-   <form class="card" id="createMany"><h2>Disa bota njëherësh</h2><p>Emra të zakonshëm, të gjeneruar vetë. Stili "Të përziera" i ndan në Tight, Balanced dhe Aggressive.</p><div class="grid">
+   <form class="card" id="createMany"><h2>Disa bota njëherësh</h2><p>Përdoret lista jote e emrave kur është ruajtur te "Mbush tavolinat"; përndryshe emrat gjenerohen vetë. Stili "Të përziera" i ndan në Tight, Balanced dhe Aggressive.</p><div class="grid">
     <label>Sa bota (1–20)<input name="count" type="number" min="1" max="20" value="6" required></label>
     <label>Buxheti për secilin (€)<input name="budget" type="number" min="0.01" step="0.01" required></label>
     <div data-config data-mix style="display:contents"></div></div><p></p><button class="gold">Krijo botat</button></form>

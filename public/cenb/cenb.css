@@ -3,7 +3,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif}
 body{min-height:100vh;background:radial-gradient(1200px 600px at 80% -10%,#14302455,transparent 60%),radial-gradient(900px 500px at -10% 10%,#2b220e44,transparent 60%),var(--bg)}
-button,input,select{font:inherit;color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:1px solid var(--line2);background:var(--panel2);border-radius:10px;padding:8px 14px;font-weight:600;transition:background .15s,border-color .15s,color .15s}
 button:hover{border-color:var(--gold2)}
 button:disabled{opacity:.5;cursor:default}
@@ -13,7 +13,11 @@ button.danger{background:#3a1416;border-color:#ff6b6b66;color:#ffd6d6}
 button.danger:hover{background:#4d191c;border-color:var(--red)}
 button.ghost{background:transparent}
 button.small{padding:5px 10px;font-size:12px;border-radius:8px}
-input,select{background:#07100d;border:1px solid var(--line2);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+input,select,textarea{background:#07100d;border:1px solid var(--line2);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+textarea{resize:vertical}
+#fillControls{border:0;padding:0;margin:0;min-width:0}
+.fillHelp{color:var(--muted);font-size:12px}
+#fillResult{white-space:pre-line;margin-top:12px}
 input:focus,select:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 0 3px #e9c97a22}
 label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em}
 .hidden{display:none!important}

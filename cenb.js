@@ -50,7 +50,7 @@ export function createCenb({db,bots,save,fail,env=process.env,checkCenter=()=>fa
   if(checkCenter(String(body.centerUsername||''),password))fail('Choose a password different from the center password');
   fails.delete(ip);store(user,password);const token=openSession(ip);log(ip,'Created the CENB sign-in',user);save();return {token,user};
  }
- const LOGGED=new Set(['create','bulk','configure','status','delete','settings','stopall','startall','topup']);
+ const LOGGED=new Set(['create','bulk','configure','status','delete','settings','stopall','startall','topup','names','fill']);
  // p is the path after /api/cenb/
  function route(p,body,token,ip){
   if(p==='login')return login(body,ip);
@@ -66,7 +66,7 @@ export function createCenb({db,bots,save,fail,env=process.env,checkCenter=()=>fa
   const name=p.replace(/^bots\//,'');if(!/^[a-z]+$/.test(name))fail('Not found',404);
   const bot=db.users.find(u=>u.isBot&&u.id===body.id);
   const value=bots.route('/api/bots/'+name,body,c);if(value===undefined)fail('Not found',404);
-  if(LOGGED.has(name)){log(ip,{create:'Created a bot',bulk:'Created bots',configure:'Changed a bot',status:body.enabled?'Started a bot':'Stopped a bot',delete:'Deleted a bot',settings:'Changed the house limits',stopall:'Stopped every bot',startall:'Started every bot',topup:'Added money to a bot'}[name],bot?.username||body.name||(name==='bulk'?body.count+' × €'+body.budget:''));save();}
+  if(LOGGED.has(name)){log(ip,{create:'Created a bot',bulk:'Created bots',configure:'Changed a bot',status:body.enabled?'Started a bot':'Stopped a bot',delete:'Deleted a bot',settings:'Changed the house limits',stopall:'Stopped every bot',startall:'Started every bot',topup:'Added money to a bot',names:'Saved bot names',fill:'Filled virtual-credit tables'}[name],bot?.username||body.name||(name==='bulk'?body.count+' × €'+body.budget:name==='fill'?body.tableId+' · '+value.added+' bots':name==='names'?value.names.length+' names':''));save();}
   return value;
  }
  setInterval(()=>{const now=Date.now();for(const [k,s] of sessions)if(now-s.seen>IDLE_MS||now-s.created>MAX_MS)sessions.delete(k);},600_000).unref();
