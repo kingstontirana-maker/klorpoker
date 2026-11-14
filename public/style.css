@@ -176,7 +176,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .lobbyCheck{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
 #lobbyTables{display:block;grid-template-columns:none}
 .lobbyList{border:1px solid #263735;border-radius:14px;overflow:hidden;background:#0c1514}
-.llHead,.llRow{display:grid;grid-template-columns:62px minmax(170px,2.2fr) minmax(112px,1fr) minmax(150px,1.3fr) minmax(130px,1.1fr) minmax(104px,.9fr) 136px;align-items:center;column-gap:14px;padding:0 18px}
+.llHead,.llRow{display:grid;grid-template-columns:62px minmax(170px,2.2fr) minmax(112px,1fr) minmax(150px,1.3fr) minmax(130px,1.1fr) 136px;align-items:center;column-gap:14px;padding:0 18px}
 .llHead{background:#101c19;border-bottom:1px solid #263735;min-height:44px}
 .llSort{all:unset;cursor:pointer;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:13px 0;white-space:nowrap}
 .llSort:hover,.llSort.on{color:#e8f3ee}.llSort:focus-visible{outline:2px solid var(--mint);outline-offset:2px;border-radius:4px}
@@ -209,7 +209,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  .lobbyTools{gap:8px 14px}#lobbySearch{max-width:none}
 }
 /* Lobby list: keep the live status visible down to 900 px; ID first on phones. */
-@media(max-width:1100px){.llHead,.llRow{grid-template-columns:48px minmax(140px,1.8fr) minmax(96px,.9fr) minmax(128px,1.1fr) minmax(112px,1fr) minmax(92px,.8fr) 104px;column-gap:12px;padding:0 14px}.llStatus{display:flex}.llHead .llSort[data-sort="status"]{display:block}}
+@media(max-width:1100px){.llHead,.llRow{grid-template-columns:48px minmax(140px,1.8fr) minmax(96px,.9fr) minmax(128px,1.1fr) minmax(112px,1fr) 104px;column-gap:12px;padding:0 14px}.llStatus{display:flex}.llHead .llSort[data-sort="status"]{display:block}}
 @media(max-width:900px){.llHead,.llRow{grid-template-columns:44px minmax(130px,1.8fr) minmax(92px,.9fr) minmax(124px,1.1fr) minmax(108px,1fr) 100px}.llStatus{display:none}.llHead .llSort[data-sort="status"]{display:none}}
 @media(max-width:760px){.llId{order:0;flex:none;font-size:12px}.llStatus{display:flex}}
 
@@ -403,7 +403,7 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 .lobbySelect{min-height:38px;padding:0 10px;border-radius:10px;border:1px solid var(--line,#2c4133);background:#0c1713;color:inherit;font:inherit;font-size:13px}
 .gameTag.sizeTag{background:#ffffff12;color:#cfe3d9;border-color:#ffffff26}
 .llName .gameTag{flex:none}
-@media(min-width:1101px){.llHead,.llRow{grid-template-columns:62px minmax(290px,2.8fr) minmax(104px,1fr) minmax(130px,1.2fr) minmax(120px,1fr) minmax(90px,.8fr) 120px}}
+@media(min-width:1101px){.llHead,.llRow{grid-template-columns:62px minmax(290px,2.8fr) minmax(104px,1fr) minmax(130px,1.2fr) minmax(120px,1fr) 120px}}
 @media(max-width:1100px){.llName{flex-wrap:wrap;row-gap:4px}}
 .llRow.seated .llName{flex-wrap:wrap;row-gap:4px}.llRow.seated .llName b:first-of-type{flex:none}
 .cashoutCard{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:900;width:min(420px,calc(100vw - 24px));padding:14px 16px;border-radius:14px;border:1px solid #d9bb83;background:#0c1514;color:#e8f3ee;box-shadow:0 18px 50px #000b}
@@ -431,3 +431,7 @@ body.fitPhone .myTablesBar{top:4px;max-width:44vw;padding:2px}body.fitPhone .mtC
 
 /* A quick double tap never zooms the page (pinch zoom outside the table stays possible). */
 html{touch-action:manipulation}
+/* Phones: the three game tabs share one row (each takes a third, text may shrink). */
+@media(max-width:760px){.lobbyTabs{flex-wrap:nowrap}.lobbyTabs button{min-width:0;padding:10px 4px;gap:4px}.lobbyTabs button b{min-width:0;padding:2px 5px}}
+@media(max-width:760px){.lobbyTabs button{font-size:11.5px;letter-spacing:-.01em;overflow:hidden}.lobbyTabs button b{font-size:10px;padding:1px 4px}}
+@media(max-width:760px){.lobbyTabs button{flex:1 1 auto}}

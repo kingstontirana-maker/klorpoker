@@ -569,7 +569,7 @@ function renderLobbyList(){if(!profile||!$('#lobbyTables')||$('#lobby').hidden)r
  const val={busy:t=>busyRank.has(t.id)?busyRank.get(t.id):1e6+(Number(t.id)||0),id:t=>Number(t.id)||0,name:t=>t.name.toLowerCase(),blinds:t=>t.bb,buyin:t=>t.minBuyin,players:t=>t.players,status:t=>LOBBY_LIVE.includes(t.phase)?1:0};
  list.sort((a,b)=>{const x=val[lobbySort.key](a),y=val[lobbySort.key](b);return ((x>y)-(x<y))*lobbySort.dir||(Number(a.id)-Number(b.id));});
  const mineAt=id=>(profile.myTables||[]).some(x=>x.id===id),canPlay=t=>!(profile.user.balance<=0&&!mineAt(t.id));
- const head=[['id','ID'],['name','Table'],['blinds','Blinds'],['buyin','Buy-in'],['players','Players'],['status','Status']];
+ const head=[['id','ID'],['name','Table'],['blinds','Blinds'],['buyin','Buy-in'],['players','Players']];
  const arrow=k=>lobbySort.key===k?(lobbySort.dir>0?' ▲':' ▼'):'';
  patchMarkup($('#lobbyTables'),'<div class="lobbyList" role="table" aria-label="Tables"><div class="llHead" role="row">'+head.map(([k,l])=>'<button type="button" role="columnheader" class="llSort'+(lobbySort.key===k?' on':'')+'" data-sort="'+k+'" aria-sort="'+(lobbySort.key===k?(lobbySort.dir>0?'ascending':'descending'):'none')+'">'+l+arrow(k)+'</button>').join('')+'<span role="columnheader" class="llHeadAct"></span></div>'
   +(list.length?list.map(t=>{const seated=mineAt(t.id),wl=(profile.waitlists||[]).find(w=>w.tableId===t.id),ok=canPlay(t),playing=LOBBY_LIVE.includes(t.phase);
@@ -580,7 +580,7 @@ function renderLobbyList(){if(!profile||!$('#lobbyTables')||$('#lobby').hidden)r
     +'<span class="llBlinds" role="cell"><small>Blinds</small>'+fmt(t.sb)+' / '+fmt(t.bb)+'</span>'
     +'<span class="llBuyin" role="cell"><small>Buy-in</small>'+fmt(t.minBuyin)+' – '+fmt(t.maxBuyin)+'</span>'
     +'<span class="llPlayers" role="cell"><small>Players</small><span class="llSeats" aria-hidden="true">'+seats+'</span>'+t.players+'/'+t.size+(t.bots?'<i class="botTag" title="'+t.bots+' bot'+(t.bots>1?'s':'')+' at this table">'+t.bots+' BOT</i>':'')+'</span>'
-    +'<span class="llStatus'+(playing?' live':'')+'" role="cell"><span class="statusDot"></span>'+phaseLabel(t.phase)+'</span>'
+    
     +'<span class="llAct" role="cell">'+(!seated&&t.players>=t.size&&ok?(wl?'<button class="ghostButton llWait on" data-wait="leave" data-wait-table="'+safe(t.id)+'" title="Leave the waiting list">#'+wl.position+' in line ✕</button>':'<button class="ghostButton llWait" data-wait="join" data-wait-table="'+safe(t.id)+'">Wait for a seat'+(t.waiting?' · '+t.waiting:'')+'</button>'):'')+'<button class="primary" '+(ok?'data-table="'+safe(t.id)+'"':'disabled title="Your credit is zero"')+'>'+(seated?'Go to table':t.players>=t.size?'Watch':'Open')+' <span>↗</span></button></span></div>';}).join('')
    :'<p class="llEmpty">'+(profile.tables.some(t=>(t.game||'holdem')===game)?'No table matches your search.':'No '+(game==='omaha'?'Omaha':'Texas Hold’em')+' tables yet.')+'</p>')+'</div>');}
 $('#lobbyTables').addEventListener('click',e=>{const s=e.target.closest('[data-sort]');if(!s)return;e.stopPropagation();const k=s.dataset.sort;lobbySort=lobbySort.key===k?{key:k,dir:-lobbySort.dir}:{key:k,dir:k==='players'||k==='status'?-1:1};renderLobbyList();},true);
