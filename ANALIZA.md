@@ -737,3 +737,12 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Tavolina:** chati lexonte madhësinë e dritares në çdo përditësim. Tani e lexon vetëm kur vjen mesazh i ri, dhe koha e tij ra nga 1.2 s në 0.12 s. Lista e lobby-t nuk rifreskohet më kur je në tavolinë.
 - **Prekje:** "Hide full / Hide empty" kanë kuti 20 px dhe rresht 40 px të lartë. Lidhjet dhe kutia 18+ në login kanë zonë prekjeje 40 px.
 - **Skanimi:** u kontrolluan home, login, regjistrimi, lobby, tavolina, paneli i agjentit dhe i qendrës, në telefon, tablet dhe kompjuter. Nuk ka asnjë gabim JS, asnjë kërkesë të dështuar dhe asnjë faqe që lëviz anash. Paralajmërimi i zërit vjen vetëm sepse testi nuk e prek ekranin, dhe zëri ndizet me prekjen e parë siç duhet.
+
+## Katalogu v4: më pak tavolina me 9 vende, më shumë me 6 vende
+- **Mbyllen 14 tavolina me 9 vende:** Porto II–III, Rotterdam II–III, Brussels III–V, Vienna III–V, Geneva II–III, Zurich II, London II. Mbeten 11, të paktën një për çdo nivel.
+- **Hapen 14 tavolina me 6 vende:**
+  - Valencia I–VII me €0.15/€0.25 (buy-in €2.50–€25);
+  - Sevilla I–VII me €0.25/€0.50 (buy-in €5–€50).
+- **Totali:** mbetet 164.
+- **Si zbatohet:** ndryshimi bëhet një herë, kur niset serveri. Një databazë në versionin 2 kalon edhe hapin v3 edhe hapin v4. Tavolinat që ka krijuar qendra nuk preken.
+- **Kontroll:** 300 duar me €0.15/€0.25 ruajnë çdo cent.
