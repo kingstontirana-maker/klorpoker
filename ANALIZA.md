@@ -870,3 +870,28 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - Fair play: mburojë; Database: cilindër; Activity log: listë; Settings: rrëshqitës; My account: profil.
 - Edhe kartat e Overview-t dhe të raporteve përdorin të njëjtat ikona (portofol, ∞, njerëz, transferim, %, letra, orë).
 - Vlen për qendrën, adminin, menaxherin dhe agjentin, në kompjuter dhe në menunë poshtë te telefoni. Paneli i lojtarit nuk ndryshoi.
+
+## Kontroll sigurie: çfarë mund të tentojë një lojtar
+- **Letrat e të tjerëve:**
+  - serveri i dërgon lojtarit vetëm letrat e veta, dhe ato që janë treguar në tavolinë (showdown ose all-in);
+  - historiku i duarve i fsheh letrat e të tjerëve;
+  - deku nuk del kurrë nga serveri dhe përzihet me `crypto.randomInt`;
+  - "Live inspection" dhe historiku i plotë janë vetëm për qendrën.
+- **Shtim krediti:**
+  - lojtari nuk ka asnjë rrugë transferimi;
+  - ulja dhe rebuy kontrollojnë shumën në cent, pa vlera negative, jo mbi portofolin dhe brenda kufijve të tavolinës;
+  - raise kontrollohet nga serveri (minimumi, maksimumi, pot limit);
+  - veprimet e panjohura refuzohen;
+  - serveri i trajton kërkesat një nga një, kështu që dy kërkesa njëkohësisht nuk e dyfishojnë kredinë.
+- **Tërheqje:**
+  - tërheqja crypto kërkon minimumin dhe nuk kalon portofolin, dhe pret qendrën që ta paguajë me dorë;
+  - depozitat lidhen me një shumë unike për lojtarin, verifikohen në blockchain dhe nuk kreditohen dy herë;
+  - cash-out-i i agjentit kërkon konfirmimin e lojtarit.
+- **Defekt i rregulluar:** bllokimi i hyrjes pas tentativave të gabuara mbahej sipas IP + emër, dhe IP-ja merret nga një header që mund ta falsifikojë kushdo. Kështu mund të provoheshin fjalëkalime pa u bllokuar. Tani ka edhe një kufi për llogari, që nuk varet nga IP-ja: 20 tentativa të gabuara në 15 minuta e pushojnë hyrjen e asaj llogarie për 15 minuta.
+
+## "Një llogari tjetër nga kjo pajisje": bllokim i gabuar
+- **Shkaku:** kontrolli "një pajisje, një llogari në tavolinë" krahasonte edhe 5 pajisjet e fundit ku kishte hyrë ndonjëherë secila llogari. Kështu bllokoheshin gabimisht:
+  - lojtarët që agjenti ua kishte hapur ose kontrolluar llogaritë nga telefoni i vet;
+  - lojtarët që kishin hyrë një herë nga telefoni i dikujt tjetër.
+- **Rregulli i ri:** bllokohet vetëm kur nga kjo pajisje është ulur në këtë tavolinë, në këtë moment, një llogari tjetër. Mesazhi tani thotë që duhet të ngrihesh fillimisht me atë llogari.
+- **Fair play:** historiku i pajisjeve mbetet te raporti i qendrës, ku llogaritë që ndajnë pajisje shënohen për kontroll.

@@ -16,8 +16,8 @@ test('one device, one account at a table',()=>{
  assert.equal(seatedFromSameDevice(t,users.b,'device-aaaa',find),true,'the device of a seat');
  assert.equal(seatedFromSameDevice(t,users.b,'device-cccc',find),false,'another device');
  assert.equal(seatedFromSameDevice(t,users.a,'device-aaaa',find),false,'the same account is not a second account');
- assert.equal(seatedFromSameDevice(t,users.c,'device-new1',find),true,'a new browser, but this account was seen on the device of the seat');
- assert.equal(seatedFromSameDevice({seats:[{userId:'c'}]},users.b,'device-aaaa',find),true,'a seated account was seen on this device');
+ assert.equal(seatedFromSameDevice(t,users.c,'device-new1',find),false,'an earlier sign-in on that device does not block: only the device in use now counts');
+ assert.equal(seatedFromSameDevice({seats:[{userId:'c'}]},users.b,'device-aaaa',find),false,'a seated account once seen on this device does not block');
  assert.equal(seatedFromSameDevice(t,users.b,'device-bbbb',find),false,'bots are left out');
  assert.equal(seatedFromSameDevice(t,users.b,undefined,find),false,'no device sent, nothing to compare');
  assert.equal(seatedFromSameDevice(t,users.b,'no',find),false,'junk is ignored');

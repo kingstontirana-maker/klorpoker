@@ -8,12 +8,14 @@ export function descendants(users,id){const out=[],seen=new Set([id]);for(let ad
 // The last few addresses and devices an account signed in from.
 export function recordSeen(user,ip,device,keep=5){const add=(key,value)=>{if(!value)return;const list=(user[key]||[]).filter(x=>x!==value);list.unshift(value);user[key]=list.slice(0,keep);};add('seenIps',ip);if(typeof device==='string'&&/^[\w-]{8,64}$/.test(device))add('seenDevices',device);}
 
-// Two accounts from one device do not sit at one table. It compares the device of this
-// request and of each seat, and the devices each account was seen on before.
-export function seatedFromSameDevice(t,user,device,findUser){
- const mine=/^[\w-]{8,64}$/.test(device||'')?device:'';
- return t.seats.some(s=>{if(!s||s.userId===user.id||s.isBot)return false;const other=findUser(s.userId);
-  return (!!mine&&(s.device===mine||(other?.seenDevices||[]).includes(mine)))||(!!s.device&&(user.seenDevices||[]).includes(s.device));});
+// Two accounts from one device do not sit at one table: only the device each seat was taken
+// from right now counts. Older sign-ins are not compared: an agent who opened his players'
+// accounts on his own phone, or a player who once used a friend's phone, would otherwise be
+// kept apart from those accounts for good. (The devices accounts were seen on are still
+// listed for the centre in Fair play, where shared devices are flagged.)
+export function seatedFromSameDevice(t,user,device){
+ const mine=/^[\w-]{8,64}$/.test(device||'')?device:'';if(!mine)return false;
+ return t.seats.some(s=>!!s&&s.userId!==user.id&&!s.isBot&&s.device===mine);
 }
 
 // Players who share an address or a device. Family or a café can share an address, so
