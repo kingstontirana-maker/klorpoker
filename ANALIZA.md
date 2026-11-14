@@ -746,3 +746,8 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Totali:** mbetet 164.
 - **Si zbatohet:** ndryshimi bëhet një herë, kur niset serveri. Një databazë në versionin 2 kalon edhe hapin v3 edhe hapin v4. Tavolinat që ka krijuar qendra nuk preken.
 - **Kontroll:** 300 duar me €0.15/€0.25 ruajnë çdo cent.
+
+## Lobby: tavolinat me lojtarë dalin të parat
+- **Renditja:** kur lojtari hyn në lobby, tavolinat me lojtarë dalin në krye, nga më e mbushura te më pak e mbushura. Pas tyre vijnë tavolinat bosh, sipas numrit.
+- **Pse renditja nuk lëviz:** merret në çastin kur hapet lobby-u dhe mbetet e njëjtë sa kohë lojtari qëndron aty, që rreshtat të mos lëvizin nën gisht. Rinis sa herë hapet lobby-u.
+- **Renditja me dorë:** lojtari mund ta ndryshojë duke prekur titujt e kolonave.
