@@ -674,7 +674,7 @@ body.fitPhone .dockInfo{display:none!important}
 /* ---------- The room around the tables: green marble lounge at night ----------
    A fixed layer behind the page, so the table's scaling never moves or stretches it. */
 body[data-view="table"]{background:transparent}
-body[data-view="table"]::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#000000b8 0,#00000000 20%),url(/table-room.webp) center/cover no-repeat,#050a08}
+body[data-view="table"]::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#00000059 0,#00000000 12%),url(/table-room.webp) center top/cover no-repeat,#050a08}
 /* Nine seats share the same felt: slightly smaller seats. */
 .game.nineMax .seat:not(.me){scale:.86}
 /* Nothing in the action panel may widen the table: long rows wrap instead. */
