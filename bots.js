@@ -198,6 +198,10 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   // Excess bots leave between hands through the normal seating policy.
   save();return {ok:true,added:jobs.length,funded:funding/100,tables:reports};
  }
+ // Moves the wallet of every bot that is not at a table back to the centre.
+  function reclaim(){const c=center();let returned=0,bots_=0;if(!c)return {returned,bots:0,waiting:0};periods();
+   for(const b of bots()){if(seatOf(b)||!(b.balance>0))continue;const n=b.balance;c.balance+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.enabled=false;moveStarts(-n);audit('BOT_REFUND',b,n,{reclaim:true});returned+=n;bots_++;}
+   const waiting=bots().filter(b=>seatOf(b)).length;if(!waiting)delete db.botReclaim;return {returned:returned/100,bots:bots_,waiting};}
  const stop=(b,reason,at)=>{b.bot.enabled=false;b.bot.error=reason||null;if(at)try{engine.leave(at.t,b);}catch{}save();};
  function route(p,body,u){if(!p.startsWith('/api/bots'))return undefined;if(u?.role!=='CENTER')fail('Only the center can manage bots',403);
   if(p==='/api/bots')return list();
@@ -222,6 +226,9 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');if(each*n>u.balance)fail('The center does not have enough credit for this budget');
    if(db.botNames?.length&&db.botNames.filter(name=>!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase())).length<n)fail('Nuk ka mjaft emra të lirë në listë');
    if(bots().length+n>MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');const made=[];for(let i=0;i<n;i++)made.push(create(u,freshName(),each,{...body,risk:body.risk==='mix'?['low','medium','high'][i%3]:body.risk}).id);save();return {ok:true,ids:made};}
+  // Return every bot's credit to the centre: all bots stop; the ones at a table leave when
+  // their hand ends and are emptied then (tick below). The bot accounts stay, with €0.
+  if(p==='/api/bots/reclaim'){let stopped=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});stopped++;}db.botReclaim=true;const r=reclaim();save();return {ok:true,stopped,...r};}
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);
@@ -263,6 +270,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   return big?3000+random()*4000:d.type==='raise'?1500+random()*3000:d.type==='call'?1200+random()*2300:700+random()*1300;};
  function tick(now=Date.now()){
   settleReturns();
+  if(db.botReclaim){const r=reclaim();if(r.bots)save();}
   const r=periods(now);
   for(const [p,limit,name] of PERIODS)if(g[limit]>0&&r[p]<=-g[limit])for(const b of bots())if(b.bot.enabled)stop(b,`House ${name} limit reached`,seatOf(b));
   for(const t of runtime.values())if(t.seats.some(Boolean))observe(t);

@@ -106,6 +106,7 @@ $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn
   await refresh();
  }catch(err){toast(err.message,true);}};
 $('#botList').onsubmit=async e=>{e.preventDefault();const id=e.target.closest('[data-id]').dataset.id;try{await api('bots/configure',{id,...formBody(e.target)});editing=null;toast('U ruajt');await refresh();}catch(err){toast(err.message,true);}};
+$('#reclaimAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat dhe t\'i kthehet qendrës gjithë kredia e tyre?\n\nBotat që janë në një dorë ngrihen sapo të mbarojë dora, dhe kredia e tyre kthehet vetë pas kësaj. Llogaritë e botave mbeten, me €0.'))return;try{const r=await api('bots/reclaim');toast('U kthyen €'+r.returned.toLocaleString('en-US',{minimumFractionDigits:2})+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}};
 $('#stopAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;try{const r=await api('bots/stopall');toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}};
 $('#startAll').onclick=async()=>{try{const r=await api('bots/startall');toast(r.started+' bota u nisën');await refresh();}catch(err){toast(err.message,true);}};
 

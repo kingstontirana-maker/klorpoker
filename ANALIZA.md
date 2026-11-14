@@ -837,3 +837,12 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Rake-u:** sipas zinxhirit të vërtetë. Shembull: admin 50%, menaxher 30%, agjent 20%. Agjenti merr 20%, menaxheri 30−20 = 10%, admini 50−30 = 20% dhe qendra 50%.
 - **Rrjetet e vjetra:** agjentët që janë ende direkt nën një admin vazhdojnë të funksionojnë (agjenti merr %-in e tij, admini diferencën). Mund të zhvendosen nën një menaxher nga tab-i Database, duke ndryshuar `parentId`.
 - **Raportet:** te raporti i të ardhurave ka edhe kolonën Manager, si në tabelë ashtu edhe në CSV.
+
+## CENB: "Kthe kredinë te qendra"
+- **Pse u ul kredia e qendrës:** mbushja e tavolinave nga CENB i jep çdo boti një buxhet nga kredia e qendrës (sipas cilësimeve të paracaktuara, 2× buy-in-i, me buy-in 35–90% të maksimumit). Për të 164 tavolinat kjo shkon rreth €768,000, kryesisht te stake-t e larta: Macau ~€300k, Singapore ~€150k. Paratë nuk humbën: janë te portofolat e botave, dhe kontrolli i parave e tregon totalin të plotë.
+- **Butoni i ri:** te paneli CENB, "↩ Kthe kredinë te qendra":
+  - ndal të gjithë botat;
+  - ia kthen qendrës menjëherë kredinë e çdo boti që nuk është në tavolinë;
+  - botat që janë në mes të një dore ngrihen kur mbaron dora, dhe kredia e tyre kthehet vetë (kontrollohet në çdo tick).
+- **Pas kthimit:** llogaritë e botave mbeten, me €0. Çdo kthim shënohet në ledger si `BOT_REFUND` dhe te log-u i CENB.
+- **Testuar në demo:** €100,000 nga 5 bota, dhe 4 bota të ulur në tavolinë. Kredia u kthye deri në cent dhe kontrolli i parave mbeti OK.
