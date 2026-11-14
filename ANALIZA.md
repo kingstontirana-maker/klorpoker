@@ -783,3 +783,8 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - nëse faqja zmadhohet gjithsesi, kthehet vetë në madhësinë normale;
   - fusha e shumës dhe chati kanë shkronja 16 px.
 - **Shuma te raise:** fusha është 86 px e gjerë (më parë 66 px), pa shigjetat e numrave, kështu që del i plotë edhe "12345.67".
+
+## Telefon: letrat e tua më të mëdha
+- Letrat e lojtarit vetë kanë tani lartësi 60 px (më parë 51); letrat e kundërshtarëve nuk ndryshuan.
+- Chipsat e tua dhe butoni D dalin pak më larg (8 px), që të mos prekin letrat.
+- Testi i pozicioneve e kontrollon madhësinë e re.

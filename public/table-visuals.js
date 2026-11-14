@@ -227,7 +227,7 @@ export function phoneLayout(size=6,feltW=726,feltH=235,seated=false){
  spots.forEach(([x,y],i)=>{
   seats.push(pc(x,y));const side=i===hero?'b':y<cy-b*.88?'t':x<cx?'l':x>cx?'r':'t';sides.push(side);inner.push(x>cx?'left':'right');
   slots.push(i===hero?3:side==='t'?0:side==='l'?(y<cy?5:4):(y<cy?1:2));
-  if(i===hero&&seated){bets.push([...pc(x-52,y-50),'end']);dealer.push(pc(x+62,y-44));return;}
+  if(i===hero&&seated){bets.push([...pc(x-60,y-50),'end']);dealer.push(pc(x+70,y-44));return;}
   if(i===hero){bets.push([...pc(x,y-PHONE_POD.up-14),'chips']);dealer.push(pc(x+56,y-30));return;}
   bets.push(null);dealer.push(null);
  });
@@ -238,7 +238,7 @@ export function phoneLayout(size=6,feltW=726,feltH=235,seated=false){
  // touches the board, the pot, another player or a bet already placed, the line turns a
  // little (12°, 24°, then 36°) until it is free.
  const box=(x,y,l,t,r,b2)=>[x-l,y-t,x+r,y+b2],hit=(p,q)=>p[0]<q[2]-1&&q[0]<p[2]-1&&p[1]<q[3]-1&&q[1]<p[3]-1;
- const pod=(x,y,i)=>i===hero?box(x,y,56,71,56,76):box(x,y,PHONE_POD.half,PHONE_POD.up,PHONE_POD.half,PHONE_POD.down);
+ const pod=(x,y,i)=>i===hero?box(x,y,56,80,56,76):box(x,y,PHONE_POD.half,PHONE_POD.up,PHONE_POD.half,PHONE_POD.down);
  // each player as two boxes: the photo with its cards, and the plate under it
  const pods=spots.map(([x,y],i)=>i===hero?[pod(x,y,i)]:[[x-36,y-PHONE_POD.up,x+36,y+16],[x-42,y+16,x+42,y+PHONE_POD.down]]);
  const taken=[box(cx,boardY,boardW*2.5+8,boardW*.7,boardW*2.5+8,boardW*.7),box(cx,potY,62,11,62,11),...pods.flat()];

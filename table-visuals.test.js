@@ -112,7 +112,7 @@ test('phones in landscape: players around the felt, bets in front of them, nothi
   const [hx]=P(l.seats[l.hero]);assert.ok(Math.abs(hx-W/2)<1,'you sit in the middle at the bottom');
   const boxes=[];
   l.seats.forEach((s,i)=>{const [x,y]=P(s);
-   if(seated&&i===l.hero)boxes.push(['heroCards',[x-48,y-69,x+48,y-18]],['hero',[x-55,y-28,x+55,y+75]]);
+   if(seated&&i===l.hero)boxes.push(['heroCards',[x-54,y-80,x+54,y-18]],['hero',[x-55,y-28,x+55,y+75]]);
    else boxes.push(['photo'+i,[x-36,y-PHONE_POD.up,x+36,y+16]],['plate'+i,[x-42,y+16,x+42,y+PHONE_POD.down]]);
    const [bx,by]=P(l.bets[i]),a=l.bets[i][2],bb=a==='chips'?[bx-19,bx+80]:a==='flip'?[bx-80,bx+19]:a==='end'?[bx-84,bx]:a==='start'?[bx,bx+84]:[bx-42,bx+42];boxes.push(['bet'+i,[bb[0],by-9,bb[1],by+9]]);
    const [dx,dy]=P(l.dealer[i]);boxes.push(['dealer'+i,[dx-11,dy-11,dx+11,dy+11]]);

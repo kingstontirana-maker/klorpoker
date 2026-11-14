@@ -140,3 +140,5 @@ body.fitPhone .dock.sizing .sizingHead button{background:linear-gradient(180deg,
 body.fitPhone .dock.sizing .betValue input{width:86px;min-width:86px;padding:0 4px;font-size:16px;letter-spacing:-.01em;-moz-appearance:textfield;appearance:textfield}
 body.fitPhone .dock.sizing .betValue input::-webkit-outer-spin-button,body.fitPhone .dock.sizing .betValue input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 body.fitPhone #chatInput,body[data-view="table"] #chatInput{font-size:16px}
+/* Your own cards a little larger (60 px tall, opponents' cards unchanged). */
+body.fitPhone .tableStage{--me-hole-h:60px;--me-hole-w:43px}
