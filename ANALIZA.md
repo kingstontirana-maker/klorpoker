@@ -708,15 +708,16 @@ U provua te demo: dërgimi i €10 nga telefoni kaloi saktë (lojtari 120→130,
 - Ndryshimi bëhet një herë, kur niset serveri. Tavolinat e tjera dhe ato që ka krijuar qendra nuk preken.
 - Platforma tani ka edhe tavolina me 5 vende: dy lojtarë lart, një në çdo anë dhe lojtari vetë poshtë.
 
-## Tavolina në telefon (horizontal): skema e re
-Çdo lojtar ka një "pod" rreth avatarit, dhe çdo element ka vendin e vet, të matur në piksel nga avatari:
-- **Lart:** [pllaka] (avatar) [letrat]. Basti del drejt poshtë avatarit.
-- **Anash (6, 5 dhe 4 vende):** avatari me pllakën poshtë tij. Letrat dhe basti dalin drejt nga qendra.
-- **Anash (9 vende):** tre lojtarë në çdo anë, në rresht kompakt (avatar)[pllaka]. Basti del përtej pllakës, nga qendra.
-- **Poshtë:** avatari me pllakën poshtë tij. Basti del drejt sipër avatarit. Ti ulesh në qendër, me letrat e tua nën board dhe bastin pranë tyre.
-- **Letrat e mbyllura:** dalin pak nga pas avatarit.
-- **Letrat e hapura (showdown):** dalin të plota pranë avatarit (mbi avatar te lojtarët poshtë dhe te ulëset kompakte), dhe nuk mbulohen nga asgjë.
-- **CALL / CHECK...:** dalin si etiketë nën pllakë dhe nuk e mbulojnë emrin.
-- **Pot:** një rresht i vetëm sipër board-it.
-- **9 vende:** askush nuk ulet poshtë djathtas, kështu që butonat e veprimit nuk mbulojnë asnjë lojtar.
-- **Skedarët:** `public/table-phone.css` dhe `phoneLayout()` te `public/table-visuals.js`. Në kompjuter tavolina mbetet siç ishte.
+## Tavolina në telefon (horizontal): lojtarët rreth tavolinës
+- **Vendet:** lojtarët ulen mbi buzën e tavolinës, me largësi të barabarta përgjatë saj dhe simetrikë majtas/djathtas. Ti ulesh poshtë në qendër. Qoshet poshtë mbeten të lira për chatin (majtas) dhe butonat e veprimit (djathtas).
+- **Pamja e çdo lojtari:** letrat (gjysma e sipërme mbi foto, pak të rrotulluara), poshtë tyre fotoja (48 px), pastaj pllaka me emrin dhe kredinë, dhe në fund etiketa FOLD / CHECK / CALL.
+- **Showdown:** letrat e hapura dalin përpara fotos dhe pllakës, të mëdha dhe pak të rrotulluara. Letrat e fituesit ndriçohen, ato të humbësit dalin më të errëta.
+- **Chipsat:**
+  - lojtarët lart i hedhin drejt poshtë pllakës;
+  - të tjerët i hedhin në vijë drejt qendrës së tavolinës, aq afër sa të mos prekin foton, letrat ose pllakën;
+  - kur ai vend përplaset me diçka, vija kthehet pak.
+- **Butoni D** zë vendin e parë të lirë pranë lojtarit.
+- **Butonat Fold / Call / Raise:** në telefon dalin si kapsula të ulëta në buzën e poshtme të ekranit, që të mos mbulojnë asnjë lojtar.
+- **Shkalla:** kanavaca e telefonit është 400 px e lartë (më parë 365), prandaj gjithçka ka hapësirë dhe del rreth 8% më e vogël.
+- **Testi** `table-visuals.test.js` kontrollon tavolinat me 2, 4, 5, 6 dhe 9 vende, në tre madhësi ekrani, të ulur dhe jo. Asnjë element nuk duhet të mbivendoset me tjetrin.
+- **Skedarët:** `public/table-phone.css`, `phoneLayout()` dhe `feltBox()` te `public/table-visuals.js`, `FIT_H` te `public/app.js`. Në kompjuter tavolina mbetet siç ishte.

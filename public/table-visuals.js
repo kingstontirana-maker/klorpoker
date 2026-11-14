@@ -184,44 +184,78 @@ export function sizedLayout(base,size=6){
   return {seats:[tl,tr,r1,r2,br,bottom,bl,l2,l1],bets,dealer,slots:[0,0,1,2,3,3,3,4,5],hero:5};}
  return {...base,slots:[0,1,2,3,4,5],hero:3};
 }
-// ---- Phones in landscape: one fixed scheme for every table size ----
-// Every seat is a "pod" anchored on its avatar. The side of the table it sits on decides
-// where everything else goes, always measured in pixels from the avatar, so the felt
-// size never pushes anything out of place:
-//   top row (t)  : [plate] (avatar) [cards]   bet straight below the avatar
-//   sides (l, r) : avatar with the plate under it, cards toward the middle,
-//                  bet straight toward the middle
-//   bottom (b)   : avatar with the plate under it, cards above the avatar when shown,
-//                  bet straight above the avatar; your own seat keeps its large cards
-//                  and puts its bet beside them
-// "inner" is the horizontal direction of the middle of the table seen from the seat.
-// fw/fh: felt size in px. Coordinates are % of the felt, like the other layouts.
-const PHONE_SEATS={
- 2:[[50,'T'],[50,'B']],
- 4:[[50,'T'],[97,48],[50,'B'],[3,48]],
- 5:[[33,'T'],[67,'T'],[97,62],[50,'B'],[3,62]],
- 6:[[50,'T'],[97,27],[97,72],[50,'B'],[3,72],[3,27]],
- // Nine: three a side (compact pods, plate beside the avatar) and nobody else on the
- // bottom row, so the action buttons in the bottom-right corner never cover a player.
- 9:[[33,'T'],[67,'T'],[97,17,1],[97,48,1],[97,79,1],[50,'B'],[3,79,1],[3,48,1],[3,17,1]]};
-const PHONE_HERO={2:1,4:2,5:3,6:3,9:5};
-export function phoneLayout(size=6,fw=711,fh=240,seated=false){
- const list=PHONE_SEATS[size]||PHONE_SEATS[6],hero=PHONE_HERO[size]??3,px=(x,y,dx,dy)=>[x+dx/fw*100,y+dy/fh*100];
+// ---- Phones in landscape: the players sit around the table ----
+// The canvas is FIT_H (400) px tall; the felt leaves 80 px above it, 85 px below it and
+// 70 px on each side (feltBox). Every player is a pod built on the avatar: the cards stand
+// half out above the photo (shown cards come in front of the photo and the plate), the
+// plate with the name and the credit sits under it, the action tag on the seam.
+// Opponents sit on the edge of the felt, spread at equal distances along it, mirrored
+// left/right; you sit at the bottom in the middle. The bottom
+// corners stay free for the chat button (left) and the action buttons (right).
+// Bets lie on the line from the player to the middle of the table, just clear of the pod;
+// the dealer button sits beside the pod. Vertically, from the top: the top players
+// (pods end 57 px under the avatar), their bets, the pot, the board, your cards, you.
+// fw/fh: felt size in px. Coordinates are % of the felt, like the other layouts. The work
+// is done in a frame 27 px wider on each side and 30 px higher than the felt.
+export const PHONE_POD={up:40,down:57,half:42};
+const PHONE_SPREAD={2:0,4:88,5:75,6:74,9:74};
+export function phoneLayout(size=6,feltW=726,feltH=235,seated=false){
+ const ox=27,oy=30,fw=feltW+2*ox,fh=feltH+45,n=Math.max(1,size-1),cx=fw/2,cy=oy+feltH/2,b=feltH/2-3;
+ const heroY=fh-13,boardW=50,boardY=162.5,potY=116.5;
+ // the track: the edge of the felt pushed out by 3 px (a stadium), walked from the
+ // bottom middle through the left, the top and the right; angles are seen from the middle
+ const r=feltH/2+3,half=feltW/2-feltH/2,path=[];
+ for(let i=0;i<=1440;i++){const t=i/1440*2*Math.PI;let x=-Math.sin(t),y=Math.cos(t);// direction from the middle
+  // where that direction meets the stadium
+  let px,py;
+  const k=Math.abs(y)>1e-9?r/Math.abs(y):1e9;if(Math.abs(x*k)<=half){px=x*k;py=y*k;}else{const c=x<0?-half:half;const bq=x*c,disc=bq*bq-(c*c-r*r);const u=bq+Math.sqrt(Math.max(0,disc));px=x*u;py=y*u;}
+  path.push([cx+px,cy+py]);}
+ const len=[0];for(let i=1;i<path.length;i++)len.push(len[i-1]+Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]));
+ const pt=deg=>path[Math.round(deg/360*1440)],at=dist=>{let i=len.findIndex(v=>v>=dist);if(i<1)i=1;const f=(dist-len[i-1])/((len[i]-len[i-1])||1);return [path[i-1][0]+(path[i][0]-path[i-1][0])*f,path[i-1][1]+(path[i][1]-path[i-1][1])*f];};
+ const start=PHONE_SPREAD[size]??56,s0=len[Math.round(start/360*1440)],s1=len[Math.round((360-start)/360*1440)];
+ const opp=n===1?[pt(180)]:Array.from({length:n},(_,k)=>at(s0+(s1-s0)*k/(n-1)));
+ const hero=Math.floor(size/2)===0?0:{2:1,4:2,5:3,6:3,9:5}[size]??3;
+ const spots=[];for(let i=0;i<size;i++)spots.push(i===hero?[cx,heroY]:opp[(i-hero-1+size)%size]);
+ const pc=(x,y)=>[(x-ox)/feltW*100,(y-oy)/feltH*100],toward=[cx,boardY];
  const seats=[],bets=[],dealer=[],sides=[],inner=[],slots=[];
- list.forEach(([x,row,compact],i)=>{
-  const y=row==='T'?2/fh*100:row==='B'?97:row,base=row==='T'?'t':row==='B'?'b':x<50?'l':'r',dir=base==='l'?1:base==='r'?-1:x>50?-1:1;
-  if(compact){seats.push([x,y]);sides.push(base+'c');inner.push(dir>0?'right':'left');slots.push(base==='r'?(y<50?1:2):(y<50?5:4));
-   bets.push([...px(x,y,dir*112,0),dir>0?'start':'end']);dealer.push(px(x,y,0,36));return;}
-  const side=base;
-  seats.push([x,y]);sides.push(side);inner.push(dir>0?'right':'left');
-  slots.push(side==='t'?0:side==='b'?3:side==='r'?(y<50?1:2):(y<50?5:4));
-  if(side==='t'){bets.push(px(x,y,0,36));dealer.push(px(x,y,dir*64,34));}
-  else if(side==='l'||side==='r'){bets.push([...px(x,y,dir*58,0),dir>0?'start':'end']);dealer.push(px(x,y,dir*62,30));}
-  else if(seated&&i===hero){bets.push([...px(x,y,-58,-50),'end']);dealer.push(px(x,y,62,-46));}
-  else{bets.push(px(x,y,0,-40));dealer.push(px(x,y,dir*66,-30));}
+ spots.forEach(([x,y],i)=>{
+  seats.push(pc(x,y));const side=i===hero?'b':y<cy-b*.88?'t':x<cx?'l':x>cx?'r':'t';sides.push(side);inner.push(x>cx?'left':'right');
+  slots.push(i===hero?3:side==='t'?0:side==='l'?(y<cy?5:4):(y<cy?1:2));
+  if(i===hero&&seated){bets.push([...pc(x-52,y-50),'end']);dealer.push(pc(x+62,y-44));return;}
+  if(i===hero){bets.push(pc(x,y-PHONE_POD.up-14));dealer.push(pc(x+56,y-30));return;}
+  bets.push(null);dealer.push(null);
  });
- return {seats,bets,dealer,slots,hero,sides,inner};
+ // Bets: straight under the players of the top row; for everyone else on the straight line
+ // from the centre of the player (the photo) to the centre of the
+ // table, as close as the pod allows: clear of the photo and the cards (±36 px, up to 16 px
+ // under the centre) and of the plate (±42 px, 16…57 px under it), 3 px apart. If that spot
+ // touches the board, the pot, another player or a bet already placed, the line turns a
+ // little (12°, 24°, then 36°) until it is free.
+ const box=(x,y,l,t,r,b2)=>[x-l,y-t,x+r,y+b2],hit=(p,q)=>p[0]<q[2]&&q[0]<p[2]&&p[1]<q[3]&&q[1]<p[3];
+ const pod=(x,y,i)=>i===hero?box(x,y,56,71,56,76):box(x,y,PHONE_POD.half,PHONE_POD.up,PHONE_POD.half,PHONE_POD.down);
+ const pods=spots.map(([x,y],i)=>pod(x,y,i));
+ const taken=[box(cx,boardY,boardW*2.5+8,boardW*.7,boardW*2.5+8,boardW*.7),box(cx,potY,40,12,40,12),...pods];
+ const clearOf=(x,y,me)=>!hit(me,[x-39,y-PHONE_POD.up-3,x+39,y+19])&&!hit(me,[x-45,y+16,x+45,y+PHONE_POD.down+3]);
+ const along=(x,y,ux,uy)=>{for(let d=20;d<220;d+=2){const bx=x+ux*d,by=y+uy*d;if(clearOf(x,y,box(bx,by,33,9,33,9)))return [bx,by,ux,uy];}return [x+ux*220,y+uy*220,ux,uy];};
+ const order=spots.map((s,i)=>i).filter(i=>i!==hero).sort((p,q)=>spots[p][1]-spots[q][1]);
+ const heroBet=bets[hero];if(heroBet){const hx=heroBet[0]*feltW/100+ox,hy=heroBet[1]*feltH/100+oy;taken.push(seated?[hx-66,hy-9,hx,hy+9]:box(hx,hy,33,9,33,9));}
+ for(const i of order){const [x,y]=spots[i];let pick=null;const base=sides[i]==='t'?Math.PI/2:Math.atan2(cy-y,cx-x);
+  for(const g of [0,.21,-.21,.42,-.42,.63,-.63]){
+   const [bx,by,ux,uy]=along(x,y,Math.cos(base+g),Math.sin(base+g)),me=box(bx,by,33,9,33,9);
+   pick??=[bx,by,ux,uy];if(!taken.some(t=>t!==pods[i]&&hit(t,me))){pick=[bx,by,ux,uy];break;}}
+  bets[i]=pc(pick[0],pick[1]);dealer[i]=[pick[2],pick[3]];taken.push(box(pick[0],pick[1],34,10,34,10));}
+ // The dealer button: beside the pod, turned off the bet direction, at the first angle
+ // where it touches no other player, bet, the board or the pot.
+ spots.forEach(([x,y],i)=>{if(i===hero)return;const [ux,uy]=dealer[i];let best=null;
+  for(const g of [.95,-.95,1.6,-1.6,2.3,-2.3,0]){const vx=ux*Math.cos(g)-uy*Math.sin(g),vy=ux*Math.sin(g)+uy*Math.cos(g);
+   const ex=Math.abs(vx)>.01?(PHONE_POD.half+14)/Math.abs(vx):1e9,ey=vy>.01?(PHONE_POD.down+14)/vy:vy<-.01?(PHONE_POD.up+14)/-vy:1e9,e=Math.min(ex,ey),dx=x+vx*e,dy=y+vy*e;
+   const me=box(dx,dy,12,12,12,12),own=box(x,y,PHONE_POD.half,PHONE_POD.up,PHONE_POD.half,PHONE_POD.down);
+   if(dx<12||dx>fw-12||dy<-2||dy>fh+40)continue;
+   if(!taken.some(t=>t!==own&&hit(t,me))){best=[dx,dy];break;}best??=[dx,dy];}
+  dealer[i]=pc(...best);taken.push(box(best[0],best[1],12,12,12,12));});
+ return {seats,bets,dealer,slots,hero,sides,inner,boardW,boardY:(boardY-oy)/feltH*100,potY:(potY-oy)/feltH*100};
 }
+
 export function seatLayout(portrait=false,phone=false,narrow=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action
@@ -237,10 +271,9 @@ export function seatLayout(portrait=false,phone=false,narrow=false){
 }
 // Felt size from the free stage area; text and cards never scale with it.
 export function feltBox(width,height,portrait=false,phone=false){
- // Phones in landscape: the felt fills the whole screen, edge to edge.
- if(phone&&!portrait){const top=50,side=Math.max(24,Math.round(width*.05)),button=height<=340?64:74,
-  hMax=Math.min(height-top-52,(height-top-12-button-6-62)/.67),w=Math.min(width-2*side,hMax*3.4),h=Math.min(hMax,w/1.9);
-  return {width:w,height:h,top,minStage:top+h+52,ratio:w/h};}
+ // The canvas is at least 730×400 (see FIT_H in app.js); the players sit on the edge of the
+ // felt (phoneLayout), so it leaves 80 px above it, 85 px below it and 70 px on each side.
+ if(phone&&!portrait){const w=Math.max(200,width-140),h=Math.max(120,height-165);return {width:w,height:h,top:80,minStage:height,ratio:w/h};}
  // Short screens (phones in landscape, small phones) use tighter margins.
  const short=portrait?height<620:height<=560;
  const ratio=portrait?.78:2.1,top=portrait?(short?64:72):(short?50:78),bottom=portrait?(short?80:92):(short?48:92),side=portrait?50:(short?14:36);

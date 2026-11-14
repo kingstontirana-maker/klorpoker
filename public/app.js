@@ -57,7 +57,7 @@ function render(t){if(t.color!==feltColor){feltColor=t.color;const g=$('.game');
  $('.game').classList.toggle('omaha',t.game==='omaha');$('#activeTableName').textContent=t.name;$('#tableHandInfo').textContent=(gameInfo(t.game).short?gameInfo(t.game).short+' · ':'')+'Hand #'+t.hand+' · '+(t.runout?'All-in · '+phaseLabel(t.phase):phaseLabel(t.phase));const collected=Math.max(0,Math.round((t.pot-t.seats.reduce((n,s)=>n+(s?.bet||0),0))*100)/100);$('#potValue').textContent=fmt(t.pot);$('.pot').classList.toggle('settled',t.phase==='finished');$('.pot').classList.toggle('empty',!(t.pot>0));setMarkup($('#potChips'),chipStack(collected));
  for(let i=0;i<5;i++){let slot=$('#community').children[i];if(!slot){slot=document.createElement('div');slot.className='boardSlot';$('#community').append(slot);}const code=t.board[i];setMarkup(slot,card(code,{winning:win.board.has(code),dim:!!win.hand&&!!code&&!win.board.has(code),index:i}));}
  if(tableViewKey!==t.id){$('#seats').replaceChildren();$('#tableBets').replaceChildren();tableViewKey=t.id;}
- const size=t.seats.length,stageStyle=$('.tableStage').style,layout=isPhone()&&!isPortrait()?phoneLayout(size,parseFloat(stageStyle.getPropertyValue('--felt-w'))||711,parseFloat(stageStyle.getPropertyValue('--felt-h'))||240,seatIdx>=0):sizedLayout(seatLayout(isPortrait(),isPhone(),$('.game').classList.contains('narrowFelt')),size),relativeOf=i=>seatIdx>=0?(i-seatIdx+layout.hero+size)%size:i;$('.game').classList.toggle('nineMax',size===9);
+ const size=t.seats.length,stageStyle=$('.tableStage').style,layout=isPhone()&&!isPortrait()?phoneLayout(size,parseFloat(stageStyle.getPropertyValue('--felt-w'))||726,parseFloat(stageStyle.getPropertyValue('--felt-h'))||235,seatIdx>=0):sizedLayout(seatLayout(isPortrait(),isPhone(),$('.game').classList.contains('narrowFelt')),size),relativeOf=i=>seatIdx>=0?(i-seatIdx+layout.hero+size)%size:i;$('.game').classList.toggle('nineMax',size===9);{const felt=$('#table');if(layout.boardY!=null){felt.style.setProperty('--board-y',layout.boardY+'%');felt.style.setProperty('--pot-y',layout.potY+'%');}else{felt.style.removeProperty('--board-y');felt.style.removeProperty('--pot-y');}}
  // A seated player has no use for the other JOIN buttons.
  $('#table').classList.toggle('seated',seatIdx>=0);
  t.seats.forEach((seat,i)=>{
@@ -239,7 +239,7 @@ let lastPortrait=null;// Phones in landscape: lay the table out on a canvas of a
 // PCs and large tablets in landscape: the full table layout is drawn at 1000×760
 // (or wider) and scaled to the window, so it fills the window the moment it opens
 // and only scales evenly (never re-flows) when the window or full screen changes.
-const FIT_W=730,FIT_H=365,DESK_W=1000,DESK_H=760;
+const FIT_W=730,FIT_H=400,DESK_W=1000,DESK_H=760;
 // Safe-area insets (notch, rounded corners, home indicator) in CSS px.
 let insetProbe=null;
 function safeInsets(){if(!insetProbe){insetProbe=document.createElement('div');insetProbe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';document.body.append(insetProbe);}
