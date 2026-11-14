@@ -334,7 +334,7 @@ export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object
 let f=path.resolve(ROOT,'public',name);if(!f.startsWith(path.resolve(ROOT,'public')+path.sep))fail('Forbidden',403);let contents=fs.readFileSync(f);
  // Stamp stylesheet and script links with their modification time so phones and
  // browsers always fetch the newest version after a change.
- if(name==='index.html')contents=String(contents).replace(/(\/[\w.-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
+ if(name.endsWith('index.html'))contents=String(contents).replace(/(\/[\w./-]+\.(?:css|js))\?v=[\w.-]+/g,(m,file)=>{try{return file+'?v='+Math.round(fs.statSync(path.join(ROOT,'public',file)).mtimeMs).toString(36);}catch{return m;}});
  sendStatic(req,res,f,name,contents,url);}catch(err){const status=err.status||(err.code==='ENOENT'?404:500);if(res.headersSent){res.end();if(status===500)noteError('request',err);return;}res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error':err.message}));if(status===500)noteError('request',err);}});
 server.on('error',err=>{console.error('[Suprem Poker] server cannot start:',err.message);process.exit(1);});
 server.listen(PORT,()=>console.log(`Suprem Poker http://localhost:${PORT}`));
