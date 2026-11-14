@@ -1,0 +1,92 @@
+/* ---------- Phones in landscape: one scheme for every seat ----------
+   app.js gives each seat data-side (t = top row, l / r = sides, b = bottom row) and
+   data-inner (the direction of the middle of the table). Everything is measured from
+   the avatar, the centre of the seat (a 52 px box):
+
+     top row        [ plate ](avatar)[cards]       bet 36 px straight below the avatar
+     left side      (avatar)[cards] → bet          plate under the avatar
+     right side     bet ← [cards](avatar)          plate under the avatar
+     bottom row       cards (shown) / bet above    plate under the avatar
+                    (avatar)[cards]
+
+   • Face-down cards peek from behind the avatar on the table side.
+   • Cards that are shown move out, full size, next to the avatar (above it on the
+     bottom row), and never sit under the avatar or the plate.
+   • The action (CALL, CHECK…) hangs under the plate and never covers the name.
+   • Bets and the dealer button come from phoneLayout() in table-visuals.js. */
+body.fitPhone .game .seat[data-side]:not(.me){width:52px;height:52px;scale:1}
+
+/* Plate: name and stack, always readable. */
+body.fitPhone .game .seat[data-side]:not(.me) .seatName{left:50%;right:auto;top:calc(100% - 8px);bottom:auto;transform:translateX(-50%);width:88px;padding:2px 5px 3px;border-radius:8px}
+body.fitPhone .game .seat[data-side]:not(.me) .seatName b{font-size:11px;line-height:13px}
+body.fitPhone .game .seat[data-side]:not(.me) .seatName strong{margin:0;font-size:14px;line-height:15px}
+/* Top row: the plate sits beside the avatar, on the side away from the cards. */
+body.fitPhone .game .seat[data-side="t"]:not(.me) .seatName{top:calc(50% - 17px);left:-46px}
+body.fitPhone .game .seat[data-side="t"][data-inner="left"]:not(.me) .seatName{left:calc(100% + 46px)}
+
+/* Action: a small tag on the bottom edge of the plate. */
+body.fitPhone .game .seat[data-side]:not(.me) .seatAction{display:block;left:50%;right:auto;top:calc(100% + 20px);bottom:auto;transform:translateX(-50%);padding:0 6px;font-size:9px;line-height:12px;z-index:6}
+body.fitPhone .game .seat[data-side]:not(.me) .seatAction:empty{display:none}
+body.fitPhone .game .seat[data-side="t"]:not(.me) .seatAction{top:calc(50% + 11px);left:-46px}
+body.fitPhone .game .seat[data-side="t"][data-inner="left"]:not(.me) .seatAction{left:calc(100% + 46px)}
+
+/* Face-down cards: a small fan behind the avatar, on the table side. */
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards{display:flex;gap:0;left:calc(50% + 12px);right:auto;top:calc(50% - 22px);bottom:auto;transform:none;z-index:2}
+body.fitPhone .game .seat[data-side][data-inner="left"]:not(.me) .seatCards{left:auto;right:calc(50% + 12px);flex-direction:row-reverse}
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards .card.back{width:26px;height:36px;border-radius:4px}
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards .card.back+.card.back{margin-left:-14px}
+body.fitPhone .game .seat[data-side][data-inner="left"]:not(.me) .seatCards .card.back+.card.back{margin-left:0;margin-right:-14px}
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards .card.back:first-child{transform:rotate(-7deg)}
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards .card.back:nth-child(2){transform:rotate(7deg)}
+body.fitPhone .game.omaha .seat[data-side]:not(.me) .seatCards .card.back{width:22px;height:31px}
+body.fitPhone .game.omaha .seat[data-side]:not(.me) .seatCards .card.back+.card.back{margin-left:-15px}
+body.fitPhone .game.omaha .seat[data-side][data-inner="left"]:not(.me) .seatCards .card.back+.card.back{margin-left:0;margin-right:-15px}
+
+/* Shown cards: full size, beside the avatar on the table side, above everything near
+   them; on the bottom row they stand above the avatar. Cards that are not part of the
+   winning hand stay readable (only slightly dimmed). */
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards:has(.face){gap:3px;left:calc(50% + 24px);right:auto;top:calc(50% - 26px);z-index:8;flex-direction:row}
+body.fitPhone .game .seat[data-side][data-inner="left"]:not(.me) .seatCards:has(.face){left:auto;right:calc(50% + 24px)}
+body.fitPhone .game .seat[data-side="b"]:not(.me) .seatCards:has(.face),
+body.fitPhone .game .seat[data-side="b"][data-inner="left"]:not(.me) .seatCards:has(.face){left:50%;right:auto;top:auto;bottom:calc(100% - 2px);transform:translateX(-50%)}
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards .card.face{width:38px;height:53px;margin:0;border-radius:5px;transform:none}
+body.fitPhone .game.omaha .seat[data-side]:not(.me) .seatCards .card.face{width:32px;height:45px}
+body.fitPhone .game.omaha .seat[data-side]:not(.me) .seatCards .card.face+.card.face{margin-left:-13px}
+body.fitPhone .game .seat[data-side]:not(.me) .seatCards .card.face.dimCard{opacity:.78;filter:saturate(.7) brightness(.85)}
+body.fitPhone .game .seat.foldedSeat[data-side]:not(.me) .seatCards:has(.face){opacity:.85;filter:none}
+
+/* Blind tag on the avatar's upper corner; win amount where nothing else is. */
+body.fitPhone .game .seat[data-side]:not(.me) .blindBadge{left:-4px;top:-4px;bottom:auto}
+body.fitPhone .game .seat[data-side]:not(.me) .winBadge{left:50%;top:auto;bottom:calc(100% + 2px);font-size:12px;line-height:16px;padding:1px 8px}
+body.fitPhone .game .seat[data-side="t"]:not(.me) .winBadge{top:calc(100% + 2px);bottom:auto}
+body.fitPhone .game .seat[data-side="b"]:not(.me) .winBadge{top:calc(50% - 9px);bottom:auto;left:calc(50% + 70px)}
+body.fitPhone .game .seat[data-side="b"][data-inner="left"]:not(.me) .winBadge{left:calc(50% - 70px)}
+
+/* Pot: one compact line just above the board, clear of the top row's bets. */
+body.fitPhone .game .pot,body.fitPhone .game .pot.settled{flex-direction:row;gap:0;top:calc(50% - 6px - var(--board-w) * .7 - 13px)}
+body.fitPhone .game #potChips{display:none}
+body.fitPhone .game #potValue{font-size:13px;line-height:16px;padding:2px 10px}
+
+/* Bets: the chip and the amount in one small piece. */
+body.fitPhone .tableBet{gap:3px}
+body.fitPhone .tableBet .betAmount{font-size:11px;padding:3px 7px}
+
+/* Your own seat: the action tag hangs under your plate too, never over your name. */
+body.fitPhone .game .seat.me[data-side] .seatAction{top:calc(100% + 22px);padding:0 7px;font-size:9px;line-height:13px}
+
+/* Nine seats: three a side, each a compact row (avatar)[plate] facing the middle.
+   Face-down cards peek over the avatar's outer corner and shown cards cover the avatar;
+   the bet sits beyond the plate, the win amount under it, the dealer button under the avatar. */
+body.fitPhone .game .seat[data-side="lc"]:not(.me) .seatName,body.fitPhone .game .seat[data-side="rc"]:not(.me) .seatName{width:80px;top:calc(50% - 17px);left:calc(100% + 42px)}
+body.fitPhone .game .seat[data-side="rc"][data-inner="left"]:not(.me) .seatName{left:-42px}
+body.fitPhone .game .seat[data-side="lc"]:not(.me) .seatAction,body.fitPhone .game .seat[data-side="rc"]:not(.me) .seatAction{top:calc(50% + 11px);left:calc(100% + 42px)}
+body.fitPhone .game .seat[data-side="rc"][data-inner="left"]:not(.me) .seatAction{left:-42px}
+body.fitPhone .game .seat[data-side="lc"]:not(.me) .seatCards{left:calc(50% - 44px);right:auto;top:calc(50% - 34px);flex-direction:row}
+body.fitPhone .game .seat[data-side="rc"][data-inner="left"]:not(.me) .seatCards{left:auto;right:calc(50% - 44px);top:calc(50% - 34px);flex-direction:row-reverse}
+/* Shown cards cover the avatar (shifted a little toward the screen edge), so the plate
+   stays readable and nothing reaches the board. */
+body.fitPhone .game .seat[data-side="lc"]:not(.me) .seatCards:has(.face){left:50%;right:auto;top:calc(50% - 24px);transform:translateX(calc(-50% - 8px));flex-direction:row}
+body.fitPhone .game .seat[data-side="rc"][data-inner="left"]:not(.me) .seatCards:has(.face){left:50%;right:auto;top:calc(50% - 24px);transform:translateX(calc(-50% + 8px));flex-direction:row}
+body.fitPhone .game .seat[data-side="lc"]:not(.me) .seatCards .card.face,body.fitPhone .game .seat[data-side="rc"]:not(.me) .seatCards .card.face{width:34px;height:48px}
+body.fitPhone .game .seat[data-side="lc"]:not(.me) .winBadge,body.fitPhone .game .seat[data-side="rc"]:not(.me) .winBadge{top:calc(50% + 19px);bottom:auto;left:calc(100% + 42px)}
+body.fitPhone .game .seat[data-side="rc"][data-inner="left"]:not(.me) .winBadge{left:-42px}

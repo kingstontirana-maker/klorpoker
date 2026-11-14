@@ -707,3 +707,16 @@ U provua te demo: dërgimi i €10 nga telefoni kaloi saktë (lojtari 120→130,
 - Në vend të tyre mbyllen 14 tavolina me stake të ulëta: Lisbon VII–VIII, Madrid IX–X, Milano X–XII, Paris X–XII, Barcelona IX–X, Amsterdam VII–VIII. Totali mbetet 164.
 - Ndryshimi bëhet një herë, kur niset serveri. Tavolinat e tjera dhe ato që ka krijuar qendra nuk preken.
 - Platforma tani ka edhe tavolina me 5 vende: dy lojtarë lart, një në çdo anë dhe lojtari vetë poshtë.
+
+## Tavolina në telefon (horizontal): skema e re
+Çdo lojtar ka një "pod" rreth avatarit, dhe çdo element ka vendin e vet, të matur në piksel nga avatari:
+- **Lart:** [pllaka] (avatar) [letrat]. Basti del drejt poshtë avatarit.
+- **Anash (6, 5 dhe 4 vende):** avatari me pllakën poshtë tij. Letrat dhe basti dalin drejt nga qendra.
+- **Anash (9 vende):** tre lojtarë në çdo anë, në rresht kompakt (avatar)[pllaka]. Basti del përtej pllakës, nga qendra.
+- **Poshtë:** avatari me pllakën poshtë tij. Basti del drejt sipër avatarit. Ti ulesh në qendër, me letrat e tua nën board dhe bastin pranë tyre.
+- **Letrat e mbyllura:** dalin pak nga pas avatarit.
+- **Letrat e hapura (showdown):** dalin të plota pranë avatarit (mbi avatar te lojtarët poshtë dhe te ulëset kompakte), dhe nuk mbulohen nga asgjë.
+- **CALL / CHECK...:** dalin si etiketë nën pllakë dhe nuk e mbulojnë emrin.
+- **Pot:** një rresht i vetëm sipër board-it.
+- **9 vende:** askush nuk ulet poshtë djathtas, kështu që butonat e veprimit nuk mbulojnë asnjë lojtar.
+- **Skedarët:** `public/table-phone.css` dhe `phoneLayout()` te `public/table-visuals.js`. Në kompjuter tavolina mbetet siç ishte.

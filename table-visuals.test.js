@@ -102,3 +102,19 @@ test('tables for 2 and 4 players put one spot on the table for every seat',()=>{
  const four=sizedLayout({seats:[[50,0],[100,10],[100,30],[50,100],[0,30],[0,10]],bets:[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],dealer:[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]},4);
  assert.deepEqual(four.seats,[[50,0],[100,20],[50,100],[0,20]]);
 });
+
+test('phones in landscape: one fixed spot for every seat, bet and dealer button',async()=>{
+ const {phoneLayout}=await import('./public/table-visuals.js');
+ for(const [fw,fh] of [[711,240],[657,307],[880,240]])for(const size of [2,4,5,6,9])for(const seated of [false,true]){
+  const l=phoneLayout(size,fw,fh,seated);
+  for(const key of ['seats','bets','dealer','slots','sides','inner'])assert.equal(l[key].length,size,key+' for '+size);
+  assert.deepEqual(l.seats[l.hero],[50,97],'you sit at the bottom in the middle');
+  const px=([x,y])=>[x*fw/100,y*fh/100];
+  for(let i=0;i<size;i++){const [sx,sy]=px(l.seats[i]),[bx,by]=px(l.bets[i]);
+   assert.ok(Math.hypot(bx-sx,by-sy)<125,'the bet stays next to its player');
+   // the bet lies on the table side of the player, straight in front of them
+   if(l.sides[i]==='t')assert.ok(by>sy&&bx===sx);else if(l.sides[i][0]==='l')assert.ok(bx>sx&&by===sy);else if(l.sides[i][0]==='r')assert.ok(bx<sx&&by===sy);else if(!(seated&&i===l.hero))assert.ok(by<sy&&bx===sx);
+   for(let j=i+1;j<size;j++){const [ox,oy]=px(l.seats[j]);assert.ok(Math.hypot(ox-sx,oy-sy)>=70,`seats ${i} and ${j} of ${size} do not overlap`);}}
+  if(size===9)assert.ok(!l.sides.some((s,i)=>s==='b'&&i!==l.hero),'nine seats: nobody else on the bottom row, clear of the action buttons');
+ }
+});

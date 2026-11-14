@@ -184,6 +184,44 @@ export function sizedLayout(base,size=6){
   return {seats:[tl,tr,r1,r2,br,bottom,bl,l2,l1],bets,dealer,slots:[0,0,1,2,3,3,3,4,5],hero:5};}
  return {...base,slots:[0,1,2,3,4,5],hero:3};
 }
+// ---- Phones in landscape: one fixed scheme for every table size ----
+// Every seat is a "pod" anchored on its avatar. The side of the table it sits on decides
+// where everything else goes, always measured in pixels from the avatar, so the felt
+// size never pushes anything out of place:
+//   top row (t)  : [plate] (avatar) [cards]   bet straight below the avatar
+//   sides (l, r) : avatar with the plate under it, cards toward the middle,
+//                  bet straight toward the middle
+//   bottom (b)   : avatar with the plate under it, cards above the avatar when shown,
+//                  bet straight above the avatar; your own seat keeps its large cards
+//                  and puts its bet beside them
+// "inner" is the horizontal direction of the middle of the table seen from the seat.
+// fw/fh: felt size in px. Coordinates are % of the felt, like the other layouts.
+const PHONE_SEATS={
+ 2:[[50,'T'],[50,'B']],
+ 4:[[50,'T'],[97,48],[50,'B'],[3,48]],
+ 5:[[33,'T'],[67,'T'],[97,62],[50,'B'],[3,62]],
+ 6:[[50,'T'],[97,27],[97,72],[50,'B'],[3,72],[3,27]],
+ // Nine: three a side (compact pods, plate beside the avatar) and nobody else on the
+ // bottom row, so the action buttons in the bottom-right corner never cover a player.
+ 9:[[33,'T'],[67,'T'],[97,17,1],[97,48,1],[97,79,1],[50,'B'],[3,79,1],[3,48,1],[3,17,1]]};
+const PHONE_HERO={2:1,4:2,5:3,6:3,9:5};
+export function phoneLayout(size=6,fw=711,fh=240,seated=false){
+ const list=PHONE_SEATS[size]||PHONE_SEATS[6],hero=PHONE_HERO[size]??3,px=(x,y,dx,dy)=>[x+dx/fw*100,y+dy/fh*100];
+ const seats=[],bets=[],dealer=[],sides=[],inner=[],slots=[];
+ list.forEach(([x,row,compact],i)=>{
+  const y=row==='T'?2/fh*100:row==='B'?97:row,base=row==='T'?'t':row==='B'?'b':x<50?'l':'r',dir=base==='l'?1:base==='r'?-1:x>50?-1:1;
+  if(compact){seats.push([x,y]);sides.push(base+'c');inner.push(dir>0?'right':'left');slots.push(base==='r'?(y<50?1:2):(y<50?5:4));
+   bets.push([...px(x,y,dir*112,0),dir>0?'start':'end']);dealer.push(px(x,y,0,36));return;}
+  const side=base;
+  seats.push([x,y]);sides.push(side);inner.push(dir>0?'right':'left');
+  slots.push(side==='t'?0:side==='b'?3:side==='r'?(y<50?1:2):(y<50?5:4));
+  if(side==='t'){bets.push(px(x,y,0,36));dealer.push(px(x,y,dir*64,34));}
+  else if(side==='l'||side==='r'){bets.push([...px(x,y,dir*58,0),dir>0?'start':'end']);dealer.push(px(x,y,dir*62,30));}
+  else if(seated&&i===hero){bets.push([...px(x,y,-58,-50),'end']);dealer.push(px(x,y,62,-46));}
+  else{bets.push(px(x,y,0,-40));dealer.push(px(x,y,dir*66,-30));}
+ });
+ return {seats,bets,dealer,slots,hero,sides,inner};
+}
 export function seatLayout(portrait=false,phone=false,narrow=false){
  // Phones in landscape: the top player sits a little lower and the lower side
  // players a little higher, so the table fills the screen and the action
