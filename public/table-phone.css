@@ -102,3 +102,8 @@ body.fitPhone .tableBet[data-align=chips]:has(.chipColumn+.chipColumn){transform
 body.fitPhone .tableBet[data-align=flip]{flex-direction:row-reverse;transform:translate(calc(-100% + 9px),-50%)}
 body.fitPhone .tableBet[data-align=flip]:has(.chipColumn+.chipColumn){transform:translate(calc(-100% + 18.5px),-50%)}
 body.fitPhone .tableBet[data-align=flip] .chipStacks{flex-direction:row-reverse}
+
+/* The pot is anchored by its bottom edge, 8 px above the board: however many chips it
+   shows, it only grows upward and never touches the cards. */
+body.fitPhone .game .pot,body.fitPhone .game .pot.settled{align-items:flex-end;transform:translate(-50%,calc(-100% + 6px))}
+body.fitPhone .game #potChips{height:auto;min-height:0;margin-bottom:1px}
