@@ -1,0 +1,81 @@
+/* Staff panel on a phone (agents first of all): the menu becomes a bar at the bottom, the
+   list of accounts becomes cards with large Send / Return buttons, and the list comes before
+   the "create account" form. Only the layout changes; every button does what it did. */
+@media (max-width:760px){
+ html body[data-view="management"]{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+
+ /* ---- Bottom menu ---- */
+ html body[data-view="management"] .panelNav{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:80;width:auto;height:auto;margin:0;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border:0;border-top:1px solid #263735;border-radius:0;background:#0b1413f2;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 -10px 30px #0009;overflow:visible}
+ html body[data-view="management"] .panelNav .navIdentity,html body[data-view="management"] .panelNav .navGroup{display:none!important}
+ html body[data-view="management"] .panelNav nav{display:flex;flex-direction:row;gap:2px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:0;margin:0}
+ html body[data-view="management"] .panelNav nav::-webkit-scrollbar{display:none}
+ html body[data-view="management"] .panelNav .navItem{flex:1 0 74px;min-width:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:56px;margin:0;padding:4px 2px;border:0;border-radius:12px;background:none;font-size:10.5px;font-weight:600;line-height:1.1;text-align:center;white-space:normal;color:#8eaaa1;position:relative}
+ html body[data-view="management"] .panelNav .navItem>span:first-child{font-size:19px;line-height:1;width:auto;height:auto;margin:0}
+ html body[data-view="management"] .panelNav .navItem.active{color:#e8fff3;background:#16302a}
+ html body[data-view="management"] .panelNav .navItem.active>span:first-child{color:#75e4b4}
+ html body[data-view="management"] .panelNav .navCount{position:absolute;top:4px;right:calc(50% - 22px)}
+ html body[data-view="management"] .panelNav .navItem.centerOnly{display:none}
+ html body.isCenter[data-view="management"] .panelNav .navItem.centerOnly{display:flex}
+
+ /* ---- Page ---- */
+ html body[data-view="management"] .panelContent{padding:16px 12px 24px}
+ html body[data-view="management"] #panelTitle{font-size:24px}
+ html body[data-view="management"] .surface{padding:16px;border-radius:16px}
+ html body[data-view="management"] input,html body[data-view="management"] select{font-size:16px} /* no zoom on iPhone */
+
+ /* ---- Accounts: the list first, the create form after it ---- */
+ html body[data-view="management"] .panelPage[data-page="accounts"]>div{display:flex;flex-direction:column;gap:14px}
+ html body[data-view="management"] .panelPage[data-page="accounts"]>div>.accountsSurface{order:-1}
+ html body[data-view="management"] #accountSearch{height:48px;width:100%}
+ html body[data-view="management"] .accountsSurface .sectionHead{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+
+ /* Each account is a card. */
+ html body[data-view="management"] .accountsSurface .tableScroll{overflow:visible;border:0;margin:0}
+ html body[data-view="management"] .accountsSurface table,html body[data-view="management"] .accountsSurface tbody{display:block;width:100%;min-width:0}
+ html body[data-view="management"] .accountsSurface thead{display:none}
+ html body[data-view="management"] #children tr{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px 12px;margin:0 0 12px;padding:14px;border:1px solid #263735;border-radius:16px;background:linear-gradient(180deg,#101c1b,#0c1514)}
+ html body[data-view="management"] #children tr:has(.emptyState){display:block}
+ html body[data-view="management"] #children td{display:block;padding:0;border:0;min-width:0;width:auto}
+ html body[data-view="management"] #children td:nth-child(1){grid-column:1}
+ html body[data-view="management"] #children td:nth-child(2){grid-column:2;justify-self:end;display:flex;gap:6px;align-items:center}
+ html body[data-view="management"] #children .accountCell strong{font-size:17px}
+ html body[data-view="management"] #children .accountAvatar{width:40px;height:40px;font-size:16px}
+ html body[data-view="management"] #children td.balanceCell{grid-column:1 / -1;font-size:26px;font-weight:750;color:#e8fff3;font-variant-numeric:tabular-nums;white-space:normal}
+ html body[data-view="management"] #children td.balanceCell .accountMeta{display:block;margin-top:2px;font-size:12px;font-weight:500;white-space:normal;color:#8eaaa1}
+ html body[data-view="management"] #children td:nth-child(4){grid-column:1 / -1}
+ html body[data-view="management"] #children .transferAmount{width:100%;max-width:none;height:52px;font-size:20px;font-weight:650;text-align:center;border-radius:12px}
+ html body[data-view="management"] #children td:nth-child(5){grid-column:1 / -1}
+ html body[data-view="management"] #children .rowActions{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+ /* The two everyday buttons, large and side by side. */
+ html body[data-view="management"] #children .rowActions [data-dir],html body[data-view="management"] #children .rowActions [data-cashout]{flex:1 1 calc(50% - 4px);height:52px;font-size:16px;font-weight:700;border-radius:12px}
+ html body[data-view="management"] #children .rowActions [data-dir="send"]{background:linear-gradient(180deg,#22b277,#11724c);border-color:#7dffc099;color:#fff}
+ html body[data-view="management"] #children .rowActions [data-dir="return"]{background:#18211f;border:1px solid #3a5049;color:#e8fff3}
+ /* Less frequent actions, smaller underneath. */
+ html body[data-view="management"] #children .rowActions .ghostButton{flex:1 1 calc(33% - 6px);min-width:0;height:40px;padding:0 6px;font-size:12.5px;border-radius:10px;white-space:nowrap}
+ html body[data-view="management"] #children .rowActions [data-cashout-cancel]{flex:1 1 100%}
+ html body[data-view="management"] #children .rowActions small{flex:1 1 100%}
+
+ /* Create account: one column, big fields. */
+ html body[data-view="management"] #createUser{display:grid;grid-template-columns:1fr;gap:12px}
+ html body[data-view="management"] #createUser input{height:50px}
+ html body[data-view="management"] #createUser button{height:52px;font-size:16px}
+
+ /* Other lists keep sliding sideways inside their box, never the whole page. */
+ html body[data-view="management"] .tableScroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ html body[data-view="management"] .panelPage{max-width:100%;overflow-x:hidden}
+}
+@media (max-width:760px){
+ /* Credit history: one compact row per entry, the amount always visible on the right. */
+ html body[data-view="management"] #ledger .tableScroll,html body[data-view="management"] #ledger table,html body[data-view="management"] #ledgerRows{display:block;width:100%;min-width:0;overflow:visible}
+ html body[data-view="management"] #ledger thead{display:none}
+ html body[data-view="management"] #ledgerRows tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ref amount" "date type";gap:4px 10px;padding:12px 2px;border-bottom:1px solid #263735}
+ html body[data-view="management"] #ledgerRows td{display:block;padding:0;border:0;min-width:0;white-space:normal}
+ html body[data-view="management"] #ledgerRows td:nth-child(1){grid-area:date;font-size:12px;color:#8eaaa1}
+ html body[data-view="management"] #ledgerRows td:nth-child(2){grid-area:type;justify-self:end}
+ html body[data-view="management"] #ledgerRows td:nth-child(3){grid-area:ref;font-size:15px;font-weight:600;color:#e8fff3;overflow:hidden;text-overflow:ellipsis}
+ html body[data-view="management"] #ledgerRows td:nth-child(4){grid-area:amount;justify-self:end;font-size:17px;font-weight:750;font-variant-numeric:tabular-nums}
+ html body[data-view="management"] #ledgerRows td:nth-child(n+5){grid-column:1 / -1;font-size:12px;color:#8eaaa1}
+ html body[data-view="management"] #ledgerRows tr:has(td[colspan]){display:block}
+}
+@media (max-width:760px){html body[data-view="management"] #ledger,html body[data-view="management"] #ledger .tableScroll{height:auto;max-height:none;overflow:visible}}
+@media (max-width:760px){html body[data-view="management"] #ledgerRows{max-height:none}}

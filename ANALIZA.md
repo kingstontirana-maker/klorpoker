@@ -691,3 +691,13 @@ Nga 40 fotot e ChatGPT u shtuan 19 portrete origjinale (`public/avatars/p01–p1
 - fotot me logo makinash (Rolls-Royce);
 - fotot me fëmijë me çipa poker dhe cigare.
 Nga seria e dytë (19 foto katrore 1254 px) u shtuan 17 (p20–p36). U lanë jashtë Hulk dhe një portret që i ngjan qartë Pablo Escobar-it.
+
+## Paneli i agjentit në telefon
+Te `public/staff-mobile.css`, vetëm për ekrane deri 760 px dhe vetëm për panelin e stafit. Desktopi nuk ndryshon, dhe asnjë buton nuk ndryshon atë që bën.
+- Menuja bëhet shirit poshtë, me ikona si te aplikacionet.
+- Te Players, lista e lojtarëve del e para dhe formulari i krijimit pas saj.
+- Çdo lojtar është kartë me: emrin, bilancin e madh, statusin, fushën e shumës në gjerësi të plotë, butonat e mëdhenj **+ Send** / **↙ Return**, dhe Mute / Password / Block më të vegjël poshtë.
+- Credit history: një rresht për çdo lëvizje, me shumën gjithmonë të dukshme djathtas.
+- Fushat kanë shkrim 16 px, që iPhone të mos zmadhojë faqen kur shtyp.
+
+U provua te demo: dërgimi i €10 nga telefoni kaloi saktë (lojtari 120→130, agjenti 980→970).
