@@ -96,3 +96,16 @@ test('during a rolling deploy the older server can no longer write',()=>{
 test('no files: nothing to import',()=>{
  const dir=tmp(),s=openStore(path.join(dir,'klor.db'));assert.equal(s.importFiles(path.join(dir,'a'),path.join(dir,'b')),null);s.close();
 });
+
+test('database browser: every table, newest first, secrets masked, read-only',async()=>{
+ const {openStore}=await import('./store.js');const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'dbb-')),s=openStore(path.join(dir,'b.db'));
+ s.commit({users:[{id:'u1',username:'ann',role:'USER',balance:500,salt:'abc',passHash:'def',cryptoSecret:'zzz'}],ledger:[{id:'l1',type:'TRANSFER',amount:5,time:1},{id:'l2',type:'TRANSFER',amount:7,time:2}],tables:[],rakePercent:5});
+ const names=s.browseTables().map(t=>t.name);for(const n of ['users','ledger','hands','audit','settings'])assert.ok(names.includes(n),n);
+ const u=s.browseRows('users');const row=Object.fromEntries(u.columns.map((c,i)=>[c,u.rows[0][i]]));
+ assert.equal(row.username,'ann');assert.equal(row.balance,500);assert.equal(row.salt,'••••••');assert.equal(row.passHash,'••••••');assert.equal(row.cryptoSecret,'••••••');
+ const l=s.browseRows('ledger');assert.equal(l.rows[0][l.columns.indexOf('id')],'l2','newest first');
+ assert.equal(s.browseRows('users',{q:"x' OR 1=1 --"}).total,0,'search is a value, never SQL');
+ assert.throws(()=>s.browseRows('users; DROP TABLE users'),/Unknown table/);assert.equal(s.browseRows('users').total,1,'nothing was dropped');
+ s.close();fs.rmSync(dir,{recursive:true,force:true});
+});

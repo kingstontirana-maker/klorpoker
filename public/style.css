@@ -435,3 +435,28 @@ html{touch-action:manipulation}
 @media(max-width:760px){.lobbyTabs{flex-wrap:nowrap}.lobbyTabs button{min-width:0;padding:10px 4px;gap:4px}.lobbyTabs button b{min-width:0;padding:2px 5px}}
 @media(max-width:760px){.lobbyTabs button{font-size:11.5px;letter-spacing:-.01em;overflow:hidden}.lobbyTabs button b{font-size:10px;padding:1px 4px}}
 @media(max-width:760px){.lobbyTabs button{flex:1 1 auto}}
+
+/* ---- Database page (centre) ---- */
+.dbHead{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dbTables{display:flex;flex-wrap:wrap;gap:6px}
+.dbTables button{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:10px;border:1px solid #263735;background:#0c1514;color:var(--muted);font:600 12.5px/1 Inter,system-ui,sans-serif}
+.dbTables button b{padding:2px 6px;border-radius:999px;background:#ffffff10;font-size:10.5px;color:inherit}
+.dbTables button[aria-selected="true"]{color:#fff;background:linear-gradient(180deg,#19a36c,#0b5c3d);border-color:#7dffc099}
+.dbTools{display:flex;gap:10px;align-items:center}
+.dbTools input{width:230px;max-width:100%;height:38px}
+.dbLive{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#7ff0b9;white-space:nowrap}
+.dbLive i{width:8px;height:8px;border-radius:50%;background:#2fe08c;box-shadow:0 0 8px #2fe08c}
+.dbLive.off{color:#f0a07f}.dbLive.off i{background:#ef5d6b;box-shadow:none}
+.dbInfo{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+.dbScroll{max-height:62vh;overflow:auto;border:1px solid #1b2a27;border-radius:12px}
+.dbTable{font:12px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;border-collapse:separate;border-spacing:0;min-width:100%}
+.dbTable th{position:sticky;top:0;z-index:1;background:#101c19;text-align:left;white-space:nowrap;padding:8px 10px;font:700 11px/1 Inter,system-ui,sans-serif;letter-spacing:.04em;color:#bfe9d0}
+.dbTable td{padding:7px 10px;border-top:1px solid #16231f;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;vertical-align:top;color:#dbe8e2}
+.dbTable td.dbLong{cursor:pointer}
+.dbTable td.dbLong.open{white-space:pre-wrap;word-break:break-all;max-width:520px}
+.dbTable td.dbNull{color:#5d716a;font-style:italic}
+.dbTable tbody tr:hover td{background:#ffffff06}
+.dbPager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px;font-size:12.5px;color:var(--muted)}
+.dbNote{margin:10px 0 0;font-size:11.5px;color:#6f857d}
+@media(max-width:760px){.dbTools{width:100%}.dbTools input{flex:1;width:auto}.dbScroll{max-height:none}}
+.dbTools input{padding:0 12px;border-radius:10px;border:1px solid #263735;background:#071010;color:#e8f3ee;font-size:14px}

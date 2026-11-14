@@ -154,6 +154,29 @@ export function openStore(file){
    });
    return db&&{db,hands:hands.length,skipped};
   },
+  // ---- Database browser (centre only, read-only) ----
+  // Lists the tables and reads one page of rows, newest first. The "data" column (one JSON
+  // object per row) is opened into its own columns; other JSON stays as text. Secrets never leave the
+  // server: password hashes and salts, session keys and any field whose name says it is a
+  // password, key, token, secret, seed or mnemonic are replaced by "••••••".
+  browseTables(){return sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(({name})=>({name,rows:sql.prepare('SELECT COUNT(*) AS n FROM "'+name+'"').get().n,columns:sql.prepare('PRAGMA table_xinfo("'+name+'")').all().map(c=>c.name)}));},
+  browseRows(table,{offset=0,limit=50,q=''}={}){
+   const known=this.browseTables().find(t=>t.name===table);if(!known)throw Object.assign(Error('Unknown table'),{status:404});
+   const cols=known.columns,quoted=cols.map(c=>'"'+c+'"').join(','),text=cols.filter(c=>!/^(seq|id|at|time|started_at|hand_id|result|won|vpip|bot|balance)$/.test(c)||c==='id');
+   const where=q?' WHERE '+text.map(c=>'CAST("'+c+'" AS TEXT) LIKE ?').join(' OR '):'',args=q?text.map(()=>'%'+q+'%'):[];
+   const order=cols.includes('seq')?'seq':cols.includes('at')?'at':cols.includes('started_at')?'started_at':'rowid';
+   const total=sql.prepare('SELECT COUNT(*) AS n FROM "'+table+'"'+where).get(...args).n;
+   const rows=sql.prepare('SELECT '+quoted+' FROM "'+table+'"'+where+' ORDER BY '+order+' DESC LIMIT ? OFFSET ?').all(...args,Math.max(1,Math.min(200,limit)),Math.max(0,offset));
+   const SECRET=/^(passhash|salt|key)$|password|secret|token|private|mnemonic|seed|apikey|api_key|xprv/i,mask=v=>v==null||v===''?v:'••••••';
+   const clean=(k,v)=>{if(SECRET.test(k)&&!(table!=='sessions'&&k==='key'))return mask(v);if(v&&typeof v==='object'){if(Array.isArray(v))return v.map((x,i)=>clean(String(i),x));return Object.fromEntries(Object.entries(v).map(([a,b])=>[a,clean(a,b)]));}return v;};
+   const JSONCOL=new Set(['data']),out=[],extra=new Set();
+   for(const r of rows){const row={};for(const c of cols){let v=r[c];
+     if(table==='sessions'&&c==='key'){row[c]=v?String(v).slice(0,6)+'…':v;continue;}
+     if(typeof v==='string'&&/^[[{]/.test(v)){try{const o=JSON.parse(v);if(JSONCOL.has(c)&&o&&typeof o==='object'&&!Array.isArray(o)){for(const [k,x] of Object.entries(o)){extra.add(k);row[k]=clean(k,x);}continue;}v=clean(c,o);}catch{}}
+     row[c]=clean(c,v);}
+    out.push(row);}
+   const shown=[...cols.filter(c=>!(JSONCOL.has(c)&&out.every(r=>!(c in r)))),...[...extra].filter(c=>!cols.includes(c))];
+   return {table,total,offset,columns:shown,rows:out.map(r=>shown.map(c=>{const v=r[c];return v===undefined?null:typeof v==='object'&&v!==null?JSON.stringify(v).slice(0,4000):typeof v==='string'?v.slice(0,4000):v;}))};},
   close(){sql.close();},
  };
  return store;

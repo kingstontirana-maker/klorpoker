@@ -804,3 +804,11 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - stafi mund të tërheqë kredi nga portofoli i një lojtari pa pëlqimin e tij;
   - qendra mund të tërheqë edhe nga lojtarët me depozitë crypto;
   - stafi mund të ndryshojë fjalëkalimin e lojtarit dhe të hyjë si ai (shënohet në log).
+
+## Qendra: tab-i Database
+- Te paneli i qendrës, menuja "Database" tregon të gjitha tabelat e databazës (users, ledger, hands, hand_players, audit, sessions, settings, game_tables, chat_reports, meta) me numrin e rreshtave.
+- Për çdo tabelë shfaqen kolonat dhe rreshtat, nga më i riu, 50 për faqe, me kërkim dhe faqe të mëparshme/të tjera. Kolona `data` (JSON) hapet në kolonat e veta. Qelizat e gjata hapen me një prekje.
+- Rifreskohet çdo 2 sekonda sa kohë faqja është e hapur dhe e dukshme. Kur del nga faqja, ndalon.
+- **Vetëm lexim:** nuk ka asnjë mënyrë për të ndryshuar të dhëna nga ky tab. Kërkimi trajtohet si vlerë, kurrë si SQL, dhe emri i tabelës pranohet vetëm nëse ekziston.
+- **Sekretet nuk dalin kurrë nga serveri:** passHash, salt, çelësat e sesioneve (shfaqen vetëm 6 shenjat e para) dhe çdo fushë me emër si password, secret, token, private, seed ose mnemonic dalin si ••••••.
+- Vetëm qendra e hap (admini, agjenti dhe lojtari marrin 403). Shumat janë në cent (100 = €1), siç ruhen në databazë.
