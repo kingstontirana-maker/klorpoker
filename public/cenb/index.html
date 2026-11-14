@@ -6,8 +6,8 @@
  <label>Qendra · përdoruesi<input name="centerUsername" autocomplete="username" required></label>
  <label>Qendra · fjalëkalimi<input name="centerPassword" type="password" autocomplete="current-password" required></label>
  <label>CENB · përdoruesi i ri<input name="username" pattern="[a-zA-Z0-9_]{3,24}" value="cenb" required></label>
- <label>CENB · fjalëkalimi i ri (12+ shenja, shkronja dhe numra)<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
- <label>Përsërit fjalëkalimin e ri<input name="again" type="password" minlength="12" autocomplete="new-password" required></label>
+ <label>CENB · fjalëkalimi i ri<input name="password" type="password" autocomplete="new-password" required></label>
+ <label>Përsërit fjalëkalimin e ri<input name="again" type="password" autocomplete="new-password" required></label>
  <button class="gold">Krijo hyrjen</button><p class="err" id="setupErr" role="alert"></p></form>
 <form class="loginCard" id="loginForm" autocomplete="on"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Kontrolli i botave · hyrje e veçantë</p>
  <label>Përdoruesi<input name="username" autocomplete="username" required></label>
@@ -76,8 +76,8 @@
    <button class="gold">Ruaj limitet</button></div></form>
   <form class="card" id="passForm"><h2>Fjalëkalimi i CENB</h2><p id="passNote">Pas ndryshimit, sesionet e tjera mbyllen.</p><div class="grid">
    <label>Fjalëkalimi aktual<input name="current" type="password" autocomplete="current-password" required></label>
-   <label>I riu (12+ shenja)<input name="next" type="password" minlength="12" autocomplete="new-password" required></label>
-   <label>Përsërite<input name="again" type="password" minlength="12" autocomplete="new-password" required></label>
+   <label>I riu<input name="next" type="password" autocomplete="new-password" required></label>
+   <label>Përsërite<input name="again" type="password" autocomplete="new-password" required></label>
    <button class="gold">Ndrysho</button></div></form></section>
   <section data-pane="log" class="hidden"><div class="card"><h2>Aktiviteti në CENB</h2><p>Çdo hyrje dhe çdo ndryshim, me adresën nga erdhi.</p><div class="tableWrap" id="logList"></div></div></section>
  </main>

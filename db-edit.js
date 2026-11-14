@@ -48,7 +48,7 @@ export function createDbEditor({db,store,save,fail,uid,hash,secret,runtime,makeT
    if(db.users.some(x=>x.username.toLowerCase()===username.toLowerCase()))fail('That username is taken');
    if(!['ADMIN','MANAGER','AGENT','USER'].includes(v.role))fail('Role must be ADMIN, MANAGER, AGENT or USER');
    const parent=db.users.find(x=>x.id===v.parentId);if(!parent)fail('parentId must be an existing account');
-   if(password.length<8||!/[A-Za-z]/.test(password)||!/\d/.test(password))fail('Give the new account a password: at least 8 characters, letters and numbers');
+   if(!password||password.length>256)fail('Give the new account a password');
    const balance=Number.isSafeInteger(v.balance)&&v.balance>0?v.balance:0,salt=secret();
    const {password:_,passHash,salt:__,id:___,...rest}=v;
    const user={...rest,id:uid(),username,role:v.role,parentId:parent.id,salt,passHash:hash(password,salt),balance};db.users.push(user);adjust(user,balance,by,'database insert');return user.id;}

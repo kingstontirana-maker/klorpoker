@@ -76,8 +76,10 @@ const clientIp=req=>String(req.headers['x-forwarded-for']||'').split(',')[0].tri
 const samePassword=(user,password)=>{const a=Buffer.from(hash(password,user.salt),'hex'),b=Buffer.from(user.passHash,'hex');return a.length===b.length&&crypto.timingSafeEqual(a,b);};
 // Sign-in checks the password off the main thread, so many players signing in at once never pause the tables.
 const samePasswordAsync=(user,password)=>new Promise(ok=>crypto.scrypt(password,user.salt,64,(err,key)=>{if(err||!user.passHash)return ok(false);const b=Buffer.from(user.passHash,'hex');ok(key.length===b.length&&crypto.timingSafeEqual(key,b));}));
-const strongEnough=p=>typeof p==='string'&&p.length>=8&&p.length<=128&&/[A-Za-z]/.test(p)&&/\d/.test(p);
-const PASSWORD_RULE='The password must have at least 8 characters, with letters and numbers.';
+// Any password is accepted (at least one character); 256 at most, so a huge text cannot keep
+// the server busy hashing it.
+const strongEnough=p=>typeof p==='string'&&p.length>=1&&p.length<=256;
+const PASSWORD_RULE='Enter a password.';
 function leaveAllTables(user,reason){for(const t of runtime.values())if(t.seats.some(s=>s?.userId===user.id)){try{engine.leave(t,user);}catch{}}}const roleCheck=(u,...roles)=>{if(!roles.includes(u.role))fail('Forbidden',403);};const childOf=(u,p)=>u.parentId===p.id;
 // A player who registered alone holds their own money: only the centre manages that account.
 // Their agent keeps the rake share and can see and mute them, but cannot touch wallet or login.

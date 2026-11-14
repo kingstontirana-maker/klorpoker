@@ -16,7 +16,7 @@ export function cenbDocument(host,pathname){
 
 const IDLE_MS=2*3600_000,MAX_MS=12*3600_000,LOCK_MS=15*60_000;
 const sha=v=>crypto.createHash('sha256').update(String(v)).digest();
-const strong=p=>String(p).length>=12&&/[a-zA-Z]/.test(p)&&/[0-9]/.test(p);
+const strong=p=>String(p).length>=1&&String(p).length<=256;
 
 export function createCenb({db,bots,save,fail,env=process.env,checkCenter=()=>false}){
  const envPass=String(env.CENB_PASSWORD||''),envUser=String(env.CENB_USER||'cenb').trim().toLowerCase(),envSalt=crypto.randomBytes(16),envHash=envPass.length>=12?crypto.scryptSync(envPass,envSalt,32):null;
@@ -46,7 +46,7 @@ export function createCenb({db,bots,save,fail,env=process.env,checkCenter=()=>fa
   if(!checkCenter(String(body.centerUsername||''),String(body.centerPassword||''))){wrong(ip,f,'Failed CENB setup');fail('The center username or password is wrong',401);}
   const user=String(body.username||'').trim().toLowerCase(),password=String(body.password||'');
   if(!/^[a-z0-9_]{3,24}$/.test(user))fail('CENB username: 3–24 letters, numbers or _');
-  if(!strong(password))fail('The CENB password needs at least 12 characters, with letters and numbers');
+  if(!strong(password))fail('Enter a password');
   if(checkCenter(String(body.centerUsername||''),password))fail('Choose a password different from the center password');
   fails.delete(ip);store(user,password);const token=openSession(ip);log(ip,'Created the CENB sign-in',user);save();return {token,user};
  }
@@ -59,7 +59,7 @@ export function createCenb({db,bots,save,fail,env=process.env,checkCenter=()=>fa
   const s=sessionOf(token);if(!s)fail('Sign in to CENB',401);
   if(p==='logout'){sessions.delete(s.key);log(ip,'Signed out');save();return {ok:true};}
   if(p==='password'){const c=creds();if(c.fromServer)fail('This sign-in is set on the server (CENB_PASSWORD): change it there.');
-   if(!c.check(body.current||''))fail('The current password is wrong',401);if(!strong(body.next||''))fail('The new password needs at least 12 characters, with letters and numbers');
+   if(!c.check(body.current||''))fail('The current password is wrong',401);if(!strong(body.next||''))fail('Enter a password');
    store(c.user,body.next);for(const [k] of sessions)if(k!==s.key)sessions.delete(k);log(ip,'Changed the CENB password');save();return {ok:true};}
   const c=center();if(!c)fail('There is no center account',500);
   if(p==='overview')return {...bots.route('/api/bots/overview',body,c),centerBalance:c.balance/100,log:db.cenbLog.slice(-40).reverse(),signIn:{user:creds().user,fromServer:creds().fromServer}};

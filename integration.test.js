@@ -200,7 +200,8 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     const fresh=(await call('login','',{username:'test3',password})).data.token;
     const old=await call('state',tokens[3]);assert.equal(old.status,401);assert.match(old.data.error,/another device/);
     assert.equal((await call('state',fresh)).status,200);
-    assert.equal((await call('users/create',tokens[2],{username:'weakpass',password:'short'})).status,400);
+    assert.equal((await call('users/create',tokens[2],{username:'nopass',password:''})).status,400,'an empty password is refused');
+    assert.equal((await call('users/create',tokens[2],{username:'shortpass',password:'1'})).status,200,'any other password is accepted');
     assert.equal((await call('users/create',tokens[2],{username:'goodpass',password:'Fjalekalim9'})).status,200);
     const t4=(await call('users',tokens[2])).data.find(k=>k.username==='test4');assert.ok('lastLoginAt' in t4&&'blocked' in t4);
     assert.equal((await call('users/status',tokens[2],{userId:t4.id,blocked:true})).status,200);
@@ -209,7 +210,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     assert.equal((await call('users/status',tokens[1],{userId:t4.id,blocked:false})).status,404,'only the direct manager');
     assert.equal((await call('users/status',tokens[2],{userId:t4.id,blocked:false})).status,200);
     const t4b=(await call('login','',{username:'test4',password})).data.token;
-    assert.equal((await call('password',t4b,{current:password,next:'abc'})).status,400);
+    assert.equal((await call('password',t4b,{current:password,next:''})).status,400,'an empty new password is refused');
     assert.equal((await call('password',t4b,{current:'wrong',next:'NewPass987'})).status,400);
     assert.equal((await call('password',t4b,{current:password,next:'NewPass987'})).status,200);
     assert.equal((await call('login','',{username:'test4',password:'NewPass987'})).status,200);

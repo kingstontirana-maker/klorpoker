@@ -364,7 +364,7 @@ test('CENB: first-visit setup by the center, its own sign-in and lockout',()=>{
  const c=createCenb({db,bots,save:()=>{},fail,env:{},checkCenter});
  assert.deepEqual(c.route('status',{},'','1'),{ready:false,setup:true});assert.throws(()=>c.route('login',{username:'cenb',password:'x'},'','1'),/no sign-in yet/);
  assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'nope',username:'boss',password:'a-long-pass-2026'},'','4.4.4.4'),/center username or password is wrong/);
- assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'center-pass-123',username:'boss',password:'short1'},'','4'),/12 characters/);
+ assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'center-pass-123',username:'boss',password:''},'','4'),/Enter a password/);
  assert.throws(()=>c.route('setup',{centerUsername:'center',centerPassword:'center-pass-123',username:'boss',password:'center-pass-123'},'','4'),/different from the center/);
  const first=c.route('setup',{centerUsername:'Center',centerPassword:'center-pass-123',username:'Boss',password:'a-long-pass-2026'},'','4');assert.equal(first.user,'boss');assert.ok(first.token.length>=64);
  assert.ok(db.cenbAuth.hash&&!JSON.stringify(db.cenbAuth).includes('a-long-pass-2026'),'only a hash is stored');

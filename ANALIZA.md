@@ -846,3 +846,9 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - botat që janë në mes të një dore ngrihen kur mbaron dora, dhe kredia e tyre kthehet vetë (kontrollohet në çdo tick).
 - **Pas kthimit:** llogaritë e botave mbeten, me €0. Çdo kthim shënohet në ledger si `BOT_REFUND` dhe te log-u i CENB.
 - **Testuar në demo:** €100,000 nga 5 bota, dhe 4 bota të ulur në tavolinë. Kredia u kthye deri në cent dhe kontrolli i parave mbeti OK.
+
+## Fjalëkalimet: pa kufizime
+- **Çfarë pranohet:** çdo fjalëkalim, mjafton të mos jetë bosh. Nuk kërkohen më 8 shenja, shkronja ose numra (te CENB nuk kërkohen më 12).
+- **Kufiri i vetëm:** 256 shenja, që një tekst gjigant të mos e zërë serverin me llogaritjen e hash-it. Asnjë njeri nuk e arrin këtë në praktikë.
+- **Ku vlen:** regjistrimi, krijimi i llogarive, ndryshimi i fjalëkalimit (vetë ose nga menaxheri), tab-i Database dhe CENB. Tekstet "At least 8…" janë hequr nga faqet.
+- **Mbrojtja nga hamendësimi:** pas 5 tentativave të gabuara hyrja bllokohet për 15 minuta. Kjo vazhdon të mbrojë edhe fjalëkalimet e shkurtra.
