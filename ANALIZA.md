@@ -852,3 +852,12 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Kufiri i vetëm:** 256 shenja, që një tekst gjigant të mos e zërë serverin me llogaritjen e hash-it. Asnjë njeri nuk e arrin këtë në praktikë.
 - **Ku vlen:** regjistrimi, krijimi i llogarive, ndryshimi i fjalëkalimit (vetë ose nga menaxheri), tab-i Database dhe CENB. Tekstet "At least 8…" janë hequr nga faqet.
 - **Mbrojtja nga hamendësimi:** pas 5 tentativave të gabuara hyrja bllokohet për 15 minuta. Kjo vazhdon të mbrojë edhe fjalëkalimet e shkurtra.
+
+## Qendra krijon kredi (pa kufi)
+- **Rregulli:** qendra nuk refuzohet më për mungesë krediti. Kur jep më shumë se sa ka në portofol, pjesa që mungon krijohet automatikisht dhe regjistrohet si transaksion `MINT`. Kjo vlen kur:
+  - i dërgon adminit;
+  - financon botat (krijim, mbushje tavolinash, top-up);
+  - i kreditohet një lojtari një depozitë crypto.
+- **Kontrolli i parave:** totali i tij rritet me të njëjtën shumë, kështu që mbetet "OK" dhe çdo euro mbetet e gjurmueshme deri te krijimi i saj (Database → ledger → `MINT`).
+- **Në panel:** karta e portofolit te qendra shkruan "Unlimited · credit is created when needed · €X created in all", dhe lart djathtas shfaqet "∞ Unlimited". Depozitat crypto nuk presin më për mungesë krediti te qendra.
+- **Testuar në demo:** qendra me €999,000 dërgoi €2,000,000. U krijuan €1,001,000 (`MINT`) dhe kontrolli i parave mbeti OK me totalin €2,001,000.

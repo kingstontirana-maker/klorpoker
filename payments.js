@@ -9,6 +9,7 @@
 // Withdrawals: the euro amount is taken from the player's wallet and held until the
 // center marks it paid (with the transaction hash) or rejects it (money returns).
 import crypto from 'node:crypto';
+import {centerFunds} from './credit.js';
 
 export const USDT_TRC20='TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -75,7 +76,7 @@ export function createPayments({db,save,fail,fetchImpl=globalThis.fetch,now=()=>
    C.seen=C.seen.slice(-5000);C.unmatched=[...C.unmatched.filter(x=>x.status!=='open').slice(-300),...C.unmatched.filter(x=>x.status==='open')];C.lastScan=now();save();return {checked:(body.data||[]).length,credited};
   }finally{scanning=null;}})();
   return scanning;}
- function creditDeposit(d,tx,at){const u=db.users.find(x=>x.id===d.userId),c=center();if(!u||!c)return false;const cents=toCents(d.micro,d.rate);if(c.balance<cents){d.note='Center credit is too low';return false;}
+ function creditDeposit(d,tx,at){const u=db.users.find(x=>x.id===d.userId),c=center();if(!u||!c)return false;const cents=toCents(d.micro,d.rate);centerFunds(db,c,cents,'crypto deposit');if(c.balance<cents){d.note='Center credit is too low';return false;}
   c.balance-=cents;u.balance+=cents;delete d.note;Object.assign(d,{status:'credited',tx,paidAt:at,cents});ledger('CRYPTO_DEPOSIT',c.id,u.id,cents,{tx,usdt:usdt(d.micro),rate:d.rate});return true;}
 
  // ---- routes ----

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {centerFunds} from './credit.js';
 import {Worker} from 'node:worker_threads';
 import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {decide,handStrength,rangeEquity,preflopRank,STYLES} from './bot-brain.js';
@@ -149,7 +150,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  }
  function create(u,name,amount,body,batch=false){
   if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');
-  if(amount>u.balance)fail('The center does not have enough credit for this budget');
+  centerFunds(db,u,amount,'bot budget');if(amount>u.balance)fail('The center does not have enough credit for this budget');
   const b={id:crypto.randomUUID(),username:name,role:'USER',isBot:true,parentId:u.id,balance:amount,createdAt:Date.now(),bot:{enabled:false,funded:amount,baseline:amount,hands:0}};
   if(!batch)periods();configure(b,body);u.balance-=amount;db.users.push(b);moveStarts(amount);audit('BOT_FUND',b,amount);return b;
  }
@@ -183,7 +184,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
    }
   }
   if(bots().length+newBots>MAX_BOTS)fail('Mbushja do të tejkalojë kufirin prej '+MAX_BOTS+' botësh');
-  if(!Number.isSafeInteger(funding)||funding>u.balance)fail('Kredia virtuale e qendrës nuk mjafton për mbushjen');
+  if(Number.isSafeInteger(funding))centerFunds(db,u,funding,'table fill');if(!Number.isSafeInteger(funding)||funding>u.balance)fail('Kredia virtuale e qendrës nuk mjafton për mbushjen');
   db.botFill??={tables:{}};db.botFill.tables??={};
   db.botFill.settings=Object.fromEntries(Object.keys(fillDefaults).map(k=>[k,c[k]]));
   for(const report of reports)if(!report.skipped)db.botFill.tables[report.id]={emptySeats:report.emptySeats};
@@ -223,7 +224,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
    if(body.returnPercent!==undefined)next.returnPercent=Number(body.returnPercent);
    Object.assign(g,next);save();return guardInfo();}
   if(p==='/api/bots/create'){const b=create(u,String(body.name||'').trim(),cents(body.budget,'Budget'),body);save();return {ok:true,id:b.id};}
-  if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');if(each*n>u.balance)fail('The center does not have enough credit for this budget');
+  if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');centerFunds(db,u,each*n,'bot budget');if(each*n>u.balance)fail('The center does not have enough credit for this budget');
    if(db.botNames?.length&&db.botNames.filter(name=>!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase())).length<n)fail('Nuk ka mjaft emra të lirë në listë');
    if(bots().length+n>MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');const made=[];for(let i=0;i<n;i++)made.push(create(u,freshName(),each,{...body,risk:body.risk==='mix'?['low','medium','high'][i%3]:body.risk}).id);save();return {ok:true,ids:made};}
   // Return every bot's credit to the centre: all bots stop; the ones at a table leave when
@@ -236,7 +237,7 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
   else if(p==='/api/bots/status'){if(typeof body.enabled!=='boolean')fail('Invalid status');
    if(body.enabled){if(/^House /.test(b.bot.error||''))fail('The house limit is reached: raise it or wait for the next period');if(b.bot.tableId!=='auto'&&b.balance<b.bot.buyin&&!seatOf(b))fail('The bot wallet is smaller than its buy-in');b.bot.baseline=equity(b);}
    b.bot.enabled=body.enabled;b.bot.error=null;if(!body.enabled){const at=seatOf(b);if(at)engine.leave(at.t,b);}audit('BOT_MANAGE',b,0,{enabled:body.enabled});}
-  else if(p==='/api/bots/topup'){if(seatOf(b))fail('Let the bot leave the table first');const n=cents(body.amount,'Amount');if(n>u.balance)fail('The center does not have enough credit');periods();u.balance-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;moveStarts(n);audit('BOT_FUND',b,n);}
+  else if(p==='/api/bots/topup'){if(seatOf(b))fail('Let the bot leave the table first');const n=cents(body.amount,'Amount');centerFunds(db,u,n,'bot top-up');if(n>u.balance)fail('The center does not have enough credit');periods();u.balance-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;moveStarts(n);audit('BOT_FUND',b,n);}
   else if(p==='/api/bots/delete'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table first');periods();const left=b.balance+(rakeMap.get(b.id)?.rake||0);u.balance+=b.balance;audit('BOT_REFUND',b,b.balance);db.users.splice(db.users.indexOf(b),1);moveStarts(-left);rakeTotal-=rakeMap.get(b.id)?.rake||0;rakeMap.delete(b.id);}
   else fail('Not found',404);
   save();return {ok:true};}

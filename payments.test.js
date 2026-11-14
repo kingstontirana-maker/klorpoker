@@ -62,18 +62,18 @@ test('expired deposits are not credited automatically; the center can assign a t
  assert.throws(()=>pay.route('/api/crypto/assign',{tx,username:'ana'},center),/not found/,'one transfer, one credit');
 });
 
-test('a paid deposit waits while center credit is too low, then is credited; nothing is credited twice',async()=>{
- const {db,pay,p1,send,tick}=world();const center=db.users.find(u=>u.role==='CENTER'),had=center.balance;center.balance=100;
+test('a paid deposit is credited even when the center wallet is low: the missing credit is created; nothing is credited twice',async()=>{
+ const {db,pay,p1,send,tick}=world();const center=db.users.find(u=>u.role==='CENTER');center.balance=100;
  const d=pay.route('/api/crypto/deposit',{amount:50},p1);tick(1000);send(Math.round(Number(d.amount)*1e6));tick(1000);await pay.scan();
- assert.equal(p1.balance,0);assert.equal(db.crypto.deposits[0].note,'Center credit is too low');assert.equal(db.crypto.seen.length,0,'kept for the next try');
- center.balance=had;await pay.scan();const paid=Math.floor(Number(d.amount)*0.9*100);assert.equal(p1.balance,paid);assert.equal(db.crypto.deposits[0].status,'credited');assert.equal(db.crypto.deposits[0].note,undefined);
- await pay.scan(true);assert.equal(p1.balance,paid);
+ const paid=Math.floor(Number(d.amount)*0.9*100);assert.equal(p1.balance,paid);assert.equal(db.crypto.deposits[0].status,'credited');
+ assert.equal(db.ledger.find(x=>x.type==='MINT')?.amount,paid-100,'only the missing part was created');assert.equal(center.balance,0);
+ await pay.scan(true);assert.equal(p1.balance,paid,'credited once');
 });
 
-test('still too low when the deposit expires: the transfer is listed for the center',async()=>{
- const {db,pay,p1,send,tick}=world();db.users.find(u=>u.role==='CENTER').balance=100;
+test('a deposit is never stuck on the center wallet: it is credited at once',async()=>{
+ const {db,pay,p1,send,tick}=world();db.users.find(u=>u.role==='CENTER').balance=0;
  const d=pay.route('/api/crypto/deposit',{amount:50},p1);tick(1000);const tx=send(Math.round(Number(d.amount)*1e6));tick(1000);await pay.scan();
- tick(4*3600000);await pay.scan(true);assert.equal(db.crypto.unmatched.find(x=>x.tx===tx)?.status,'open');assert.equal(p1.balance,0);
+ tick(4*3600000);await pay.scan(true);assert.ok(!db.crypto.unmatched.some(x=>x.tx===tx),'nothing left waiting');assert.ok(p1.balance>0);
 });
 
 test('a late payment is found without any open deposit, even after downtime; open ones are never trimmed away',async()=>{

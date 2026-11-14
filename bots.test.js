@@ -26,7 +26,6 @@ test('bot budgets, permissions, configuration and refunds conserve credit',()=>{
  const {center,db,manager}=world();
  assert.throws(()=>manager.route('/api/bots',{},{role:'AGENT'}),/Only the center/);
  assert.throws(()=>manager.route('/api/bots/create',{name:'NoTable',budget:100,tableId:'x',stopLoss:10},center),/valid table/);assert.equal(center.balance,1000000);
- assert.throws(()=>manager.route('/api/bots/create',{name:'Huge',budget:999999,tableId:'1'},center),/enough credit/);
  manager.route('/api/bots/create',{name:'TestBot',budget:100,tableId:'1',buyin:40,stopLoss:30,stopWin:10},center);const b=db.users[1];
  assert.equal(b.username,'TestBot');assert.ok(b.isBot);assert.equal(center.balance,990000);assert.equal(b.balance,10000);assert.deepEqual([b.bot.buyin,b.bot.stopLoss,b.bot.stopWin],[4000,3000,1000]);
  assert.throws(()=>manager.route('/api/bots/configure',{id:b.id,tableId:'1',risk:'crazy',buyin:40,stopLoss:30},center),/Invalid style/);
@@ -394,4 +393,11 @@ test('decisions on the bot thread come back and the game plays on with them',asy
  sitDeep(engine,t,human(1,500000),0,500);manager.tick();assert.ok(engine.startHand(t));
  let acted=false;for(let k=0;k<400&&LIVE.includes(t.phase)&&!acted;k++){const s=t.seats[t.turn];if(s?.userId===b.id){const hand=t.hand,turn=t.turnStartedAt;manager.tick(Date.now());await new Promise(r=>setTimeout(r,700));manager.tick(turn+20000);acted=t.hand!==hand||t.turnStartedAt!==turn||!LIVE.includes(t.phase);}else engine.act(t,s.userId,t.currentBet>s.roundBet?'call':'check');}
  assert.ok(acted,'the bot acted with the answer from its thread');
+});
+
+test('the center has no credit limit: a bot budget above its wallet creates the missing credit (MINT)',()=>{
+ const {center,db,manager}=world();const total=()=>db.users.reduce((n,u)=>n+u.balance,0);db.moneyTotal=total();
+ manager.route('/api/bots/create',{name:'Huge',budget:5000000,tableId:'1',buyin:40,stopLoss:30},center);
+ const mint=db.ledger.find(x=>x.type==='MINT');assert.ok(mint,'credit was created');assert.equal(mint.amount,500000000-1000000);
+ assert.equal(center.balance,0,'the centre gave out everything it had plus what it created');assert.equal(total(),db.moneyTotal,'the money check total follows');
 });

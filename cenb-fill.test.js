@@ -65,7 +65,7 @@ test('single-table fill can occupy every seat; reducing the target releases exce
 });
 
 test('fill validates all tables before creating accounts or moving credit',()=>{
- for(const problem of ['names','credit','percent','range','target','limit']){
+ for(const problem of ['names','percent','range','target','limit']){
   const {route,db,center,names}=setup();route('names',{names:problem==='names'?names.slice(0,1):names});
   if(problem==='credit')center.balance=1;
   if(problem==='limit')route('settings',{maxBB:.5});
@@ -119,4 +119,10 @@ test('one fill covers the complete production table catalog and persists its con
   store=openStore(path.join(dir,'test.db'));const loaded=store.load();
   assert.deepEqual(loaded.botNames,names);assert.deepEqual(loaded.botFill,db.botFill);
  }finally{store?.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('fill with little credit at the center: the missing credit is created, nothing is refused',()=>{
+ const {route,db,center,names}=setup();route('names',{names});center.balance=1;const before=db.users.filter(u=>u.isBot).length;
+ const r=route('fill',{tableId:'all'});assert.ok(r.added>0);assert.ok(db.ledger.some(x=>x.type==='MINT'),'credit was created');assert.ok(center.balance>=0);
+ assert.ok(db.users.filter(u=>u.isBot).length>before);
 });
