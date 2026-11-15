@@ -55,7 +55,18 @@
     <label>Buxheti për secilin (€)<input name="budget" type="number" min="0.01" step="0.01" required></label>
     <div data-config data-mix style="display:contents"></div></div><p></p><button class="gold">Krijo botat</button></form>
   </div></section>
-  <section data-pane="tables" class="hidden"><div class="card"><h2>Tavolinat me lojtarë</h2><p>Me opsionin “Ulet direkt”, botat ulen edhe në tavolinë bosh dhe mund të luajnë me njëri-tjetrin. Botat lënë vende për lojtarët dhe ngrihen kur tavolina mbushet ose kur dikush pret radhën.</p><div class="tableWrap" id="tableList"></div></div></section>
+  <section data-pane="tables" class="hidden"><div class="card"><h2>Tavolinat</h2><p>Çdo tavolinë me vendet e saj. Shtyp një vend bosh <b>＋</b> për të ulur aty një bot: krijo një të ri ose zgjidh një që është i lirë. Boti e mban vendin dhe luan direkt, edhe me bota të tjerë; e lëshon vetëm kur një lojtar pret radhën.</p>
+   <div class="seatTools"><input id="seatSearch" type="search" placeholder="Kërko tavolinë…" autocomplete="off"><select id="seatStake"><option value="">Të gjitha stake-t</option><option value="0.1">deri €0.10</option><option value="0.5">deri €0.50</option><option value="2">deri €2</option><option value="9999">mbi €2</option></select><label class="chk"><input type="checkbox" id="seatFreeOnly" checked> Vetëm me vende bosh</label></div>
+   <div id="seatTables" class="seatTables"></div>
+   <h2 style="margin-top:18px">Tavolinat me lojtarë tani</h2><div class="tableWrap" id="tableList"></div></div></section>
+  <dialog id="seatDialog" class="seatDialog"><form method="dialog" id="seatForm">
+   <h2 id="seatTitle">Ulu një bot</h2><p class="muted" id="seatInfo"></p>
+   <div class="seatSwitch"><button type="button" data-seatmode="new" class="on">＋ Bot i ri</button><button type="button" data-seatmode="old">Bot ekzistues</button></div>
+   <div class="grid" data-seatpane="new"><label>Emri · bosh = automatik<input name="name" pattern="[a-zA-Z0-9_]{3,18}" placeholder="automatik"></label><label>Buxheti (€) · bosh = 2× buy-in<input name="budget" type="number" min="0.01" step="0.01"></label></div>
+   <div class="grid hidden" data-seatpane="old"><label>Boti<select name="id"></select></label></div>
+   <div class="grid"><label>Buy-in (€)<input name="buyin" type="number" step="0.01" required></label><label>Stili<select name="risk"></select></label><label>Mënyra<select name="mode"><option value="play">Luan duar</option><option value="seat">Vetëm zë vend · nuk luan</option></select></label></div>
+   <div class="seatActions"><button type="button" id="seatCancel">Anulo</button><button class="gold" id="seatGo">Ulu botin</button></div>
+  </form></dialog>
   <section data-pane="players" class="hidden"><div class="card"><h2>Stili i lojtarëve</h2><p>Çfarë kanë mësuar botat nga veprimet publike të lojtarëve (asnjëherë nga letrat e tyre). VPIP: sa shpesh hyn në pot · PFR: sa shpesh ngre para flop-it · AF: agresiviteti · Fold: sa shpesh heq dorë përballë një basti.</p><div class="tableWrap" id="playerList"></div></div></section>
   <section data-pane="moves" class="hidden"><div class="card"><h2>Vendimet e fundit</h2><p>Rezultati kontrollohet nga letrat reale që do të hapen dhe duart ende aktive. Call-et humbëse për kthim varen nga përqindja dhe fitimi i disponueshëm.</p><div class="tableWrap" id="moveList"></div></div></section>
   <section data-pane="limits" class="hidden">

@@ -411,3 +411,14 @@ test('Rikrediti botat: bots go back to their funding, winners pay losers, the re
  a.balance=7000;b.balance=5000;db.cenbRake=0;// not enough: €120 for €200 of funding
  manager.route('/api/bots/restore',{},center);assert.deepEqual([a.balance,b.balance],[6000,6000],'the same share for each');assert.equal(db.cenbRake,0);
 });
+
+test('seat a bot on a chosen seat: new or existing, the seat must be free, the bot keeps it',()=>{
+ const {center,db,manager}=world();const t=manager.route('/api/bots/tables',{},center).tables.find(x=>x.id==='1');assert.ok(t.seats.length>=2);
+ const r=manager.route('/api/bots/seat',{tableId:'1',position:1,name:'SeatOne',budget:100,buyin:40},center);assert.equal(r.seat,2);
+ const b=db.users.find(u=>u.username==='SeatOne');assert.equal(b.bot.pinned,'1');assert.equal(b.bot.enabled,true);
+ assert.throws(()=>manager.route('/api/bots/seat',{tableId:'1',position:1,name:'Other',budget:100,buyin:40},center),/taken/);
+ manager.route('/api/bots/create',{name:'Spare',budget:100,tableId:'1',buyin:40,stopLoss:30},center);
+ manager.route('/api/bots/seat',{tableId:'1',position:0,id:db.users.find(u=>u.username==='Spare').id,buyin:40},center);
+ assert.throws(()=>manager.route('/api/bots/seat',{tableId:'1',position:0,id:db.users.find(u=>u.username==='Spare').id,buyin:40},center),/taken|already/);
+ assert.throws(()=>manager.route('/api/bots/seat',{tableId:'1',position:3,name:'Big',buyin:999999},center),/Buy-in must be/);
+});

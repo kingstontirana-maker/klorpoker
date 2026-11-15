@@ -123,7 +123,9 @@ const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake()-(Number(db.ce
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
   options.sort((a,b)=>b.score-a.score);return options[0]?.t||null;
  }
- const shouldLeave=(t,b,s)=>t.waitlist?.length||t.waitOffer||(fillPolicy(t)?botsAt(t)>perTable(t):(!humansAt(t)&&!b.bot.waitForPlayers)||(t.seats.length>2&&!freeAt(t))||humansAt(t)>=crowd(t)||botsAt(t)>perTable(t))||!stakeOk(t,b)||s.stack<t.bb||s.rebuyDeadline;
+ // A bot seated by hand on a chosen seat (b.bot.pinned) keeps it: it gives it up only to a player
+// on the waiting list, when it is broke, or while it must rebuy.
+const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffer||s.stack<t.bb||s.rebuyDeadline):t.waitlist?.length||t.waitOffer||(fillPolicy(t)?botsAt(t)>perTable(t):(!humansAt(t)&&!b.bot.waitForPlayers)||(t.seats.length>2&&!freeAt(t))||humansAt(t)>=crowd(t)||botsAt(t)>perTable(t))||!stakeOk(t,b)||s.stack<t.bb||s.rebuyDeadline;
 
  // ---- Managing bots ----
  function rakeByBot(){botRake();return rakeMap;}
@@ -133,6 +135,7 @@ const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake()-(Number(db.ce
    session:(eq-u.bot.baseline)/100,total:(eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:(eq-u.bot.funded+r.rake)/100,hands:u.bot.hands||0,
    status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null};});}
  function configure(b,body){
+  if(body.tableId!==undefined&&String(body.tableId)!==b.bot.pinned)delete b.bot.pinned;
   const risk=body.risk??b.bot.risk??'medium';if(!STYLES[risk])fail('Invalid style');
   const mode=body.mode??b.bot.mode??'play';if(!['play','seat'].includes(mode))fail('Invalid mode');
   const wait=body.waitForPlayers??b.bot.waitForPlayers??false;
@@ -245,6 +248,25 @@ const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake()-(Number(db.ce
    const nextWallet=pool-given;db.cenbFlow=(Number(db.cenbFlow)||0)+(wallet-nextWallet);db.cenbRake=nextWallet;
    db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,walletBefore:wallet,walletAfter:nextWallet,time:Date.now()});save();
    return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:nextWallet/100,walletChange:(nextWallet-wallet)/100};}
+  // Tables tab: every table with every seat, and the bots that are free to be seated.
+  if(p==='/api/bots/tables'){return {tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,sb:t.sb/100,bb:t.bb/100,size:t.seats.length,min:l.min/100,max:l.max/100,live:LIVE.includes(t.phase),waiting:t.waitlist?.length||0,
+    seats:t.seats.map((s,i)=>s?{p:i,name:s.username,bot:!!s.isBot,stack:s.stack/100,out:!!s.sittingOut}:null)};}),
+   free:bots().filter(b=>!seatOf(b)).map(b=>({id:b.id,name:b.username,balance:b.balance/100,risk:b.bot.risk||'medium'}))};}
+  // Seat a bot on one chosen empty seat: an existing free bot, or a new one made here. The bot
+  // keeps that seat (pinned) and plays at once, also with other bots. Missing wallet credit for
+  // the buy-in comes from the centre.
+  if(p==='/api/bots/seat'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Choose a table');const pos=Number(body.position);
+   if(!Number.isInteger(pos)||pos<0||pos>=t.seats.length)fail('Choose a seat');if(t.seats[pos])fail('This seat is taken');
+   if(t.waitlist?.length||t.waitOffer)fail('A player is waiting for a seat at this table');
+   const l=engine.buyinLimits(t),buyin=body.buyin===undefined||body.buyin===''?Math.round(l.max*0.6):cents(body.buyin,'Buy-in');if(buyin<l.min||buyin>l.max)fail('Buy-in must be €'+(l.min/100).toFixed(2)+'–€'+(l.max/100).toFixed(2));
+   const risk=body.risk||'medium',mode=body.mode||'play';let b;periods();
+   if(body.id){b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);if(seatOf(b))fail('This bot is already at a table');
+    const missing=buyin-b.balance;if(missing>0){centerFunds(db,u,missing,'bot seat');if(missing>u.balance)fail('The center does not have enough credit');u.balance-=missing;b.balance+=missing;b.bot.funded+=missing;b.bot.baseline+=missing;moveStarts(missing);audit('BOT_FUND',b,missing);}
+    configure(b,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??(b.bot.stopLoss||b.balance)/100});}
+   else{const name=String(body.name||'').trim()||freshName(),budget=body.budget===undefined||body.budget===''?buyin*2:cents(body.budget,'Budget');if(budget<buyin)fail('The budget must cover the buy-in');
+    centerFunds(db,u,budget,'bot budget');b=create(u,name,budget,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??budget/100,stopWin:body.stopWin??0},true);}
+   b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);b.bot.baseline=equity(b);if(mode==='seat')engine.sitOut(t,b,true);
+   audit('BOT_MANAGE',b,0,{enabled:true,seat:pos+1,table:t.name});save();return {ok:true,bot:b.username,seat:pos+1,table:t.name};}
   if(p==='/api/bots/sendrake'){const pool=Number(db.cenbRake)||0,n=body.amount===undefined||body.amount===''||body.amount===null?pool:cents(body.amount,'Amount');
    if(!(n>0))fail('There is no bot rake to send');if(n>pool)fail('CENB holds only €'+(pool/100).toFixed(2)+' of bot rake');const c=center();if(!c)fail('No center account');
    db.cenbRake=pool-n;c.balance+=n;db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',to:c.id,amount:n,time:Date.now()});save();return {ok:true,sent:n/100,left:db.cenbRake/100};}

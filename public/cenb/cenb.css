@@ -134,3 +134,30 @@ td.num,th.num{text-align:right}
 /* "Dërgo te qendra" under the bot rake card */
 .kpi .mini{display:block;margin-top:8px;padding:6px 10px;border-radius:8px;border:1px solid #2fe08c88;background:#14513a;color:#fff;font:600 12px/1 system-ui,sans-serif;cursor:pointer}
 .kpi .mini:disabled{opacity:.45;cursor:default}
+
+/* ---- Tables tab: seats ---- */
+.seatTools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 12px}
+.seatTools input[type=search]{flex:1 1 220px;min-width:0}
+.seatTools .chk{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.seatTables{display:grid;gap:8px;max-height:62vh;overflow:auto;padding-right:4px}
+.seatRow{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#ffffff05}
+.seatName b{display:block}.seatName small{color:var(--muted,#93a29a)}
+.seatChips{display:flex;flex-wrap:wrap;gap:6px}
+.seatChip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.seatChip i{font-style:normal;font-size:10.5px;opacity:.6}
+.seatChip.human{background:#173a2b;border-color:#2fe08c66;color:#c9f7e0}
+.seatChip.bot{background:#3a2e14;border-color:#e9c97a77;color:#f3dc9c}
+.seatChip.out{opacity:.55}
+.seatChip.empty{background:transparent;border-style:dashed;color:#cfe;cursor:pointer}
+.seatChip.empty:hover{border-color:#2fe08c;background:#2fe08c14}
+.seatChip.empty:disabled{opacity:.4;cursor:not-allowed}
+.seatDialog{width:min(520px,calc(100vw - 24px));padding:18px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),var(--panel));color:inherit}
+.seatDialog::backdrop{background:#000b}
+.seatSwitch{display:flex;gap:6px;margin:10px 0}
+.seatSwitch button{flex:1}.seatSwitch button.on{background:#14513a;border-color:#2fe08c88;color:#fff}
+.seatActions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+@media(max-width:640px){.seatRow{grid-template-columns:1fr}}
+.seatTools input[type=search]{width:auto;flex:1 1 240px}
+.seatTools select{width:auto;flex:0 0 auto}
+.seatTools .chk{flex:0 0 auto;flex-direction:row;margin:0;font-size:13px}
+.seatTools .chk input{width:16px;height:16px;margin:0}

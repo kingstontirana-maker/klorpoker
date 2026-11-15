@@ -193,3 +193,27 @@ async function refresh(first=false){
 }
 setInterval(()=>{if(token&&data&&!document.hidden&&!document.activeElement?.closest('form'))refresh();},3000);
 if(token)start().catch(()=>signOut());else showSignIn();
+
+// ---- Tables tab: every seat, and seating a bot on a chosen one ----
+let seatData=null,seatPick=null,seatBusy=false;
+async function loadSeats(force){if(seatBusy||(!force&&(tab!=='tables'||document.hidden||$('#seatDialog').open)))return;seatBusy=true;try{seatData=await api('bots/tables');renderSeats();}catch(err){if(force)toast(err.message,true);}finally{seatBusy=false;}}
+function renderSeats(){if(!seatData)return;const q=$('#seatSearch').value.trim().toLowerCase(),max=Number($('#seatStake').value)||0,freeOnly=$('#seatFreeOnly').checked;
+ const prev=Number($('#seatStake').selectedOptions[0]?.previousElementSibling?.value)||0;
+ const rows=seatData.tables.filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!max||(t.bb<=max&&(max===9999?t.bb>2:t.bb>prev)))&&(!freeOnly||t.seats.some(s=>!s)));
+ $('#seatTables').innerHTML=rows.length?rows.map(t=>'<div class="seatRow"><div class="seatName"><b>'+safe(t.name)+'</b><small>'+eur(t.sb)+' / '+eur(t.bb)+' · '+t.size+' vende'+(t.waiting?' · '+t.waiting+' në pritje':'')+(t.live?' · <span class="pill on">në lojë</span>':'')+'</small></div><div class="seatChips">'
+  +t.seats.map((s,i)=>s?'<span class="seatChip '+(s.bot?'bot':'human')+(s.out?' out':'')+'" title="'+(s.bot?'Bot':'Lojtar')+' · '+eur(s.stack)+'"><i>'+(i+1)+'</i>'+safe(s.name)+'</span>':'<button type="button" class="seatChip empty" data-seat="'+safe(t.id)+':'+i+'"'+(t.waiting?' disabled title="Një lojtar pret radhën"':'')+'><i>'+(i+1)+'</i>＋ Ulu</button>').join('')+'</div></div>').join(''):'<div class="empty">Asnjë tavolinë nuk përputhet.</div>';}
+for(const id of ['#seatSearch','#seatStake','#seatFreeOnly'])$(id).addEventListener('input',renderSeats);
+$('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="tables"]'))loadSeats(true);});
+setInterval(()=>loadSeats(),4000);
+const seatMode=m=>{$$('[data-seatmode]').forEach(b=>b.classList.toggle('on',b.dataset.seatmode===m));$$('[data-seatpane]').forEach(p=>p.classList.toggle('hidden',p.dataset.seatpane!==m));$('#seatForm').dataset.mode=m;};
+$('#seatDialog').addEventListener('click',e=>{const b=e.target.closest('[data-seatmode]');if(b&&!b.disabled)seatMode(b.dataset.seatmode);});
+$('#seatTables').addEventListener('click',e=>{const b=e.target.closest('[data-seat]');if(!b||b.disabled)return;const [tid,pos]=b.dataset.seat.split(':'),t=seatData.tables.find(x=>x.id===tid);if(!t)return;seatPick={t,pos:Number(pos)};
+ const f=$('#seatForm');f.reset();$('#seatTitle').textContent=t.name+' · vendi '+(seatPick.pos+1);$('#seatInfo').textContent='Blinde '+eur(t.sb)+' / '+eur(t.bb)+' · buy-in '+eur(t.min)+' – '+eur(t.max);
+ f.buyin.min=t.min;f.buyin.max=t.max;f.buyin.value=(Math.round(t.max*60)/100).toFixed(2);
+ f.risk.innerHTML=Object.entries(data?.styles||{low:'Tight',medium:'Balanced',high:'Aggressive'}).map(([k,v])=>'<option value="'+k+'"'+(k==='medium'?' selected':'')+'>'+safe(v)+'</option>').join('');
+ const free=seatData.free||[];f.id.innerHTML=free.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+' · '+eur(x.balance)+'</option>').join('');
+ $('[data-seatmode="old"]').disabled=!free.length;$('[data-seatmode="old"]').textContent=free.length?'Bot ekzistues ('+free.length+')':'Asnjë bot i lirë';seatMode('new');$('#seatDialog').showModal();});
+$('#seatCancel').onclick=()=>$('#seatDialog').close();
+$('#seatForm').addEventListener('submit',async e=>{e.preventDefault();if(!seatPick)return;const f=e.target,old=f.dataset.mode==='old',go=$('#seatGo');
+ const body={tableId:seatPick.t.id,position:seatPick.pos,buyin:f.buyin.value,risk:f.risk.value,mode:f.mode.value,...(old?{id:f.id.value}:{name:f.name.value.trim(),budget:f.budget.value})};
+ go.disabled=true;try{const r=await api('bots/seat',body);$('#seatDialog').close();toast(r.bot+' u ul te '+r.table+', vendi '+r.seat);await loadSeats(true);refresh();}catch(err){toast(err.message,true);}finally{go.disabled=false;}});

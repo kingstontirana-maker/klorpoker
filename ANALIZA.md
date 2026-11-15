@@ -946,3 +946,11 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - Chucky, Scooby-Doo, Bugs Bunny dhe Tom (Tom & Jerry) janë personazhe me të drejta autori.
   - Nëse krijohen versione pa logo dhe pa këta personazhe, mund të shtohen.
 - **Formati:** 512×512 WebP (~60 KB secili), ngarkohen vetëm kur hapet zgjedhësi. Testi e kontrollon numrin (100–120) dhe që çdo skedar ekziston.
+
+## CENB → Tavolinat: ulje direkte e botit në një vend të zgjedhur
+- **Lista:** te tab-i "Tavolinat" shfaqen të 164 tavolinat me çdo vend: lojtarët me jeshile, botat me ari dhe vendet bosh me "＋ Ulu". Ka kërkim, filtër sipas stake-ut dhe "Vetëm me vende bosh". Lista rifreskohet çdo 4 sekonda.
+- **Ulja:** shtypja e "＋ Ulu" hap një dritare:
+  - **Bot i ri:** emri (bosh = automatik), buxheti (bosh = 2× buy-in), buy-in-i (paracaktuar 60% e maksimumit), stili dhe mënyra;
+  - **Bot ekzistues:** listë e botave që nuk janë në tavolinë; kredia që mungon për buy-in vjen nga qendra.
+- **Pas uljes:** boti ulet pikërisht në atë vend dhe luan menjëherë, edhe me bota të tjerë. E mban vendin dhe e lëshon vetëm kur një lojtar pret radhën, kur mbetet pa chips ose kur duhet rebuy. Kur i ndryshon tavolinën me dorë, vendi lirohet.
+- **Testuar në demo:** 3 bota në Madrid III (vendet 1, 3, 5) i mbajtën vendet dhe luajtën mes tyre. Vendi i zënë, buy-in-i jashtë kufijve dhe i njëjti bot dy herë u refuzuan.
