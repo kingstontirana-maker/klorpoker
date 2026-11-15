@@ -955,3 +955,7 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Pas uljes:** boti ulet pikërisht në atë vend dhe luan menjëherë, edhe me bota të tjerë. E mban vendin dhe e lëshon vetëm kur një lojtar pret radhën, kur mbetet pa chips ose kur duhet rebuy. Kur i ndryshon tavolinën me dorë, vendi lirohet.
 - **Testuar në demo:** 3 bota në Madrid III (vendet 1, 3, 5) i mbajtën vendet dhe luajtën mes tyre. Vendi i zënë, buy-in-i jashtë kufijve dhe i njëjti bot dy herë u refuzuan.
 - **Ndalimi nga lista e vendeve:** te "Tavolinat", çdo bot në një vend është i klikueshëm. Hapet një dritare me tavolinën, vendin, chipsat, portofolin dhe duart, si dhe butonin "■ Ndalo botin". Boti ngrihet sapo mbaron dora, dhe deri atëherë shfaqet si "· ngrihet". Në demo, boti i ndalur u ngrit dhe vendi u bë sërish "＋ Ulu".
+
+## Avatarët e vjetër u hoqën
+- **Çfarë mbetet:** vetëm 56 portretet moderne (Legends, `p01`–`p56`). U hoqën 48 avatarët e vjetër të vizatuar me SVG (People, Rides, Money, Animals, Luck). `avatars.js` ra nga 22.9 KB në 1.7 KB.
+- **Lojtarët me avatar të vjetër:** kur niset serveri, avatari u hiqet dhe në hyrjen e radhës u del sërish zgjedhësi me portretet. Në demo, një lojtar me "boss" e humbi atë pas rinisjes dhe pa menjëherë zgjedhësin.

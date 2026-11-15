@@ -42,7 +42,11 @@ if(!db.tables.length)db.tables=[{id:'1',name:'Emerald One',sb:100,bb:200}];
 const catalogBefore=db.tableCatalog||0,seeded=process.env.TABLE_CATALOG==='off'?0:seedCatalog(db);if((db.tableCatalog||0)!==catalogBefore){console.log(`[Suprem Poker] Table catalog v${db.tableCatalog}: ${seeded} tables opened, ${db.tables.length} in all.`);try{store.commit(db);}catch(err){console.error('[Suprem Poker] tables not saved yet',err.message);}}
 for(const t of db.tables)makeTable(t.id,t.name,t.sb,t.bb,t.color,t.game,t.size);
 // New players register by email and land under the one agent the centre chose.
-for(const a of db.users)delete a.inviteCode;save();
+for(const a of db.users)delete a.inviteCode;
+// Profile pictures that no longer exist (the older drawn avatars): cleared, and the player is
+// offered the picture list again at the next sign-in.
+for(const a of db.users)if(a.avatar&&!avatarExists(a.avatar)){delete a.avatar;a.avatarAsked=false;}
+save();
 // Sessions end after SESSION_IDLE_MS without any request (closed tab) and after
 // SESSION_MAX_MS at most. One account has one session: a new login signs out the old one.
 const SESSION_IDLE_MS=Number(process.env.SESSION_IDLE_MS||30*60000),SESSION_MAX_MS=Number(process.env.SESSION_MAX_MS||12*3600000);
