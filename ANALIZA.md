@@ -930,3 +930,9 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - `apple-touch-icon.png` (180, mbi sfond të errët, për iPhone-in dhe email-in e verifikimit);
   - `icon-maskable.png` (Android, me hapësirë që të mos pritet).
 - **Shfletuesit:** ikonat kanë `?v=2`, që shfletuesit t'i marrin menjëherë të rejat.
+
+## Krijimi i llogarive: në krye të faqes, me kredi fillestare
+- **Formulari i krijimit:** është në krye të faqes së llogarive (Players / Agents / Managers / Administrators) për çdo nivel, edhe në telefon. Më parë, në telefon, lista dilte e para.
+- **Fusha e re "Starting credit (€)":** opsionale. Kredia dërgohet nga portofoli i krijuesit në të njëjtin hap me krijimin, dhe regjistrohet si TRANSFER. Te qendra, kredia që mungon krijohet (MINT).
+- **Kur kredia nuk mjafton:** llogaria nuk krijohet fare dhe del mesazhi "Insufficient balance for the starting credit".
+- **Testuar në demo:** agjenti me €2,800 krijoi një lojtar me €25. Lojtari kishte €25, agjenti mbeti me €2,775. Me €99,999 kërkesa u refuzua dhe llogaria nuk u krijua.
