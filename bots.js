@@ -250,7 +250,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:nextWallet/100,walletChange:(nextWallet-wallet)/100};}
   // Tables tab: every table with every seat, and the bots that are free to be seated.
   if(p==='/api/bots/tables'){return {tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,sb:t.sb/100,bb:t.bb/100,size:t.seats.length,min:l.min/100,max:l.max/100,live:LIVE.includes(t.phase),waiting:t.waitlist?.length||0,
-    seats:t.seats.map((s,i)=>s?{p:i,name:s.username,bot:!!s.isBot,stack:s.stack/100,out:!!s.sittingOut}:null)};}),
+    seats:t.seats.map((s,i)=>{if(!s)return null;const b=s.isBot?db.users.find(u=>u.id===s.userId):null;return {p:i,name:s.username,bot:!!s.isBot,stack:s.stack/100,out:!!s.sittingOut,...(b?{id:b.id,on:!!b.bot?.enabled,leaving:!!s.leaveAfterHand}:{})};})};}),
    free:bots().filter(b=>!seatOf(b)).map(b=>({id:b.id,name:b.username,balance:b.balance/100,risk:b.bot.risk||'medium'}))};}
   // Seat a bot on one chosen empty seat: an existing free bot, or a new one made here. The bot
   // keeps that seat (pinned) and plays at once, also with other bots. Missing wallet credit for

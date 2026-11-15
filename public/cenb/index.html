@@ -59,6 +59,8 @@
    <div class="seatTools"><input id="seatSearch" type="search" placeholder="Kërko tavolinë…" autocomplete="off"><select id="seatStake"><option value="">Të gjitha stake-t</option><option value="0.1">deri €0.10</option><option value="0.5">deri €0.50</option><option value="2">deri €2</option><option value="9999">mbi €2</option></select><label class="chk"><input type="checkbox" id="seatFreeOnly" checked> Vetëm me vende bosh</label></div>
    <div id="seatTables" class="seatTables"></div>
    <h2 style="margin-top:18px">Tavolinat me lojtarë tani</h2><div class="tableWrap" id="tableList"></div></div></section>
+  <dialog id="botDialog" class="seatDialog"><form method="dialog"><h2 id="botDlgName">Boti</h2><p class="muted" id="botDlgInfo"></p>
+   <div class="seatActions"><button type="button" id="botDlgClose">Mbyll</button><button type="button" class="danger" id="botDlgStop">■ Ndalo botin</button></div></form></dialog>
   <dialog id="seatDialog" class="seatDialog"><form method="dialog" id="seatForm">
    <h2 id="seatTitle">Ulu një bot</h2><p class="muted" id="seatInfo"></p>
    <div class="seatSwitch"><button type="button" data-seatmode="new" class="on">＋ Bot i ri</button><button type="button" data-seatmode="old">Bot ekzistues</button></div>

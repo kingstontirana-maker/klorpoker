@@ -161,3 +161,8 @@ td.num,th.num{text-align:right}
 .seatTools select{width:auto;flex:0 0 auto}
 .seatTools .chk{flex:0 0 auto;flex-direction:row;margin:0;font-size:13px}
 .seatTools .chk input{width:16px;height:16px;margin:0}
+
+.seatChip.bot{cursor:pointer;font:inherit;font-size:12.5px}
+.seatChip.bot:hover{border-color:#ffd78a;background:#4a3a18}
+.seatChip.bot.leaving{opacity:.6;border-style:dashed}
+#botDialog .danger{background:linear-gradient(180deg,#d2384b,#8d1d2c);border-color:#ff8a96aa;color:#fff}
