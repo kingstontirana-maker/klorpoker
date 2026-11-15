@@ -922,3 +922,11 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Testet:** një server SMTP i simuluar provon hyrjen, dërguesin, marrësin, përmbajtjen dhe refuzimin e fjalëkalimit të gabuar.
 - **Shënim:** rreshtat e mëparshëm te ky skedar që përmendin Resend nuk vlejnë më.
 - **Përkohësisht nga Gmail:** `SMTP_HOST=smtp.gmail.com`, `SMTP_USER=<adresa>@gmail.com` dhe `SMTP_PASS=<App Password me 16 shkronja>`, që kërkon 2-Step Verification te Google. Adresa e pyetjeve në email është ajo nga e cila dërgohet, ose `SUPPORT_EMAIL` nëse vendoset. Gmail lejon rreth 500 email-e në ditë. Kur të blihet kutia support@, ndryshohen vetëm këto variabla.
+
+## Logo finale
+- **Logoja e plotë:** `public/logo.webp` është zëvendësuar me logon finale (emblema "S" + "SupremPoker", sfond transparent, 1000×235). Përdoret kudo: faqja e hapjes, faqja kryesore, dritarja e hyrjes/regjistrimit, header-i i panelit dhe CENB.
+- **Ikona "S"** (nga emblema e logos):
+  - `icon.png` (192) dhe `icon-512.png`: skeda e shfletuesit dhe aplikacioni;
+  - `apple-touch-icon.png` (180, mbi sfond të errët, për iPhone-in dhe email-in e verifikimit);
+  - `icon-maskable.png` (Android, me hapësirë që të mos pritet).
+- **Shfletuesit:** ikonat kanë `?v=2`, që shfletuesit t'i marrin menjëherë të rejat.

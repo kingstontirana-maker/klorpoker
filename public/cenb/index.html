@@ -1,21 +1,21 @@
 <!doctype html>
 <html lang="sq"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png"><link rel="stylesheet" href="/cenb/cenb.css?v=1"><script type="module" src="/cenb/cenb.js?v=1"></script></head>
+<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png?v=2"><link rel="stylesheet" href="/cenb/cenb.css?v=1"><script type="module" src="/cenb/cenb.js?v=1"></script></head>
 <body>
-<section id="login"><form class="loginCard hidden" id="setupForm" autocomplete="off"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Hapja e parë: krijo hyrjen e CENB. Konfirmo një herë me llogarinë e qendrës. Pas kësaj, CENB hapet vetëm me përdoruesin dhe fjalëkalimin që zgjedh këtu.</p>
+<section id="login"><form class="loginCard hidden" id="setupForm" autocomplete="off"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="235"><h1>CENB</h1><p>Hapja e parë: krijo hyrjen e CENB. Konfirmo një herë me llogarinë e qendrës. Pas kësaj, CENB hapet vetëm me përdoruesin dhe fjalëkalimin që zgjedh këtu.</p>
  <label>Qendra · përdoruesi<input name="centerUsername" autocomplete="username" required></label>
  <label>Qendra · fjalëkalimi<input name="centerPassword" type="password" autocomplete="current-password" required></label>
  <label>CENB · përdoruesi i ri<input name="username" pattern="[a-zA-Z0-9_]{3,24}" value="cenb" required></label>
  <label>CENB · fjalëkalimi i ri<input name="password" type="password" autocomplete="new-password" required></label>
  <label>Përsërit fjalëkalimin e ri<input name="again" type="password" autocomplete="new-password" required></label>
  <button class="gold">Krijo hyrjen</button><p class="err" id="setupErr" role="alert"></p></form>
-<form class="loginCard" id="loginForm" autocomplete="on"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><h1>CENB</h1><p>Kontrolli i botave · hyrje e veçantë</p>
+<form class="loginCard" id="loginForm" autocomplete="on"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="235"><h1>CENB</h1><p>Kontrolli i botave · hyrje e veçantë</p>
  <label>Përdoruesi<input name="username" autocomplete="username" required></label>
  <label>Fjalëkalimi<input name="password" type="password" autocomplete="current-password" required></label>
  <button class="gold">Hyr</button><p class="err" id="loginErr" role="alert"></p></form></section>
 
 <div id="app" class="hidden">
- <header class="top"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="231"><div class="brand"><b>CENB</b><small>Kontrolli i botave</small></div><span class="live" id="live"><i></i><span>Live</span></span>
+ <header class="top"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="235"><div class="brand"><b>CENB</b><small>Kontrolli i botave</small></div><span class="live" id="live"><i></i><span>Live</span></span>
   <div class="topActions"><button id="startAll" class="ghost">▶ Nis të gjithë</button><button id="stopAll" class="danger">■ Ndalo të gjithë</button><button id="restoreBots" title="Çdo bot kthehet te kredia me të cilën u financua: fituesit u japin humbësve, rake-u i botave u kthehet atyre, teprica mbetet te kuleta e CENB">↺ Rikrediti botat</button><button id="reclaimAll" class="danger" title="Ndal të gjithë botat dhe ia kthen qendrës gjithë kredinë e tyre">↩ Kthe kredinë te qendra</button><button id="logout" class="ghost">Dil</button></div></header>
  <main>
   <div id="banner" class="banner hidden"></div>
