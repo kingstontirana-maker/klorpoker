@@ -5,6 +5,7 @@ import {LIVE,canRaise,toCall,maxRaiseTo,fail} from './game.js';
 import {decide,handStrength,rangeEquity,preflopRank,STYLES} from './bot-brain.js';
 import {evaluateHand,compare} from './poker.js';
 import {returnBudget,returnDecision} from './bot-returns.js';
+import {AVATARS,avatarExists} from './public/avatars.js';
 export {handStrength,rangeEquity,preflopRank,STYLES};
 
 // Virtual-credit house bots use the actual runout to follow winning hands and mix in raises.
@@ -61,6 +62,11 @@ const TAIL=['','_ace','_pro','_77','_river','_k','_aa','_win','_tilt','_nuts','_
 export function createBots({db,runtime,engine,save,olderRake,random=Math.random,decider=null}){
  for(const u of db.users)if(u.isBot&&u.username.endsWith(OLD_SUFFIX)){const plain=u.username.slice(0,-OLD_SUFFIX.length);if(!db.users.some(x=>x!==u&&x.username.toLowerCase()===plain.toLowerCase()))u.username=plain;}
  const bots=()=>db.users.filter(u=>u.isBot),center=()=>db.users.find(x=>x.role==='CENTER');
+ // Every bot has a profile picture from the platform's list: the one fewest bots wear, picked at
+ // random among those, so the faces at the tables vary. Bots made before this get one now.
+ const pickAvatar=()=>{const used=new Map(AVATARS.map(a=>[a.id,0]));for(const b of bots())if(used.has(b.avatar))used.set(b.avatar,used.get(b.avatar)+1);
+  const least=Math.min(...used.values()),pool=[...used].filter(([,n])=>n===least).map(([id])=>id);return pool[Math.floor(random()*pool.length)];};
+ {let changed=false;for(const b of bots())if(!avatarExists(b.avatar)){b.avatar=pickAvatar();changed=true;}if(changed)save();}
  const seatOf=u=>{for(const t of runtime.values()){const s=t.seats.find(x=>x?.userId===u.id);if(s)return {t,s};}return null;};
  const equity=u=>{const at=seatOf(u);return u.balance+(at?at.s.stack+(LIVE.includes(at.t.phase)&&at.s.inHand?at.s.committed:0):0);};
  const audit=(type,u,amount=0,extra={})=>db.ledger.push({id:crypto.randomUUID(),type,from:center()?.id,to:u.id,amount,...extra,time:Date.now()});
@@ -156,7 +162,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  function create(u,name,amount,body,batch=false){
   if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');
   centerFunds(db,u,amount,'bot budget');if(amount>u.balance)fail('The center does not have enough credit for this budget');
-  const b={id:crypto.randomUUID(),username:name,role:'USER',isBot:true,parentId:u.id,balance:amount,createdAt:Date.now(),bot:{enabled:false,funded:amount,baseline:amount,hands:0}};
+  const b={id:crypto.randomUUID(),username:name,role:'USER',isBot:true,parentId:u.id,balance:amount,avatar:pickAvatar(),createdAt:Date.now(),bot:{enabled:false,funded:amount,baseline:amount,hands:0}};
   if(!batch)periods();configure(b,body);u.balance-=amount;db.users.push(b);moveStarts(amount);audit('BOT_FUND',b,amount);return b;
  }
  function freshName(){if(db.botNames?.length){const name=db.botNames.find(n=>!db.users.some(x=>x.username.toLowerCase()===n.toLowerCase()));if(!name)fail('Nuk ka më emra të lirë në listë');return name;}for(let i=0;i<200;i++){const n=FIRST[Math.floor(random()*FIRST.length)],t=TAIL[Math.floor(random()*TAIL.length)],name=(random()<.5?n[0].toUpperCase()+n.slice(1):n)+t+(t&&random()<.6?'':Math.floor(10+random()*89));if(name.length<=18&&!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))return name;}fail('Could not find a free name');}

@@ -959,3 +959,9 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 ## Avatarët e vjetër u hoqën
 - **Çfarë mbetet:** vetëm 56 portretet moderne (Legends, `p01`–`p56`). U hoqën 48 avatarët e vjetër të vizatuar me SVG (People, Rides, Money, Animals, Luck). `avatars.js` ra nga 22.9 KB në 1.7 KB.
 - **Lojtarët me avatar të vjetër:** kur niset serveri, avatari u hiqet dhe në hyrjen e radhës u del sërish zgjedhësi me portretet. Në demo, një lojtar me "boss" e humbi atë pas rinisjes dhe pa menjëherë zgjedhësin.
+
+## Botat me avatar automatik
+- **Botët e rinj:** çdo bot, në çastin kur krijohet (krijim, krijim në masë, mbushje tavolinash, "＋ Ulu"), merr një portret nga lista e platformës. Zgjidhet ai që përdoret më pak nga botat e tjerë, që fytyrat në tavolina të ndryshojnë.
+- **Botët ekzistues:** botat pa avatar e marrin një kur niset serveri.
+- **Në tavolinë:** avatari i llogarisë kalon tani te vendi kur ulet çdo llogari, kështu që portreti duket në tavolinë.
+- **Testuar në demo:** 3 bota të rinj u shfaqën në Madrid IV me portrete të ndryshme (p50, p16, p54).

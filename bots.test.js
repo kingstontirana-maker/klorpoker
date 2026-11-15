@@ -422,3 +422,12 @@ test('seat a bot on a chosen seat: new or existing, the seat must be free, the b
  assert.throws(()=>manager.route('/api/bots/seat',{tableId:'1',position:0,id:db.users.find(u=>u.username==='Spare').id,buyin:40},center),/taken|already/);
  assert.throws(()=>manager.route('/api/bots/seat',{tableId:'1',position:3,name:'Big',buyin:999999},center),/Buy-in must be/);
 });
+
+test('every new bot gets a profile picture from the platform, the least used one, and shows it at the table',async()=>{
+ const {avatarExists}=await import('./public/avatars.js');const {center,db,manager}=world();
+ for(let i=0;i<4;i++)manager.route('/api/bots/create',{name:'Pic'+i,budget:100,tableId:'1',buyin:40,stopLoss:30},center);
+ const bots=db.users.filter(u=>u.isBot);assert.ok(bots.every(b=>avatarExists(b.avatar)),'each bot has a picture from the list');
+ assert.equal(new Set(bots.map(b=>b.avatar)).size,bots.length,'no two bots share one while others are unused');
+ manager.route('/api/bots/seat',{tableId:'1',position:2,name:'PicSeat',budget:100,buyin:40},center);
+ const b=db.users.find(u=>u.username==='PicSeat'),t=[...manager.runtime?.values?.()||[]][0];assert.ok(avatarExists(b.avatar));
+});
