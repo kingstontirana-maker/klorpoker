@@ -936,3 +936,13 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Fusha e re "Starting credit (€)":** opsionale. Kredia dërgohet nga portofoli i krijuesit në të njëjtin hap me krijimin, dhe regjistrohet si TRANSFER. Te qendra, kredia që mungon krijohet (MINT).
 - **Kur kredia nuk mjafton:** llogaria nuk krijohet fare dhe del mesazhi "Insufficient balance for the starting credit".
 - **Testuar në demo:** agjenti me €2,800 krijoi një lojtar me €25. Lojtari kishte €25, agjenti mbeti me €2,775. Me €99,999 kërkesa u refuzua dhe llogaria nuk u krijua.
+
+## Avatarë të rinj (p37–p56)
+- **Të shtuar:** 20 portrete te grupi Legends (gjithsej 56; me avatarët SVG, 104 avatarë).
+  - Nga paketa: 17 avatarë (#01, #02, #04–#09, #11, #13–#20).
+  - Nga fotot e dërguara: 3 (gruaja me kurorë, rosa dhe personazhi i verdhë me kapuç).
+- **Të lënë jashtë:**
+  - #03, #10, #12 kanë logon e Lamborghinit (markë tregtare);
+  - Chucky, Scooby-Doo, Bugs Bunny dhe Tom (Tom & Jerry) janë personazhe me të drejta autori.
+  - Nëse krijohen versione pa logo dhe pa këta personazhe, mund të shtohen.
+- **Formati:** 512×512 WebP (~60 KB secili), ngarkohen vetëm kur hapet zgjedhësi. Testi e kontrollon numrin (100–120) dhe që çdo skedar ekziston.
