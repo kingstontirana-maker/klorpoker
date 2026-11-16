@@ -104,6 +104,11 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  // The rake a bot pays stays with CENB (rake wallet), so it is not a loss of the bot: session and
  // total results count it back. rakeBase is the bot's rake when its session started.
  const rakeOf=id=>{botRake();return rakeMap.get(id)?.rake||0;};
+ // A bot's total result comes from the hands it played (store), not from its wallet: re-credit,
+ // collecting credit or adding money move a bot's money without being a win or a loss.
+ // Refreshed at most every 10 s. Without a store (tests) the wallet is used.
+ const playCache={at:0,map:null};
+ const playTotals=()=>{if(!store?.botPlayTotals)return null;if(!playCache.map||Date.now()-playCache.at>10000){playCache.map=new Map(store.botPlayTotals().map(r=>[r.id,Math.round((r.net||0)*100)]));playCache.at=Date.now();}return playCache.map;};
  const sessionOf=b=>{const r=rakeOf(b.id);b.bot.rakeBase??=r;return equity(b)-b.bot.baseline+(r-b.bot.rakeBase);};
  // The first time the wallets exist, the period starts are taken again so the change of
  // formula is not seen as a profit or a loss.
@@ -179,10 +184,10 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
 
  // ---- Managing bots ----
  function rakeByBot(){botRake();return rakeMap;}
- function list(){const rk=rakeByBot();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0},auto=u.bot.tableId==='auto',fixed=auto?null:runtime.get(u.bot.tableId);
+ function list(){const rk=rakeByBot(),played=playTotals();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0},auto=u.bot.tableId==='auto',fixed=auto?null:runtime.get(u.bot.tableId);
   return {id:u.id,name:u.username,risk:u.bot.risk,style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',waitForPlayers:!!u.bot.waitForPlayers,enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
    buyin:(u.bot.buyin||0)/100,buyinBB:u.bot.buyinBB||null,maxBB:(u.bot.maxBB||0)/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,
-   session:sessionOf(u)/100,total:(eq-u.bot.funded+r.rake)/100,net:(eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:(eq-u.bot.funded+r.rake)/100,hands:u.bot.hands||0,
+   session:sessionOf(u)/100,total:(played?(played.get(u.id)||0):eq-u.bot.funded)/100+r.rake/100,net:(played?(played.get(u.id)||0):eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:((played?(played.get(u.id)||0):eq-u.bot.funded)+r.rake)/100,hands:u.bot.hands||0,
    status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null};});}
  function configure(b,body){
   if(body.tableId!==undefined&&String(body.tableId)!==b.bot.pinned)delete b.bot.pinned;

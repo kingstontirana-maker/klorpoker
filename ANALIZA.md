@@ -987,3 +987,8 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - "Kjo seancë" dhe "Fitimi total" e numërojnë rake-un mbrapsht;
   - limiti i humbjes së botit përdor të njëjtën llogari, kështu që botat nuk ndalen më për shkak të rake-ut;
   - te detajet e botit shfaqen edhe "Rake i paguar · mbetet te CENB" dhe "Pa e numëruar rake-un".
+
+## "Fitimi total" i botit nga duart e luajtura
+- **Problemi:** "Fitimi total" llogaritej si `chips + portofoli − financimi`. "Rikrediti botat" (kur kredia nuk mjafton, çdo bot kthehet te e njëjta % e financimit), "Mblidh kredinë" dhe "+ Para" i lëvizin paratë e botit pa qenë fitim apo humbje. Kështu një bot që fitoi mund të dilte me minus. Provë: +€3,500 → −€1,250 pas rikreditimit.
+- **Rregullimi:** "Fitimi total" = shuma e rezultateve të të gjitha duarve që ka luajtur boti (`hand_players`), plus rake-u që ka paguar, sepse ai mbetet te CENB. Kjo shifër është e njëjtë me raportin e profitit dhe nuk ndryshon nga lëvizjet e kredisë. Rifreskohet çdo 10 sekonda.
+- **Testuar në demo:** fitimet e 6 botave përputhen me raportin, edhe para edhe pas "Rikrediti botat".
