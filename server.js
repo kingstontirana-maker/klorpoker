@@ -310,7 +310,10 @@ function openInspectStream(req,res){const token=(req.headers.authorization||'').
  const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();res.on('close',()=>{clearInterval(beat);inspectSubs.delete(res);});}
 
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.webp':'image/webp','.m4a':'audio/mp4'};
-const SECURITY_HEADERS={'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()','cross-origin-opener-policy':'same-origin',
+// HSTS: browsers that saw the site over HTTPS never use plain HTTP for it again (a year,
+// sub-domains included). Sent only when the request came in over HTTPS (Coolify's proxy).
+const HSTS='max-age=31536000; includeSubDomains';
+const SECURITY_HEADERS={'cross-origin-resource-policy':'same-origin','x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()','cross-origin-opener-policy':'same-origin',
  'content-security-policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
 // Static files. Every page load used to download everything again (~900 KB): "no-cache"
 // made browsers ask each time and the answer was always the whole file, uncompressed.
@@ -331,7 +334,7 @@ function sendStatic(req,res,f,name,contents,url){if(typeof contents==='string')c
   res.writeHead(200,{...headers,'content-encoding':'gzip','content-length':z.length});res.end(req.method==='HEAD'?undefined:z);return;}
  res.writeHead(200,{...headers,'content-length':contents.length});res.end(req.method==='HEAD'?undefined:contents);}
 const require_hash=buf=>crypto.createHash('sha1').update(buf).digest('base64url').slice(0,10);
-export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost')
+export const server=http.createServer(async(req,res)=>{for(const [k,v] of Object.entries(SECURITY_HEADERS))res.setHeader(k,v);if(String(req.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https')res.setHeader('strict-transport-security',HSTS);if(req.headers['x-forwarded-proto']==='https')res.setHeader('strict-transport-security','max-age=31536000; includeSubDomains');try{const url=new URL(req.url,'http://localhost')
  if(url.pathname.startsWith('/api/')){checkOwner();if(replaced)fail('The server is restarting. Please try again in a moment.',503);}const live=url.pathname.match(/^\/api\/table\/([^/]+)\/stream$/);if(live){openTableStream(req,res,decodeURIComponent(live[1]));return;}if(url.pathname==='/api/inspect/stream'){openInspectStream(req,res);return;}if(url.pathname==='/api/rake/events'){
  const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Login required',401);roleCheck(u,'CENTER','ADMIN','MANAGER','AGENT');
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});

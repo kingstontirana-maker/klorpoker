@@ -992,3 +992,12 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Problemi:** "Fitimi total" llogaritej si `chips + portofoli − financimi`. "Rikrediti botat" (kur kredia nuk mjafton, çdo bot kthehet te e njëjta % e financimit), "Mblidh kredinë" dhe "+ Para" i lëvizin paratë e botit pa qenë fitim apo humbje. Kështu një bot që fitoi mund të dilte me minus. Provë: +€3,500 → −€1,250 pas rikreditimit.
 - **Rregullimi:** "Fitimi total" = shuma e rezultateve të të gjitha duarve që ka luajtur boti (`hand_players`), plus rake-u që ka paguar, sepse ai mbetet te CENB. Kjo shifër është e njëjtë me raportin e profitit dhe nuk ndryshon nga lëvizjet e kredisë. Rifreskohet çdo 10 sekonda.
 - **Testuar në demo:** fitimet e 6 botave përputhen me raportin, edhe para edhe pas "Rikrediti botat".
+
+## Siguria e kodit në shfletues
+- **Kodi i faqes:** çdo faqe interneti ia dërgon shfletuesit kodin e vet (JS, CSS, HTML), që të mund ta ekzekutojë. Ky kod nuk mund të fshihet nga "View source" / DevTools; mund vetëm të bëhet më i vështirë për t'u lexuar (minify/obfuscate). Siguria nuk varet nga kjo, sepse çdo vendim (letrat, paratë, rolet, rake-u) merret te serveri.
+- **Kontrolluar:**
+  - kodi i shfletuesit nuk ka asnjë sekret (çelës, fjalëkalim, token);
+  - kodi i serverit, databaza, `.env` dhe dokumentet nuk shërbehen, sepse kthejnë 404; shërbehet vetëm dosja `public/`.
+- **Header-at e sigurisë:**
+  - ishin: CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, COOP;
+  - të shtuara tani: **HSTS** (HTTPS i detyrueshëm për një vit) dhe **Cross-Origin-Resource-Policy**.
