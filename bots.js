@@ -84,11 +84,13 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  let rakeSeen=0,rakeTotal=0,rakeMap=new Map(),oldCounted=false;
  function botRake(){const ids=new Set(bots().map(u=>u.id)),count=x=>{if(x.type!=='RAKE')return;for(const a of x.allocations||[])if(a.bot||ids.has(a.userId)){rakeTotal+=a.amount;const r=rakeMap.get(a.userId)||{rake:0,hands:0};r.rake+=a.amount;r.hands++;rakeMap.set(a.userId,r);}};if(!oldCounted){oldCounted=true;for(const x of olderRake?.()||[])count(x);}for(;rakeSeen<db.ledger.length;rakeSeen++)count(db.ledger[rakeSeen]);return rakeTotal;}
  // ---- CENB wallets ----
- // credit: what the centre gave CENB; every bot is funded from it and returns to it.
- // profit: what is left over when the bots are re-credited (their winnings).
- // rake (db.cenbRake): the rake the bots paid, kept apart.
+ // credit: CENB's capital. The centre credits it; every bot is funded from it and returns to it,
+ // and what is left over when the bots are re-credited (their winnings) lands here too.
+ // rake (db.cenbRake): the rake the bots paid, kept apart as capital for re-crediting the bots.
  // Only moves between the centre and CENB come in or out; everything else stays inside CENB.
  const freshWallet=!db.cenbWallet;const W=db.cenbWallet??={credit:0,profit:0};
+ // One wallet: the profit wallet was merged into the credit wallet (profit is read on the Profit page).
+ if(W.profit){W.credit+=W.profit;W.profit=0;}
  const need=n=>{if(n>W.credit)fail('Kuleta e kredisë së CENB ka vetëm €'+(W.credit/100).toFixed(2)+'. Kreditoje CENB nga qendra (mungojnë €'+((n-W.credit)/100).toFixed(2)+').');};
  // The house result: everything CENB holds (bot chips and the three wallets); a credit from
  // the centre or a payment to it moves the period starts, so it is never counted as profit.
@@ -300,9 +302,9 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    const pool=free.reduce((n,b)=>n+b.balance,0)+wallet,need=free.reduce((n,b)=>n+Math.max(0,b.bot.funded||0),0);
    const ratio=need>0&&pool<need?pool/need:1;let given=0;
    for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);b.balance=target;b.bot.baseline=target;b.bot.rakeBase=rakeOf(b.id);given+=target;}
-   const left=pool-given;db.cenbRake=0;W.profit+=left;
+   const left=pool-given;db.cenbRake=0;W.credit+=left;
    db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,rakeUsed:wallet,toProfit:left,time:Date.now()});save();
-   return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:W.profit/100,walletChange:left/100};}
+   return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:W.credit/100,walletChange:left/100};}
   // Tables tab: every table with every seat, and the bots that are free to be seated.
   if(p==='/api/bots/tables'){return {tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,sb:t.sb/100,bb:t.bb/100,size:t.seats.length,min:l.min/100,max:l.max/100,live:LIVE.includes(t.phase),waiting:t.waitlist?.length||0,
     seats:t.seats.map((s,i)=>{if(!s)return null;const b=s.isBot?db.users.find(u=>u.id===s.userId):null;return {p:i,name:s.username,bot:!!s.isBot,stack:s.stack/100,out:!!s.sittingOut,...(b?{id:b.id,on:!!b.bot?.enabled,leaving:!!s.leaveAfterHand}:{})};})};}),
@@ -322,15 +324,11 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     b=create(u,name,budget,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??budget/100,stopWin:body.stopWin??0},true);}
    b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);if(mode==='seat')engine.sitOut(t,b,true);
    audit('BOT_MANAGE',b,0,{enabled:true,seat:pos+1,table:t.name});save();return {ok:true,bot:b.username,seat:pos+1,table:t.name};}
-  if(p==='/api/bots/sendrake'){const pool=Number(db.cenbRake)||0,n=body.amount===undefined||body.amount===''||body.amount===null?pool:cents(body.amount,'Amount');
-   if(!(n>0))fail('There is no bot rake to send');if(n>pool)fail('CENB holds only €'+(pool/100).toFixed(2)+' of bot rake');const c=center();if(!c)fail('No center account');
-   periods();db.cenbRake=pool-n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',from:'cenb',to:c.id,amount:n,time:Date.now()});save();return {ok:true,sent:n/100,left:db.cenbRake/100};}
   // CENB wallets and the centre: credit in, credit back, profit out.
   if(p==='/api/bots/wallet'){const c=center();if(!c)fail('No center account');const a=String(body.action||'');
    const n=cents(body.amount,'Amount');periods();
    if(a==='credit'){centerFunds(db,c,n,'cenb credit');if(n>c.balance)fail('The center does not have enough credit');c.balance-=n;W.credit+=n;moveStarts(n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_CREDIT',from:c.id,to:'cenb',amount:n,time:Date.now()});}
    else if(a==='return'){if(n>W.credit)fail('The credit wallet holds only €'+(W.credit/100).toFixed(2));W.credit-=n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_RETURN',from:'cenb',to:c.id,amount:n,time:Date.now()});}
-   else if(a==='profit'){if(n>W.profit)fail('The profit wallet holds only €'+(W.profit/100).toFixed(2));W.profit-=n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_PROFIT',from:'cenb',to:c.id,amount:n,time:Date.now()});}
    else fail('Unknown wallet action');save();return {ok:true,wallets:wallets()};}
   if(p==='/api/bots/profit')return profitReport(body);
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}

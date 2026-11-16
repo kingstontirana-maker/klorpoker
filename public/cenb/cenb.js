@@ -58,11 +58,10 @@ function renderKpis(){
  const meter=(v,limit)=>limit>0?'<div class="meter" title="'+Math.round(Math.max(0,-v)/limit*100)+'% e limitit"><i style="width:'+Math.min(100,Math.max(0,-v)/limit*100)+'%"></i></div>':'<span>pa limit</span>';
  $('#kpis').innerHTML=[
   ['Profit sot ↗',signed(data.profitToday?.profit||0),'<span>'+(data.profitToday?.hands||0)+' duar · tavolina '+signed(data.profitToday?.net||0).replace('<b','<i').replace('</b>','</i>')+' · rake '+eur(data.profitToday?.rake||0)+'</span>'+(g.dailyLimit>0?'<span>Limit humbjeje '+eur(g.dailyLimit)+'</span>'+meter(g.today,g.dailyLimit):''),'profitCard'],
-  ['Kuleta e kredisë','<b>'+eur(W.credit)+'</b>','<span>nga qendra · prej këtu financohen botat · në bota '+eur(W.inBots)+'</span><div class="miniRow"><button type="button" class="mini" data-wallet="credit">+ Nga qendra</button><button type="button" class="mini ghost" data-wallet="return"'+(W.credit>0?'':' disabled')+'>Kthe te qendra</button></div>'],
-  ['Kuleta e fitimit','<b class="'+(W.profit>0?'up':'')+'">'+eur(W.profit)+'</b>','<span>fitimet e CENB pas rikreditimit të botave</span><div class="miniRow"><button type="button" class="mini" data-wallet="profit"'+(W.profit>0?'':' disabled')+'>Dërgo te qendra</button></div>'],
+  ['Kuleta e CENB','<b>'+eur(W.credit)+'</b>','<span>kapitali i CENB · nga qendra + teprica pas rikreditimit · në bota '+eur(W.inBots)+'</span><div class="miniRow"><button type="button" class="mini" data-wallet="credit">+ Nga qendra</button><button type="button" class="mini ghost" data-wallet="return"'+(W.credit>0?'':' disabled')+'>Kthe te qendra</button></div>'],
   ['Botat','<b>'+playing+' <small class="muted">/ '+on+' / '+b.length+'</small></b>','<span>në tavolinë / ndezur / gjithsej</span>'],
   ['Lojtarë që luajnë me bota','<b>'+humans+'</b>','<span>lojtarë të vërtetë në tavolina me bota</span>'],
-  ['Rake i botave','<b>'+eur(data.cenbRake||0)+'</b>','<span>i ndarë nga fitimi · u kthehet botave me Rikrediti · gjithsej '+eur(rake)+'</span><button type="button" id="sendRake" class="mini"'+((data.cenbRake||0)>0?'':' disabled')+'>Dërgo te qendra</button>'],
+  ['Rake i botave','<b>'+eur(data.cenbRake||0)+'</b>','<span>kapital për rikreditimin e botave · gjithsej '+eur(rake)+'</span>'],
   ['Kthyer te lojtarët','<b>'+eur(b.reduce((n,x)=>n+(x.returned||0),0))+'</b>','<span>Objektivi '+Number(g.returnPercent||0)+'% · në dispozicion '+eur(b.reduce((n,x)=>n+(x.returnAvailable||0),0))+'</span>'],
  ].map(([k,v,s,cls])=>'<div class="kpi'+(cls?' '+cls:'')+'"'+(cls==='profitCard'?' role="button" tabindex="0" title="Hap detajet e profitit"':'')+'><small>'+k+'</small>'+v.replace(/^<b class/,'<b class')+s+'</div>').join('');
  const stopped=g.stopped||[];$('#banner').classList.toggle('hidden',!stopped.length);$('#banner').textContent=stopped.length?'Limiti i shtëpisë u arrit ('+stopped.map(x=>x.replace('House ','').replace(' limit reached','')).join(', ')+'): të gjithë botat u ndalën dhe nisin vetë në periudhën tjetër.':'';
@@ -106,11 +105,8 @@ $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn
  }catch(err){toast(err.message,true);}};
 $('#botList').onsubmit=async e=>{e.preventDefault();const id=e.target.closest('[data-id]').dataset.id;try{await api('bots/configure',{id,...formBody(e.target)});editing=null;toast('U ruajt');await refresh();}catch(err){toast(err.message,true);}};
 $('#reclaimAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat dhe kredia e tyre të kthehet te kuleta e kredisë së CENB?\n\nBotat që janë në një dorë ngrihen sapo të mbarojë dora, dhe kredia e tyre kthehet vetë pas kësaj. Llogaritë e botave mbeten, me €0.'))return;try{const r=await api('bots/reclaim');toast('U kthyen €'+r.returned.toLocaleString('en-US',{minimumFractionDigits:2})+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}};
-document.addEventListener('click',async e=>{if(!e.target.closest('#sendRake'))return;const pool=data.cenbRake||0;if(!(pool>0))return;
- const v=prompt('Sa të dërgohet nga kuleta e CENB te qendra? Kuleta ka '+eur(pool)+'.\nLëre bosh për të gjithë shumën.',String(pool));if(v===null)return;
- try{const r=await api('bots/sendrake',v.trim()===''?{}:{amount:Number(v.replace(',','.'))});toast(eur(r.sent)+' u dërguan te qendra · mbeten '+eur(r.left));await refresh();}catch(err){toast(err.message,true);}});
 $('#restoreBots').onclick=async()=>{if(!confirm('Të rikreditohen botat?\n\n• Çdo bot që nuk është në tavolinë kthehet te kredia me të cilën u financua.\n• Botat që fituan u japin atyre që humbën, dhe rake-u i botave u kthehet atyre.\n• Ajo që mbetet plus shkon te kuleta e CENB.\n\nBotat në tavolinë nuk preken: për t\'i përfshirë, shtyp më parë "Ndalo të gjithë".'))return;
- try{const r=await api('bots/restore');toast(r.bots+' bota u rikredituan'+(r.full?'':' (pjesërisht: kredia nuk mjaftonte)')+' · kuleta e fitimit +'+eur(r.walletChange)+' = '+eur(r.wallet)+(r.seated?' · '+r.seated+' në tavolinë nuk u prekën':''));await refresh();}catch(err){toast(err.message,true);}};
+ try{const r=await api('bots/restore');toast(r.bots+' bota u rikredituan'+(r.full?'':' (pjesërisht: kredia nuk mjaftonte)')+' · kuleta e CENB +'+eur(r.walletChange)+' = '+eur(r.wallet)+(r.seated?' · '+r.seated+' në tavolinë nuk u prekën':''));await refresh();}catch(err){toast(err.message,true);}};
 $('#stopAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;try{const r=await api('bots/stopall');toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}};
 $('#startAll').onclick=async()=>{try{const r=await api('bots/startall');toast(r.started+' bota u nisën');await refresh();}catch(err){toast(err.message,true);}};
 
@@ -243,9 +239,9 @@ for(const [id,k] of [['#bfSearch','q'],['#bfStatus','status'],['#bfStyle','style
 
 // ---- Wallets ----
 document.addEventListener('click',async e=>{const w=e.target.closest('[data-wallet]');if(!w||w.disabled)return;const W=data?.wallets||{};const action=w.dataset.wallet;
- const ask={credit:'Sa kredi t\'i jepet CENB nga qendra?',return:'Sa kredi të kthehet te qendra? Kuleta e kredisë ka '+eur(W.credit),profit:'Sa fitim të dërgohet te qendra? Kuleta e fitimit ka '+eur(W.profit)}[action];
- const def={credit:'',return:String(W.credit||''),profit:String(W.profit||'')}[action];const v=prompt(ask,def);if(v===null||!v.trim())return;
- try{const r=await api('bots/wallet',{action,amount:Number(v.replace(',','.'))});toast({credit:'CENB u kreditua',return:'Kredia u kthye te qendra',profit:'Fitimi u dërgua te qendra'}[action]+' · kredi '+eur(r.wallets.credit)+' · fitim '+eur(r.wallets.profit));await refresh();}catch(err){toast(err.message,true);}});
+ const ask={credit:'Sa kredi t\'i jepet CENB nga qendra?',return:'Sa kredi të kthehet te qendra? Kuleta e kredisë ka '+eur(W.credit)}[action];
+ const def={credit:'',return:String(W.credit||'')}[action];const v=prompt(ask,def);if(v===null||!v.trim())return;
+ try{const r=await api('bots/wallet',{action,amount:Number(v.replace(',','.'))});toast({credit:'CENB u kreditua',return:'Kredia u kthye te qendra'}[action]+' · kredi '+eur(r.wallets.credit));await refresh();}catch(err){toast(err.message,true);}});
 
 // ---- Profit ----
 const tiranaDay=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane'}).format(t);
@@ -258,7 +254,7 @@ async function loadProfit(){if(pfBusy)return;pfBusy=true;try{const r=await api('
 function renderProfit(r){
  const fill=(sel,list,all)=>{const keep=sel.value;sel.innerHTML='<option value="">'+all+'</option>'+list.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');sel.value=list.some(x=>x.id===keep)?keep:'';};
  fill($('#pfBot'),r.choices.bots,'Të gjithë botat');fill($('#pfTable'),r.choices.tables,'Të gjitha tavolinat');
- const T=r.totals;$('#pfTotals').innerHTML=[['Profiti',signed(T.profit)],['Në tavolina (pas rake)',signed(T.net)],['Rake i botave',  '<b>'+eur(T.rake)+'</b>'],['Duar','<b>'+T.hands+'</b>'],['Duar të fituara','<b>'+T.winRate+'%</b>'],['Bota · tavolina','<b>'+T.bots+' · '+T.tables+'</b>'],['Kuleta e fitimit','<b>'+eur(r.wallets.profit)+'</b>']]
+ const T=r.totals;$('#pfTotals').innerHTML=[['Profiti',signed(T.profit)],['Në tavolina (pas rake)',signed(T.net)],['Rake i botave',  '<b>'+eur(T.rake)+'</b>'],['Duar','<b>'+T.hands+'</b>'],['Duar të fituara','<b>'+T.winRate+'%</b>'],['Bota · tavolina','<b>'+T.bots+' · '+T.tables+'</b>']]
   .map(([k,v])=>'<div class="kpi"><small>'+k+'</small>'+v+'</div>').join('');
  const max=Math.max(1,...r.days.map(d=>Math.abs(d.profit)));
  $('#pfChart').innerHTML=r.days.length>1?r.days.map(d=>'<div class="pfBar" title="'+d.day+' · '+eur(d.profit)+'"><i class="'+(d.profit<0?'down':'up')+'" style="height:'+Math.max(2,Math.round(Math.abs(d.profit)/max*100))+'%"></i><small>'+d.day.slice(8)+'</small></div>').join(''):'';

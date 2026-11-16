@@ -406,16 +406,15 @@ test('crediting CENB beyond the centre wallet creates the missing credit (MINT);
  manager.route('/api/bots/create',{name:'Huge',budget:5000000,tableId:'1',buyin:40,stopLoss:30},center);assert.equal(db.cenbWallet.credit,0);
  manager.route('/api/bots/delete',{id:db.users.find(u=>u.username==='Huge').id},center);assert.equal(db.cenbWallet.credit,500000000);
  manager.route('/api/bots/wallet',{action:'return',amount:1000},center);assert.equal(center.balance,100000);
- assert.throws(()=>manager.route('/api/bots/wallet',{action:'profit',amount:1},center),/profit wallet holds only/);
 });
 
 test('Rikrediti botat: bots go back to their funding, winners pay losers, the rest stays in the CENB wallet',()=>{
  const {center,db,manager,total:all}=world();const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbRake||0)+(db.cenbWallet?.credit||0)+(db.cenbWallet?.profit||0);
  manager.route('/api/bots/create',{name:'BotA',budget:100,tableId:'1',buyin:40,stopLoss:30},center);manager.route('/api/bots/create',{name:'BotB',budget:100,tableId:'1',buyin:40,stopLoss:30},center);
  const [a,b]=db.users.filter(u=>u.isBot);a.balance=13000;b.balance=6000;db.cenbRake=1500;// A won 30, B lost 40, bots paid 15 rake
- const before=total(),r=manager.route('/api/bots/restore',{},center);
- assert.deepEqual([a.balance,b.balance],[10000,10000],'both back to €100');assert.equal(db.cenbWallet.profit,500,'€5 left over goes to the profit wallet');assert.equal(db.cenbRake,0,'the rake of the bots went back to them');assert.equal(r.full,true);assert.equal(total(),before,'nothing created or lost');
- a.balance=7000;b.balance=5000;db.cenbRake=0;db.cenbWallet.profit=0;// not enough: €120 for €200 of funding
+ const before=total(),before0=db.cenbWallet.credit,r=manager.route('/api/bots/restore',{},center);
+ assert.deepEqual([a.balance,b.balance],[10000,10000],'both back to €100');assert.equal(db.cenbWallet.credit,before0+500,'€5 left over goes back to the CENB wallet');assert.equal(db.cenbRake,0,'the rake of the bots went back to them');assert.equal(r.full,true);assert.equal(total(),before,'nothing created or lost');
+ a.balance=7000;b.balance=5000;db.cenbRake=0;// not enough: €120 for €200 of funding
  manager.route('/api/bots/restore',{},center);assert.deepEqual([a.balance,b.balance],[6000,6000],'the same share for each');assert.equal(db.cenbRake,0);
 });
 

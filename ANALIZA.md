@@ -1001,3 +1001,9 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Header-at e sigurisë:**
   - ishin: CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, COOP;
   - të shtuara tani: **HSTS** (HTTPS i detyrueshëm për një vit) dhe **Cross-Origin-Resource-Policy**.
+
+## CENB: një kuletë e vetme (2026-11-16)
+
+- **Kuleta e CENB** është kapitali i CENB. E krediton qendra, prej saj financohen botat dhe atje kthehen kur ndalen ose fshihen.
+- Teprica pas **Rikrediti botat** shkon tani te Kuleta e CENB. Kuleta e veçantë e fitimit u hoq, sepse fitimi lexohet te faqja **Profiti**. Shuma që kishte kuleta e vjetër e fitimit u kalua automatikisht te Kuleta e CENB.
+- **Rake i botave** është kapital për rikreditimin e botave. Nuk dërgohet më te qendra: u hoqën butoni "Dërgo te qendra" dhe rruga `/api/bots/sendrake`.
