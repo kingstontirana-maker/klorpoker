@@ -61,7 +61,7 @@ test('direct seating bots wait alone, play with other bots and preserve credit',
   const {center,db,engine,t,manager,human,total}=world({random:()=>0});
   const initial=total();
   for(const name of ['WaitingOne','WaitingTwo']){
-   const {id}=manager.route('/api/bots/create',{name,budget:300,tableId,buyin:100,buyinBB:50,stopLoss:300,waitForPlayers:'true'},center);
+   const {id}=manager.route('/api/bots/create',{name,budget:300,tableId,buyin:100,buyinBB:50,stopLoss:300,waitForPlayers:'true',botClash:'off'},center);
    manager.route('/api/bots/status',{id,enabled:true},center);
    if(name==='WaitingOne'){
     manager.tick();assert.equal(t.seats.filter(Boolean).length,1);

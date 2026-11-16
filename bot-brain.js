@@ -185,6 +185,17 @@ function postflop(v,st,random,E){
 
 // One decision. v is the bot's view of the table (see botView in bots.js).
 export function decide(v,style='medium',random=Math.random){
+ // This flag is computed server-side from every non-folded opponent, including all-ins.
+ if(['balanced','aggressive'].includes(v.botClash)){
+  const aggressive=v.botClash==='aggressive';
+  const chance=aggressive?.7:.4;
+  if(v.canRaise&&random()<chance){
+   const target=raiseTo(v,v.currentBet+Math.max(v.bb,(v.pot+v.toCall)*(aggressive?.85:.45)));
+   if(target)return {type:'raise',amount:target/100,why:'bot clash',equity:null};
+  }
+  // Continue contested pots without consulting the future runout.
+  return {type:v.toCall?'call':'check',why:'bot clash',equity:null};
+ }
  if(Object.hasOwn(v,'outcome')){
   if(v.outcome==='win'&&v.firstFlopAction){
    // About one in 4–5 winning flops: commit 20–40% of the current table stack.

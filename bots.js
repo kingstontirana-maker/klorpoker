@@ -40,6 +40,10 @@ export function handOutcome(t,s){
   return tied?'tie':'win';
  }catch{return 'unknown';}
 }
+export function botClashView(v,isBotId,mode='balanced'){
+ const active=v.opponents.filter(o=>!o.folded);
+ return {...v,botClash:active.length>0&&active.every(o=>isBotId(o.id))?mode:'off'};
+}
 export const botDecision=(v,style='medium',random=Math.random)=>decide(v,style,random);
 
 // Decisions on a separate thread (bot-worker.js). If the thread fails, it is started again;
@@ -187,13 +191,14 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  // ---- Managing bots ----
  function rakeByBot(){botRake();return rakeMap;}
  function list(){const rk=rakeByBot(),played=playTotals();return bots().map(u=>{const at=seatOf(u),eq=equity(u),r=rk.get(u.id)||{rake:0,hands:0},auto=u.bot.tableId==='auto',fixed=auto?null:runtime.get(u.bot.tableId);
-  return {id:u.id,name:u.username,risk:u.bot.risk,style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',waitForPlayers:!!u.bot.waitForPlayers,enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
+  return {id:u.id,name:u.username,risk:u.bot.risk,botClash:u.bot.botClash||'balanced',style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',waitForPlayers:!!u.bot.waitForPlayers,enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
    buyin:(u.bot.buyin||0)/100,buyinBB:u.bot.buyinBB||null,maxBB:(u.bot.maxBB||0)/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,
    session:sessionOf(u)/100,total:(played?(played.get(u.id)||0):eq-u.bot.funded)/100+r.rake/100,net:(played?(played.get(u.id)||0):eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:((played?(played.get(u.id)||0):eq-u.bot.funded)+r.rake)/100,hands:u.bot.hands||0,
    status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null,seatedId:at?.t.id||null};});}
  function configure(b,body){
   if(body.tableId!==undefined&&String(body.tableId)!==b.bot.pinned)delete b.bot.pinned;
   const risk=body.risk??b.bot.risk??'medium';if(!STYLES[risk])fail('Invalid style');
+  const botClash=body.botClash??b.bot.botClash??'balanced';if(!['off','balanced','aggressive'].includes(botClash))fail('Invalid bot clash mode');
   const mode=body.mode??b.bot.mode??'play';if(!['play','seat'].includes(mode))fail('Invalid mode');
   const wait=body.waitForPlayers??b.bot.waitForPlayers??false;
   if(![true,false,'true','false'].includes(wait))fail('Invalid waiting option');
@@ -208,7 +213,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(buyin<l.min||buyin>l.max)fail(`Buy-in must be within the table limits (€${(l.min/100).toFixed(2)}–€${(l.max/100).toFixed(2)})`);if(buyin>b.balance)fail('Buy-in is larger than the bot wallet');
    Object.assign(b.bot,{tableId:t.id,buyin,buyinBB:null,maxBB:0});
   }
-  Object.assign(b.bot,{risk,mode,waitForPlayers:wait===true||wait==='true',stopLoss,stopWin,error:null});
+  Object.assign(b.bot,{risk,mode,botClash,waitForPlayers:wait===true||wait==='true',stopLoss,stopWin,error:null});
  }
  function create(u,name,amount,body,batch=false){
   if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');
@@ -336,7 +341,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   if(p==='/api/bots/watch'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);
    const view=engine.snapshot(t,null,false);delete view.chat;
    const info={};for(const s of t.seats){if(!s?.isBot)continue;const b=bots().find(x=>x.id===s.userId);if(!b)continue;
-    info[s.id]={id:b.id,risk:b.bot.risk||'medium',style:STYLES[b.bot.risk]?.label||b.bot.risk,mode:b.bot.mode||'play',enabled:!!b.bot.enabled,balance:b.balance/100,stopLoss:b.bot.stopLoss/100,stopWin:(b.bot.stopWin||0)/100,session:sessionOf(b)/100,hands:b.bot.hands||0,addChips:(b.bot.addChips||0)/100,error:b.bot.error||null};}
+    info[s.id]={id:b.id,risk:b.bot.risk||'medium',botClash:b.bot.botClash||'balanced',style:STYLES[b.bot.risk]?.label||b.bot.risk,mode:b.bot.mode||'play',enabled:!!b.bot.enabled,balance:b.balance/100,stopLoss:b.bot.stopLoss/100,stopWin:(b.bot.stopWin||0)/100,session:sessionOf(b)/100,hands:b.bot.hands||0,addChips:(b.bot.addChips||0)/100,error:b.bot.error||null};}
    return {...view,bots:info,maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
@@ -345,9 +350,10 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   // Live, also while it plays: style, mode and limits. It plays its next decision with them.
   else if(p==='/api/bots/live'){const risk=body.risk??b.bot.risk??'medium',mode=body.mode??b.bot.mode??'play';
    if(!STYLES[risk])fail('Invalid style');if(!['play','seat'].includes(mode))fail('Invalid mode');
+   const botClash=body.botClash??b.bot.botClash??'balanced';if(!['off','balanced','aggressive'].includes(botClash))fail('Invalid bot clash mode');
    const stopLoss=body.stopLoss===undefined?b.bot.stopLoss:cents(body.stopLoss,'Loss limit'),stopWin=body.stopWin===undefined?(b.bot.stopWin||0):cents(body.stopWin,'Win limit',true);
    const at=seatOf(b);if(at&&b.bot.mode==='seat'&&mode==='play'&&at.s.sittingOut)engine.sitOut(at.t,b,false);
-   Object.assign(b.bot,{risk,mode,stopLoss,stopWin});audit('BOT_MANAGE',b,0,{risk,mode,live:true});}
+   Object.assign(b.bot,{risk,mode,botClash,stopLoss,stopWin});audit('BOT_MANAGE',b,0,{risk,mode,live:true});}
   // Credit out of a bot, also while it plays: only from its wallet. The chips on the table stay
   // in the game (no player may take chips off the table); they come back when it leaves.
   else if(p==='/api/bots/withdraw'){const n=cents(body.amount,'Amount');if(n>b.balance)fail('The bot wallet holds only €'+(b.balance/100).toFixed(2)+'. Chips on the table come back when it leaves the table.');
@@ -423,12 +429,12 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     const {t,s}=at;
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
      const key=t.hand+':'+t.phase+':'+t.turnStartedAt;let plan=plans.get(s);
-     if(plan?.key!==key){const v=botView(t,s,profileOf);plan={key,v,d:null,at:0};plans.set(s,plan);
+     if(plan?.key!==key){const v=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced');plan={key,v,d:null,at:0};plans.set(s,plan);
       if(decider){const p=plan;decider(v,b.bot.risk).then(d=>{p.d=d;p.at=Math.max(Date.now(),t.turnStartedAt+think(d,v));}).catch(()=>{p.d=v.toCall?{type:'fold'}:{type:'check'};p.at=Date.now();});}
       else{plan.d=botDecision(v,b.bot.risk,random);plan.at=t.turnStartedAt+think(plan.d,v);}}
      // A decision that never came back: check when free, otherwise fold.
      if(!plan.d&&now-t.turnStartedAt>9000){plan.d=plan.v.toCall?{type:'fold'}:{type:'check'};plan.at=now;}
-     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botView(t,s,profileOf),d=botDecision(current,b.bot.risk,random);
+     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced'),d=botDecision(current,b.bot.risk,random);
       // Only humans may receive a deliberate return; avoid bot-to-bot transfers.
       const humanOnly=current.opponents.filter(o=>!o.folded).every(o=>!isBotId(o.id));
       const budget=returnBudget(b.bot,equity(b),g.returnPercent);

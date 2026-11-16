@@ -32,9 +32,12 @@ async function start(){$('#login').classList.add('hidden');$('#app').classList.r
 $('#tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(!b)return;tab=b.dataset.tab;$$('#tabs [data-tab]').forEach(x=>x.classList.toggle('on',x===b));$$('[data-pane]').forEach(p=>p.classList.toggle('hidden',p.dataset.pane!==tab));};
 
 // ---- Settings shared by "one bot", "many bots" and "edit" ----
+function botClashField(c={}){
+ return '<label>Bot kundër bot<select name="botClash">'+Object.entries({off:'Sjellja aktuale',balanced:'Përplasje e moderuar',aggressive:'Përplasje agresive'}).map(([k,v])=>'<option value="'+k+'"'+((c.botClash||'balanced')===k?' selected':'')+'>'+v+'</option>').join('')+'</select><small>Vetëm kur në dorë mbeten bota; lojtarët realë duhet të kenë bërë fold.</small></label>';
+}
 function configFields(c={},mix=false){
  const tables=data?.catalog||[],styles=data?.styles||{low:'Tight',medium:'Balanced',high:'Aggressive'},auto=(c.tableId??'auto')==='auto';
- return '<label>Stili<select name="risk">'+(mix?'<option value="mix">Të përziera</option>':'')+Object.entries(styles).map(([k,v])=>'<option value="'+k+'"'+((c.risk||(mix?'mix':'medium'))===k?' selected':'')+'>'+safe(v)+'</option>').join('')+'</select></label>'
+ return botClashField(c)+'<label>Stili<select name="risk">'+(mix?'<option value="mix">Të përziera</option>':'')+Object.entries(styles).map(([k,v])=>'<option value="'+k+'"'+((c.risk||(mix?'mix':'medium'))===k?' selected':'')+'>'+safe(v)+'</option>').join('')+'</select></label>'
   +'<label>Mënyra<select name="mode"><option value="play">Luan duar</option><option value="seat"'+(c.mode==='seat'?' selected':'')+'>Vetëm zë vend · nuk luan</option></select></label>'
   +'<label>Kur niset<select name="waitForPlayers"><option value="false">Ulet kur ka lojtarë</option><option value="true"'+(c.waitForPlayers?' selected':'')+'>Ulet direkt · luan edhe me bota</option></select></label>'
   +'<label>Tavolina<select name="tableId" data-table><option value="auto"'+(auto?' selected':'')+'>Auto · zgjedh vetë ku duhet</option>'+tables.map(t=>'<option value="'+safe(t.id)+'"'+(c.tableId===t.id?' selected':'')+'>'+safe(t.name)+' · '+eur(t.sb)+'/'+eur(t.bb)+' · '+t.size+' vende</option>').join('')+'</select></label>'
@@ -320,7 +323,7 @@ function renderLiveCtrl(){const v=live.v,s=v?.seats.find(x=>x&&x.id===live.pick)
   +'<div class="lBtns"><button type="button" class="small gold" data-lc="table" title="Nga Kuleta e CENB te chipsat e botit; nëse dora po luhet, shtohen sapo të mbarojë">+ Në tavolinë</button><button type="button" class="small" data-lc="wallet" title="Nga Kuleta e CENB te portofoli i botit">+ Te portofoli</button><button type="button" class="small" data-lc="out" title="Nga portofoli i botit te Kuleta e CENB">− Tërhiq</button></div>'
   +'<p class="lHint">Chipsat në tavolinë nuk tërhiqen gjatë lojës (asnjë lojtar s\'mund t\'i heqë). Kthehen kur boti ngrihet.</p>'
   +'<h4>Stili dhe limitet · vlejnë nga vendimi i radhës</h4><div class="lGrid"><label>Stili<select name="risk">'+Object.entries(v.styles).map(([k,l])=>'<option value="'+k+'"'+(k===b.risk?' selected':'')+'>'+safe(l)+'</option>').join('')+'</select></label>'
-  +'<label>Mënyra<select name="mode"><option value="play"'+(b.mode==='play'?' selected':'')+'>Luan duar</option><option value="seat"'+(b.mode==='seat'?' selected':'')+'>Vetëm zë vend</option></select></label>'
+  +botClashField(b)+'<label>Mënyra<select name="mode"><option value="play"'+(b.mode==='play'?' selected':'')+'>Luan duar</option><option value="seat"'+(b.mode==='seat'?' selected':'')+'>Vetëm zë vend</option></select></label>'
   +'<label>Humbje max (€)<input name="stopLoss" type="number" min="0.01" step="0.01" value="'+b.stopLoss+'"></label><label>Fitim max (€) · 0 = pa kufi<input name="stopWin" type="number" min="0" step="0.01" value="'+b.stopWin+'"></label></div>'
   +'<div class="lBtns"><button class="small gold">Ruaj tani</button>'+(b.enabled?'<button type="button" class="small danger" data-lc="stop">■ Ndalo</button>':'<button type="button" class="small" data-lc="start">▶ Nis</button>')+'</div></form>';}
 $('#liveFelt').addEventListener('click',e=>{const c=e.target.closest('[data-lseat]');if(!c)return;live.pick=live.pick===c.dataset.lseat?null:c.dataset.lseat;renderLive();});
@@ -335,5 +338,5 @@ $('#liveCtrl').addEventListener('click',e=>{const btn=e.target.closest('[data-lc
   else if(a==='stop'){await api('bots/status',{id:b.id,enabled:false});toast(s.username+' u ndal · ngrihet pas dorës');}
   else if(a==='start'){await api('bots/status',{id:b.id,enabled:true});toast(s.username+' u nis');}});});
 $('#liveCtrl').addEventListener('submit',e=>{e.preventDefault();const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;const f=new FormData(e.target);
- liveDo(async()=>{await api('bots/live',{id:b.id,risk:f.get('risk'),mode:f.get('mode'),stopLoss:f.get('stopLoss'),stopWin:f.get('stopWin')||0});toast(s.username+' u ndryshua · luan me të tani');});});
+ liveDo(async()=>{await api('bots/live',{id:b.id,risk:f.get('risk'),botClash:f.get('botClash'),mode:f.get('mode'),stopLoss:f.get('stopLoss'),stopWin:f.get('stopWin')||0});toast(s.username+' u ndryshua · luan me të tani');});});
 $('#seatTables').addEventListener('click',e=>{const w=e.target.closest('[data-watch]');if(w)openLive(w.dataset.watch);});
