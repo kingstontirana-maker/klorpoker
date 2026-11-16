@@ -308,7 +308,7 @@ test('bot rake is not revenue: reports count real players only, the house result
  assert.ok(botPaid>0&&humanPaid>0);
  const rev=revenueReport(db,center,{from:'all'});assert.equal(rev.totals.rake,humanPaid,'revenue = rake of real players');assert.equal(rev.totals.botRake,botPaid,'bot rake shown apart');
  assert.equal(rakeReport(db,center).total,humanPaid);assert.equal(rakeReport(db,center).botTotal,botPaid);
- const row=manager.list().find(x=>x.id===b.id);assert.equal(Math.round(row.rakePaid*100),botPaid);assert.equal(Math.round(row.house*100),Math.round(row.total*100)+botPaid);
+ const row=manager.list().find(x=>x.id===b.id);assert.equal(Math.round(row.rakePaid*100),botPaid);assert.equal(Math.round(row.total*100),Math.round(row.house*100),'the total counts the rake back (it stays in CENB)');assert.equal(Math.round(row.net*100),Math.round(row.total*100)-botPaid);
 });
 
 test('seat-only bots fill a seat and never lose a cent',()=>{

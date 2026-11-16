@@ -979,3 +979,11 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Filtrat te "Botat":** kërkim, statusi (luajnë tani / ndezur / presin / të ndalur / limit-gabim), stili, tavolina dhe renditja (emri, fitimi total, kjo seancë, duar, portofoli).
 - **Kontrolli i parave:** numëron kuletat. Lëvizjet qendër↔CENB shënohen si CENB_CREDIT / CENB_RETURN / CENB_PROFIT / CENB_RAKE.
 - **Testuar në demo:** me kuletë bosh, ulja e botit u refuzua; pas kreditimit me €500, ulja kaloi dhe kuleta zbriti €8; profiti i raportit (€0.33) përputhet me rezultatin e shtëpisë; kontrolli i parave mbeti OK.
+
+## Botat nuk dalin më "në humbje" për shkak të rake-ut
+- **Problemi:** "Kjo seancë" dhe "Fitimi total" e numëronin rake-un që paguan boti si humbje të tij. Te stake-t e larta rake-u nuk ka kufi, kështu që edhe kur botat luanin vetëm mes tyre, të gjithë dilnin me −€2–3k. Rake-u në fakt mbetet te CENB (kuleta "Rake i botave").
+- **Provë:** 2 bota heads-up në €100/€200, 300 duar. Më parë: −€3,570 dhe −€710. Tani: +€1,970 dhe −€1,970, dhe €4,400 rake në kuletë.
+- **Rregullimi:**
+  - "Kjo seancë" dhe "Fitimi total" e numërojnë rake-un mbrapsht;
+  - limiti i humbjes së botit përdor të njëjtën llogari, kështu që botat nuk ndalen më për shkak të rake-ut;
+  - te detajet e botit shfaqen edhe "Rake i paguar · mbetet te CENB" dhe "Pa e numëruar rake-un".
