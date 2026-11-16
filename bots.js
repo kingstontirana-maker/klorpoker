@@ -59,7 +59,7 @@ export function workerDecider(){
 const FIRST=['marco','luka','andi','elira','nikos','jonas','pablo','sven','dario','ilir','arben','klea','besi','tomas','milan','stefan','leon','ardit','genti','erion','enea','joni','flori','teo','rino','vali','alex','maks','niko','sara','dea','lori','tani','reni','kevin','paolo','hugo','ines','olga','emil'];
 const TAIL=['','_ace','_pro','_77','_river','_k','_aa','_win','_tilt','_nuts','_q','_88','_bet'];
 
-export function createBots({db,runtime,engine,save,olderRake,random=Math.random,decider=null}){
+export function createBots({db,runtime,engine,save,olderRake,store=null,random=Math.random,decider=null}){
  for(const u of db.users)if(u.isBot&&u.username.endsWith(OLD_SUFFIX)){const plain=u.username.slice(0,-OLD_SUFFIX.length);if(!db.users.some(x=>x!==u&&x.username.toLowerCase()===plain.toLowerCase()))u.username=plain;}
  const bots=()=>db.users.filter(u=>u.isBot),center=()=>db.users.find(x=>x.role==='CENTER');
  // Every bot has a profile picture from the platform's list: the one fewest bots wear, picked at
@@ -83,10 +83,16 @@ export function createBots({db,runtime,engine,save,olderRake,random=Math.random,
  function keys(now){const day=tirana(now),[y,m,d]=day.split('-').map(Number),wd=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7,monday=new Date(Date.UTC(y,m-1,d-wd)).toISOString().slice(0,10);return {day,week:monday,month:day.slice(0,7)};}
  let rakeSeen=0,rakeTotal=0,rakeMap=new Map(),oldCounted=false;
  function botRake(){const ids=new Set(bots().map(u=>u.id)),count=x=>{if(x.type!=='RAKE')return;for(const a of x.allocations||[])if(a.bot||ids.has(a.userId)){rakeTotal+=a.amount;const r=rakeMap.get(a.userId)||{rake:0,hands:0};r.rake+=a.amount;r.hands++;rakeMap.set(a.userId,r);}};if(!oldCounted){oldCounted=true;for(const x of olderRake?.()||[])count(x);}for(;rakeSeen<db.ledger.length;rakeSeen++)count(db.ledger[rakeSeen]);return rakeTotal;}
- // The house result: bot chips plus the rake bots paid, which goes back to the center.
- // db.cenbFlow: credit moved from the CENB wallet to the bots minus credit moved from the bots
-// to the wallet (Rikrediti botat). Those moves stay inside CENB and never change the house result.
-const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake()-(Number(db.cenbFlow)||0);
+ // ---- CENB wallets ----
+ // credit: what the centre gave CENB; every bot is funded from it and returns to it.
+ // profit: what is left over when the bots are re-credited (their winnings).
+ // rake (db.cenbRake): the rake the bots paid, kept apart.
+ // Only moves between the centre and CENB come in or out; everything else stays inside CENB.
+ const freshWallet=!db.cenbWallet;const W=db.cenbWallet??={credit:0,profit:0};
+ const need=n=>{if(n>W.credit)fail('Kuleta e kredisë së CENB ka vetëm €'+(W.credit/100).toFixed(2)+'. Kreditoje CENB nga qendra (mungojnë €'+((n-W.credit)/100).toFixed(2)+').');};
+ // The house result: everything CENB holds (bot chips and the three wallets); a credit from
+ // the centre or a payment to it moves the period starts, so it is never counted as profit.
+ const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+W.credit+W.profit+(Number(db.cenbRake)||0);
  function periods(now=Date.now()){
   const k=keys(now);let value=null,changed=false;
   for(const [p,,name] of PERIODS)if(g[p]!==k[p]){value??=houseValue();g[p]=k[p];g[p+'Start']=value;changed=true;
@@ -95,6 +101,40 @@ const houseValue=()=>bots().reduce((n,u)=>n+equity(u),0)+botRake()-(Number(db.ce
   return {day:value-g.dayStart,week:value-g.weekStart,month:value-g.monthStart};
  }
  const moveStarts=n=>{for(const [p] of PERIODS)g[p+'Start']+=n;};
+ // The first time the wallets exist, the period starts are taken again so the change of
+ // formula is not seen as a profit or a loss.
+ if(freshWallet){periods();const v=houseValue();for(const [p] of PERIODS)g[p+'Start']=v;delete db.cenbFlow;save();}
+ const wallets=()=>({credit:W.credit/100,profit:W.profit/100,rake:(Number(db.cenbRake)||0)/100,inBots:bots().reduce((n,u)=>n+equity(u),0)/100});
+ // ---- Profit report ----
+ // Profit of CENB from play = what the bots won at the tables (after rake) + the rake they paid
+ // (it comes back to CENB). Days are Europe/Tirane days. Bots playing each other cancel out.
+ // Midnight of a Europe/Tirane day, in ms (two passes settle summer/winter time).
+ const localMs=t=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).formatToParts(t).map(x=>[x.type,x.value]));return Date.UTC(+p.year,p.month-1,+p.day,+p.hour,+p.minute,+p.second);};
+ const dayStart=day=>{const g=Date.parse(day+'T00:00:00Z');let t=g-(localMs(g)-g);t-=localMs(t)-g;return t;};
+ const validDay=d=>/^\d{4}-\d{2}-\d{2}$/.test(String(d||''));
+ function profitReport(body={}){
+  const today=tirana(Date.now());let from=validDay(body.from)?body.from:today,to=validDay(body.to)?body.to:today;if(from>to)[from,to]=[to,from];
+  const since=dayStart(from),until=dayStart(new Date(Date.parse(to+'T12:00:00Z')+86400000).toISOString().slice(0,10));
+  const tableId=body.tableId?String(body.tableId):'',botId=body.botId?String(body.botId):'';
+  const rows=store?.botResults?store.botResults(since,until):[],rk=store?.botRake?store.botRake(since,until):[];
+  const byBot=new Map(),byTable=new Map(),byDay=new Map(),T={hands:0,net:0,rake:0,won:0};
+  const tName=id=>runtime.get(String(id))?.name||(db.tables||[]).find(x=>x.id===String(id))?.name||'#'+id;
+  const add=(map,key,init,f)=>{const o=map.get(key)||init();map.set(key,o);f(o);};
+  for(const r of rows){if(tableId&&String(r.tableId)!==tableId||botId&&r.id!==botId)continue;const net=Math.round(r.net*100),day=tirana(r.hour*3600000);
+   T.hands+=r.hands;T.net+=net;T.won+=r.won;
+   add(byBot,r.id,()=>({id:r.id,name:db.users.find(u=>u.id===r.id)?.username||r.name,hands:0,net:0,rake:0,won:0}),o=>{o.hands+=r.hands;o.net+=net;o.won+=r.won;});
+   add(byTable,String(r.tableId),()=>({id:String(r.tableId),name:tName(r.tableId),hands:0,net:0,rake:0}),o=>{o.hands+=r.hands;o.net+=net;});
+   add(byDay,day,()=>({day,hands:0,net:0,rake:0}),o=>{o.hands+=r.hands;o.net+=net;});}
+  for(const r of rk){if(tableId&&String(r.tableId)!==tableId)continue;const day=tirana(r.time);
+   for(const a of r.allocations){if(botId&&a.userId!==botId)continue;T.rake+=a.amount;
+    add(byBot,a.userId,()=>({id:a.userId,name:db.users.find(u=>u.id===a.userId)?.username||'—',hands:0,net:0,rake:0,won:0}),o=>{o.rake+=a.amount;});
+    add(byTable,String(r.tableId),()=>({id:String(r.tableId),name:tName(r.tableId),hands:0,net:0,rake:0}),o=>{o.rake+=a.amount;});
+    add(byDay,day,()=>({day,hands:0,net:0,rake:0}),o=>{o.rake+=a.amount;});}}
+  const out=o=>({...o,net:o.net/100,rake:o.rake/100,profit:(o.net+o.rake)/100});
+  const days=[];for(let d=from;d<=to&&days.length<400;d=new Date(Date.parse(d+'T12:00:00Z')+86400000).toISOString().slice(0,10))days.push(out(byDay.get(d)||{day:d,hands:0,net:0,rake:0}));
+  return {from,to,today,tableId,botId,totals:{...out(T),bots:byBot.size,tables:byTable.size,winRate:T.hands?Math.round(T.won/T.hands*1000)/10:0},
+   days,bots:[...byBot.values()].map(out).sort((a,b)=>b.profit-a.profit),tables:[...byTable.values()].map(out).sort((a,b)=>b.profit-a.profit),
+   wallets:wallets(),choices:{bots:bots().map(b=>({id:b.id,name:b.username})).sort((a,b)=>a.name.localeCompare(b.name)),tables:[...runtime.values()].map(t=>({id:t.id,name:t.name}))}};}
  function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
@@ -161,9 +201,9 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  }
  function create(u,name,amount,body,batch=false){
   if(!/^[a-zA-Z0-9_]{3,18}$/.test(name))fail('Name: 3–18 letters, numbers or _');if(db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))fail('This name is already taken');if(bots().length>=MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');
-  centerFunds(db,u,amount,'bot budget');if(amount>u.balance)fail('The center does not have enough credit for this budget');
+  need(amount);
   const b={id:crypto.randomUUID(),username:name,role:'USER',isBot:true,parentId:u.id,balance:amount,avatar:pickAvatar(),createdAt:Date.now(),bot:{enabled:false,funded:amount,baseline:amount,hands:0}};
-  if(!batch)periods();configure(b,body);u.balance-=amount;db.users.push(b);moveStarts(amount);audit('BOT_FUND',b,amount);return b;
+  if(!batch)periods();configure(b,body);W.credit-=amount;db.users.push(b);audit('BOT_FUND',b,amount,{from:'cenb'});return b;
  }
  function freshName(){if(db.botNames?.length){const name=db.botNames.find(n=>!db.users.some(x=>x.username.toLowerCase()===n.toLowerCase()));if(!name)fail('Nuk ka më emra të lirë në listë');return name;}for(let i=0;i<200;i++){const n=FIRST[Math.floor(random()*FIRST.length)],t=TAIL[Math.floor(random()*TAIL.length)],name=(random()<.5?n[0].toUpperCase()+n.slice(1):n)+t+(t&&random()<.6?'':Math.floor(10+random()*89));if(name.length<=18&&!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase()))return name;}fail('Could not find a free name');}
  const fillDefaults={emptySeats:1,buyinMinPercent:35,buyinMaxPercent:90,budgetPercent:200,stopLossPercent:100,stopWinPercent:0,risk:'mix',mode:'play'};
@@ -195,13 +235,13 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    }
   }
   if(bots().length+newBots>MAX_BOTS)fail('Mbushja do të tejkalojë kufirin prej '+MAX_BOTS+' botësh');
-  if(Number.isSafeInteger(funding))centerFunds(db,u,funding,'table fill');if(!Number.isSafeInteger(funding)||funding>u.balance)fail('Kredia virtuale e qendrës nuk mjafton për mbushjen');
+  if(!Number.isSafeInteger(funding))fail('Invalid funding');need(funding);
   db.botFill??={tables:{}};db.botFill.tables??={};
   db.botFill.settings=Object.fromEntries(Object.keys(fillDefaults).map(k=>[k,c[k]]));
   for(const report of reports)if(!report.skipped)db.botFill.tables[report.id]={emptySeats:report.emptySeats};
   for(const job of jobs){const {t,person,budget,topup,config,report}=job;let b=person.b;
    if(!b)b=create(u,person.name,budget,config,true);
-   else{if(topup){u.balance-=topup;b.balance+=topup;b.bot.funded+=topup;moveStarts(topup);audit('BOT_FUND',b,topup);}configure(b,config);}
+   else{if(topup){W.credit-=topup;b.balance+=topup;b.bot.funded+=topup;audit('BOT_FUND',b,topup,{from:'cenb'});}configure(b,config);}
    b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.error=null;
    engine.sit(t,b,t.seats.findIndex(s=>!s),config.buyin,[...runtime.values()]);
    if(c.mode==='seat')engine.sitOut(t,b,true);
@@ -212,14 +252,14 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  }
  // Moves the wallet of every bot that is not at a table back to the centre.
   function reclaim(){const c=center();let returned=0,bots_=0;if(!c)return {returned,bots:0,waiting:0};periods();
-   for(const b of bots()){if(seatOf(b)||!(b.balance>0))continue;const n=b.balance;c.balance+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.enabled=false;moveStarts(-n);audit('BOT_REFUND',b,n,{reclaim:true});returned+=n;bots_++;}
+   for(const b of bots()){if(seatOf(b)||!(b.balance>0))continue;const n=b.balance;W.credit+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.enabled=false;audit('BOT_REFUND',b,n,{reclaim:true,from:b.id,to:'cenb'});returned+=n;bots_++;}
    const waiting=bots().filter(b=>seatOf(b)).length;if(!waiting)delete db.botReclaim;return {returned:returned/100,bots:bots_,waiting};}
  const stop=(b,reason,at)=>{b.bot.enabled=false;b.bot.error=reason||null;if(at)try{engine.leave(at.t,b);}catch{}save();};
  function route(p,body,u){if(!p.startsWith('/api/bots'))return undefined;if(u?.role!=='CENTER')fail('Only the center can manage bots',403);
   if(p==='/api/bots')return list();
   if(p==='/api/bots/guard')return guardInfo();
   if(p==='/api/bots/overview'){const tables=[...runtime.values()].filter(t=>t.seats.some(Boolean)).map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,humans:humansAt(t),bots:botsAt(t),waiting:t.waitlist?.length||0,live:LIVE.includes(t.phase)})).sort((a,b)=>b.humans-a.humans);
-   return {cenbRake:(Number(db.cenbRake)||0)/100,bots:list(),guard:guardInfo(),fill:fillInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
+   return {cenbRake:(Number(db.cenbRake)||0)/100,wallets:wallets(),profitToday:profitReport({}).totals,bots:list(),guard:guardInfo(),fill:fillInfo(),tables,players:playerTypes(),decisions:decisions.slice(-60).reverse(),styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label])),
     catalog:[...runtime.values()].map(t=>({id:t.id,name:t.name,bb:t.bb/100,sb:t.sb/100,size:t.seats.length,free:freeAt(t),bots:botsAt(t),humans:humansAt(t),min:engine.buyinLimits(t).min/100,max:engine.buyinLimits(t).max/100}))};}
   if(p==='/api/bots/names'){
    const names=(Array.isArray(body.names)?body.names:String(body.names??'').split(/[\s,;]+/)).map(n=>String(n).trim()).filter(Boolean);
@@ -235,7 +275,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(body.returnPercent!==undefined)next.returnPercent=Number(body.returnPercent);
    Object.assign(g,next);save();return guardInfo();}
   if(p==='/api/bots/create'){const b=create(u,String(body.name||'').trim(),cents(body.budget,'Budget'),body);save();return {ok:true,id:b.id};}
-  if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');centerFunds(db,u,each*n,'bot budget');if(each*n>u.balance)fail('The center does not have enough credit for this budget');
+  if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');need(each*n);
    if(db.botNames?.length&&db.botNames.filter(name=>!db.users.some(x=>x.username.toLowerCase()===name.toLowerCase())).length<n)fail('Nuk ka mjaft emra të lirë në listë');
    if(bots().length+n>MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');const made=[];for(let i=0;i<n;i++)made.push(create(u,freshName(),each,{...body,risk:body.risk==='mix'?['low','medium','high'][i%3]:body.risk}).id);save();return {ok:true,ids:made};}
   // Return every bot's credit to the centre: all bots stop; the ones at a table leave when
@@ -251,9 +291,9 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    const pool=free.reduce((n,b)=>n+b.balance,0)+wallet,need=free.reduce((n,b)=>n+Math.max(0,b.bot.funded||0),0);
    const ratio=need>0&&pool<need?pool/need:1;let given=0;
    for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);b.balance=target;b.bot.baseline=target;given+=target;}
-   const nextWallet=pool-given;db.cenbFlow=(Number(db.cenbFlow)||0)+(wallet-nextWallet);db.cenbRake=nextWallet;
-   db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,walletBefore:wallet,walletAfter:nextWallet,time:Date.now()});save();
-   return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:nextWallet/100,walletChange:(nextWallet-wallet)/100};}
+   const left=pool-given;db.cenbRake=0;W.profit+=left;
+   db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,rakeUsed:wallet,toProfit:left,time:Date.now()});save();
+   return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:W.profit/100,walletChange:left/100};}
   // Tables tab: every table with every seat, and the bots that are free to be seated.
   if(p==='/api/bots/tables'){return {tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,sb:t.sb/100,bb:t.bb/100,size:t.seats.length,min:l.min/100,max:l.max/100,live:LIVE.includes(t.phase),waiting:t.waitlist?.length||0,
     seats:t.seats.map((s,i)=>{if(!s)return null;const b=s.isBot?db.users.find(u=>u.id===s.userId):null;return {p:i,name:s.username,bot:!!s.isBot,stack:s.stack/100,out:!!s.sittingOut,...(b?{id:b.id,on:!!b.bot?.enabled,leaving:!!s.leaveAfterHand}:{})};})};}),
@@ -267,15 +307,23 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    const l=engine.buyinLimits(t),buyin=body.buyin===undefined||body.buyin===''?Math.round(l.max*0.6):cents(body.buyin,'Buy-in');if(buyin<l.min||buyin>l.max)fail('Buy-in must be €'+(l.min/100).toFixed(2)+'–€'+(l.max/100).toFixed(2));
    const risk=body.risk||'medium',mode=body.mode||'play';let b;periods();
    if(body.id){b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);if(seatOf(b))fail('This bot is already at a table');
-    const missing=buyin-b.balance;if(missing>0){centerFunds(db,u,missing,'bot seat');if(missing>u.balance)fail('The center does not have enough credit');u.balance-=missing;b.balance+=missing;b.bot.funded+=missing;b.bot.baseline+=missing;moveStarts(missing);audit('BOT_FUND',b,missing);}
+    const missing=buyin-b.balance;if(missing>0){need(missing);W.credit-=missing;b.balance+=missing;b.bot.funded+=missing;b.bot.baseline+=missing;audit('BOT_FUND',b,missing,{from:'cenb'});}
     configure(b,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??(b.bot.stopLoss||b.balance)/100});}
    else{const name=String(body.name||'').trim()||freshName(),budget=body.budget===undefined||body.budget===''?buyin*2:cents(body.budget,'Budget');if(budget<buyin)fail('The budget must cover the buy-in');
-    centerFunds(db,u,budget,'bot budget');b=create(u,name,budget,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??budget/100,stopWin:body.stopWin??0},true);}
+    b=create(u,name,budget,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??budget/100,stopWin:body.stopWin??0},true);}
    b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);b.bot.baseline=equity(b);if(mode==='seat')engine.sitOut(t,b,true);
    audit('BOT_MANAGE',b,0,{enabled:true,seat:pos+1,table:t.name});save();return {ok:true,bot:b.username,seat:pos+1,table:t.name};}
   if(p==='/api/bots/sendrake'){const pool=Number(db.cenbRake)||0,n=body.amount===undefined||body.amount===''||body.amount===null?pool:cents(body.amount,'Amount');
    if(!(n>0))fail('There is no bot rake to send');if(n>pool)fail('CENB holds only €'+(pool/100).toFixed(2)+' of bot rake');const c=center();if(!c)fail('No center account');
-   db.cenbRake=pool-n;c.balance+=n;db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',to:c.id,amount:n,time:Date.now()});save();return {ok:true,sent:n/100,left:db.cenbRake/100};}
+   periods();db.cenbRake=pool-n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',from:'cenb',to:c.id,amount:n,time:Date.now()});save();return {ok:true,sent:n/100,left:db.cenbRake/100};}
+  // CENB wallets and the centre: credit in, credit back, profit out.
+  if(p==='/api/bots/wallet'){const c=center();if(!c)fail('No center account');const a=String(body.action||'');
+   const n=cents(body.amount,'Amount');periods();
+   if(a==='credit'){centerFunds(db,c,n,'cenb credit');if(n>c.balance)fail('The center does not have enough credit');c.balance-=n;W.credit+=n;moveStarts(n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_CREDIT',from:c.id,to:'cenb',amount:n,time:Date.now()});}
+   else if(a==='return'){if(n>W.credit)fail('The credit wallet holds only €'+(W.credit/100).toFixed(2));W.credit-=n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_RETURN',from:'cenb',to:c.id,amount:n,time:Date.now()});}
+   else if(a==='profit'){if(n>W.profit)fail('The profit wallet holds only €'+(W.profit/100).toFixed(2));W.profit-=n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_PROFIT',from:'cenb',to:c.id,amount:n,time:Date.now()});}
+   else fail('Unknown wallet action');save();return {ok:true,wallets:wallets()};}
+  if(p==='/api/bots/profit')return profitReport(body);
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);
@@ -283,8 +331,8 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   else if(p==='/api/bots/status'){if(typeof body.enabled!=='boolean')fail('Invalid status');
    if(body.enabled){if(/^House /.test(b.bot.error||''))fail('The house limit is reached: raise it or wait for the next period');if(b.bot.tableId!=='auto'&&b.balance<b.bot.buyin&&!seatOf(b))fail('The bot wallet is smaller than its buy-in');b.bot.baseline=equity(b);}
    b.bot.enabled=body.enabled;b.bot.error=null;if(!body.enabled){const at=seatOf(b);if(at)engine.leave(at.t,b);}audit('BOT_MANAGE',b,0,{enabled:body.enabled});}
-  else if(p==='/api/bots/topup'){if(seatOf(b))fail('Let the bot leave the table first');const n=cents(body.amount,'Amount');centerFunds(db,u,n,'bot top-up');if(n>u.balance)fail('The center does not have enough credit');periods();u.balance-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;moveStarts(n);audit('BOT_FUND',b,n);}
-  else if(p==='/api/bots/delete'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table first');periods();const left=b.balance+(rakeMap.get(b.id)?.rake||0);u.balance+=b.balance;audit('BOT_REFUND',b,b.balance);db.users.splice(db.users.indexOf(b),1);moveStarts(-left);rakeTotal-=rakeMap.get(b.id)?.rake||0;rakeMap.delete(b.id);}
+  else if(p==='/api/bots/topup'){if(seatOf(b))fail('Let the bot leave the table first');const n=cents(body.amount,'Amount');need(n);W.credit-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;audit('BOT_FUND',b,n,{from:'cenb'});}
+  else if(p==='/api/bots/delete'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table first');W.credit+=b.balance;audit('BOT_REFUND',b,b.balance,{from:b.id,to:'cenb'});db.users.splice(db.users.indexOf(b),1);rakeTotal-=rakeMap.get(b.id)?.rake||0;rakeMap.delete(b.id);}
   else fail('Not found',404);
   save();return {ok:true};}
 

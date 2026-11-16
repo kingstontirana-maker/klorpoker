@@ -184,6 +184,9 @@ export function openStore(file){
   rawSet(table,id,keyCol,row){const cols=this.realColumns(table),keys=Object.keys(row).filter(k=>cols.includes(k));if(!keys.length||!['rowid','seq'].includes(keyCol))return;transaction(()=>sql.prepare('UPDATE "'+table+'" SET '+keys.map(k=>'"'+k+'"=?').join(',')+' WHERE '+keyCol+'=?').run(...keys.map(k=>row[k]),id));},
   rawInsert(table,row){const cols=this.realColumns(table),keys=Object.keys(row).filter(k=>cols.includes(k));if(!keys.length)throw Object.assign(Error('Fill in at least one column'),{status:400});return Number(transaction(()=>sql.prepare('INSERT INTO "'+table+'"('+keys.map(k=>'"'+k+'"').join(',')+') VALUES('+keys.map(()=>'?').join(',')+')').run(...keys.map(k=>row[k])).lastInsertRowid));},
   rawDelete(table,id){if(!this.browseTables().some(t=>t.name===table))return;transaction(()=>sql.prepare('DELETE FROM "'+table+'" WHERE rowid=?').run(id));},
+  // CENB profit report: bot results per bot, table and hour; the rake bots paid.
+  botResults(since,until){return sql.prepare('SELECT hp.user_id AS id,hp.username AS name,h.table_id AS tableId,CAST(hp.started_at/3600000 AS INTEGER) AS hour,COUNT(*) AS hands,SUM(hp.result) AS net,SUM(hp.won) AS won FROM hand_players hp JOIN hands h ON h.id=hp.hand_id WHERE hp.bot=1 AND hp.started_at>=? AND hp.started_at<? GROUP BY hp.user_id,h.table_id,hour').all(since,until);},
+  botRake(since,until){return sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND time>=? AND time<? AND instr(data,'\"bot\":true')>0").all(since,until).map(r=>{const x=JSON.parse(r.data);return {time:x.time,tableId:x.tableId,allocations:(x.allocations||[]).filter(a=>a.bot)};});},
   close(){sql.close();},
  };
  return store;

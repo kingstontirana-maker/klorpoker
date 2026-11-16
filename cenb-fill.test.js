@@ -16,8 +16,9 @@ function setup(){
  let seed=73;const random=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
  const manager=createBots({db,runtime,engine,save:()=>{},random});
  const route=(name,body={})=>manager.route('/api/bots/'+name,body,center);
+ route('wallet',{action:'credit',amount:center.balance/100});
  const names=Array.from({length:30},(_,i)=>'TestName_'+i);
- const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+[...runtime.values()].reduce((n,t)=>n+t.seats.reduce((m,s)=>m+(s?.stack||0),0),0);
+ const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbWallet?.credit||0)+(db.cenbWallet?.profit||0)+(db.cenbRake||0)+[...runtime.values()].reduce((n,t)=>n+t.seats.reduce((m,s)=>m+(s?.stack||0),0),0);
  route('guard');return {db,center,engine,runtime,manager,route,names,total};
 }
 
@@ -105,7 +106,7 @@ test('fill skips queues, respects real seats and protects access through CENB',(
 });
 
 test('one fill covers the complete production table catalog and persists its configuration',()=>{
- const {route,db,center,engine,runtime,total,manager}=setup();runtime.clear();center.balance=10_000_000_000;
+ const {route,db,center,engine,runtime,total,manager}=setup();runtime.clear();route('wallet',{action:'credit',amount:100_000_000});
  for(const [i,c] of TABLE_CATALOG.entries()){const id=String(i+1);runtime.set(id,engine.makeTable(id,c.name,c.sb,c.bb,c.game,c.size));}
  const initial=total(),names=Array.from({length:1000},(_,i)=>'CatalogBot_'+i);route('names',{names});
  const r=route('fill',{tableId:'all',emptySeats:1,mode:'seat'});
@@ -121,8 +122,7 @@ test('one fill covers the complete production table catalog and persists its con
  }finally{store?.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
 
-test('fill with little credit at the center: the missing credit is created, nothing is refused',()=>{
- const {route,db,center,names}=setup();route('names',{names});center.balance=1;const before=db.users.filter(u=>u.isBot).length;
- const r=route('fill',{tableId:'all'});assert.ok(r.added>0);assert.ok(db.ledger.some(x=>x.type==='MINT'),'credit was created');assert.ok(center.balance>=0);
- assert.ok(db.users.filter(u=>u.isBot).length>before);
+test('fill with little credit in CENB is refused before anything changes; the message names the shortfall',()=>{
+ const {route,db,names}=setup();route('names',{names});route('wallet',{action:'return',amount:db.cenbWallet.credit/100-0.01});const before=JSON.stringify({u:db.users,w:db.cenbWallet});
+ assert.throws(()=>route('fill',{tableId:'all'}),/Kreditoje CENB nga qendra/);assert.equal(JSON.stringify({u:db.users,w:db.cenbWallet}),before);
 });

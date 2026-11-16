@@ -965,3 +965,17 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 - **Botët ekzistues:** botat pa avatar e marrin një kur niset serveri.
 - **Në tavolinë:** avatari i llogarisë kalon tani te vendi kur ulet çdo llogari, kështu që portreti duket në tavolinë.
 - **Testuar në demo:** 3 bota të rinj u shfaqën në Madrid IV me portrete të ndryshme (p50, p16, p54).
+
+## CENB si qendër e avancuar: kuletat, profiti, filtrat
+- **Kuleta e kredisë:** CENB kreditohet nga qendra me "+ Nga qendra" (te qendra, kredia që mungon krijohet si MINT). Çdo bot financohet prej saj (krijim, krijim në masë, mbushje, "＋ Ulu", "+ Para"), dhe kredia e botave kthehet aty ("Mblidh kredinë e botave", fshirja e botit). Kur kredia nuk mjafton, del mesazhi "Kreditoje CENB nga qendra (mungojnë €X)". Butoni "Kthe te qendra" e kthen kredinë e papërdorur.
+- **Kuleta e fitimit:** "Rikrediti botat" i kthen botat te financimi i tyre, dhe ajo që mbetet plus shkon këtu. "Dërgo te qendra" e dërgon fitimin te qendra.
+- **Rake i botave:** mbetet i ndarë nga fitimi. U kthehet botave me "Rikrediti botat", ose dërgohet te qendra.
+- **"Profit sot":** zëvendëson tre kartat "Shtëpia sot / Kjo javë / Ky muaj". Kur klikohet, hap tab-in "Profiti" me:
+  - periudhat Sot / Dje / 7 ditë / 30 ditë / Ky muaj / Muaji i kaluar, ose nga–deri;
+  - filtër sipas botit dhe tavolinës;
+  - totalet: profiti, në tavolina pas rake-ut, rake-u, duart, % e duarve të fituara;
+  - grafikun dhe tabelën ditë për ditë, si dhe tabelat sipas botit dhe sipas tavolinës.
+  - Profiti = ajo që botat fituan në tavolina (pas rake-ut) + rake-u i botave; botat që luajnë mes tyre nuk e ndryshojnë. Ditët janë sipas orës së Tiranës. Limitet e humbjes vazhdojnë të funksionojnë te tab-i "Limitet".
+- **Filtrat te "Botat":** kërkim, statusi (luajnë tani / ndezur / presin / të ndalur / limit-gabim), stili, tavolina dhe renditja (emri, fitimi total, kjo seancë, duar, portofoli).
+- **Kontrolli i parave:** numëron kuletat. Lëvizjet qendër↔CENB shënohen si CENB_CREDIT / CENB_RETURN / CENB_PROFIT / CENB_RAKE.
+- **Testuar në demo:** me kuletë bosh, ulja e botit u refuzua; pas kreditimit me €500, ulja kaloi dhe kuleta zbriti €8; profiti i raportit (€0.33) përputhet me rezultatin e shtëpisë; kontrolli i parave mbeti OK.

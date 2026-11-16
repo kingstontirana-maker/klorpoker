@@ -166,3 +166,28 @@ td.num,th.num{text-align:right}
 .seatChip.bot:hover{border-color:#ffd78a;background:#4a3a18}
 .seatChip.bot.leaving{opacity:.6;border-style:dashed}
 #botDialog .danger{background:linear-gradient(180deg,#d2384b,#8d1d2c);border-color:#ff8a96aa;color:#fff}
+
+/* ---- Profit card, wallets ---- */
+.kpi.profitCard{cursor:pointer;border-color:#e9c97a66}
+.kpi.profitCard:hover{border-color:#f3dc9c;box-shadow:0 0 0 1px #e9c97a44}
+.kpi .miniRow{display:flex;gap:6px;flex-wrap:wrap}
+.kpi .miniRow .mini{display:inline-block}
+.kpi .mini.ghost{background:transparent;border-color:var(--line);color:inherit}
+.kpi i.up,.kpi i.down{font-style:normal}
+/* ---- Profit page ---- */
+.pfHead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.pfPresets{display:flex;flex-wrap:wrap;gap:6px}
+.pfPresets button{padding:6px 12px;font-size:13px}.pfPresets button.on{background:#14513a;border-color:#2fe08c88;color:#fff}
+.pfFilters{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 4px}
+.pfFilters label{display:flex;flex-direction:column;gap:4px;font-size:12px;flex:1 1 170px}
+.pfNote{font-size:12px;margin:6px 0 12px}
+.pfTotals{margin-bottom:10px}
+.card h3{margin:16px 0 8px;font-size:15px}
+.pfChart{display:flex;align-items:flex-end;gap:3px;height:120px;padding:8px 4px 0;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow-x:auto}
+.pfChart:empty{display:none}
+.pfBar{flex:1 0 14px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px}
+.pfBar i{display:block;width:100%;border-radius:4px 4px 0 0}.pfBar i.up{background:#2fe08c}.pfBar i.down{background:#ef5d6b}
+.pfBar small{font-size:9px;color:var(--muted)}
+/* ---- Bot filters ---- */
+.botFilters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.botFilters input{flex:1 1 200px;width:auto}.botFilters select{width:auto;flex:0 0 auto}

@@ -9,8 +9,10 @@ function world(opts={}){
  const center={id:'center',username:'center',role:'CENTER',balance:1000000},db={users:[center],ledger:[],rakePercent:0};
  const runtime=new Map(),engine=createEngine({db}),t=engine.makeTable('1','Test',100,200,'holdem',opts.size||6);runtime.set('1',t);
  const manager=createBots({db,runtime,engine,save:()=>{},random:opts.random||Math.random});
+ // CENB funds its bots from its own credit wallet: the test world credits it from the centre first.
+ if(opts.credit!==false)manager.route('/api/bots/wallet',{action:'credit',amount:center.balance/100},center);
  const human=(i,cents=50000)=>{const u={id:'h'+i,username:'human'+i,role:'USER',balance:cents};db.users.push(u);return u;};
- const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+[...runtime.values()].reduce((m,x)=>m+x.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(x.phase)?x.pot:0),0);
+ const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbWallet?.credit||0)+(db.cenbWallet?.profit||0)+(db.cenbRake||0)+[...runtime.values()].reduce((m,x)=>m+x.seats.reduce((n,s)=>n+(s?s.stack:0),0)+(LIVE.includes(x.phase)?x.pot:0),0);
  return {center,db,runtime,engine,t,manager,human,total};
 }
 // Plays one hand: humans call or check (or follow "policy"), bots decide from the server.
@@ -25,16 +27,17 @@ function playHand(engine,manager,t,botIds,policy){
 test('bot budgets, permissions, configuration and refunds conserve credit',()=>{
  const {center,db,manager}=world();
  assert.throws(()=>manager.route('/api/bots',{},{role:'AGENT'}),/Only the center/);
- assert.throws(()=>manager.route('/api/bots/create',{name:'NoTable',budget:100,tableId:'x',stopLoss:10},center),/valid table/);assert.equal(center.balance,1000000);
+ assert.throws(()=>manager.route('/api/bots/create',{name:'NoTable',budget:100,tableId:'x',stopLoss:10},center),/valid table/);assert.equal(db.cenbWallet.credit,1000000);
  manager.route('/api/bots/create',{name:'TestBot',budget:100,tableId:'1',buyin:40,stopLoss:30,stopWin:10},center);const b=db.users[1];
- assert.equal(b.username,'TestBot');assert.ok(b.isBot);assert.equal(center.balance,990000);assert.equal(b.balance,10000);assert.deepEqual([b.bot.buyin,b.bot.stopLoss,b.bot.stopWin],[4000,3000,1000]);
+ assert.equal(b.username,'TestBot');assert.ok(b.isBot);assert.equal(db.cenbWallet.credit,990000);assert.equal(b.balance,10000);assert.deepEqual([b.bot.buyin,b.bot.stopLoss,b.bot.stopWin],[4000,3000,1000]);
  assert.throws(()=>manager.route('/api/bots/configure',{id:b.id,tableId:'1',risk:'crazy',buyin:40,stopLoss:30},center),/Invalid style/);
  manager.route('/api/bots/configure',{id:b.id,tableId:'auto',buyinBB:50,maxBB:1,stopLoss:30,stopWin:0},center);assert.deepEqual([b.bot.tableId,b.bot.buyinBB,b.bot.maxBB,b.bot.stopWin],['auto',50,100,0]);
- manager.route('/api/bots/topup',{id:b.id,amount:5},center);assert.equal(b.balance,10500);assert.equal(center.balance,989500);
- manager.route('/api/bots/delete',{id:b.id},center);assert.equal(center.balance,1000000);assert.equal(db.users.length,1);
+ manager.route('/api/bots/topup',{id:b.id,amount:5},center);assert.equal(b.balance,10500);assert.equal(db.cenbWallet.credit,989500);
+ manager.route('/api/bots/delete',{id:b.id},center);assert.equal(db.cenbWallet.credit,1000000);assert.equal(center.balance,0,'the centre gave its credit to CENB');
+ assert.throws(()=>manager.route('/api/bots/create',{name:'TooBig',budget:20000,tableId:'1',buyin:40,stopLoss:30},center),/Kreditoje CENB nga qendra/);assert.equal(db.users.length,1);
  const made=manager.route('/api/bots/bulk',{count:5,budget:20,tableId:'auto',buyinBB:100,stopLoss:20,risk:'mix'},center);assert.equal(made.ids.length,5);
  const names=db.users.filter(u=>u.isBot).map(u=>u.username);assert.equal(new Set(names.map(n=>n.toLowerCase())).size,5);assert.ok(names.every(n=>/^[a-zA-Z0-9_]{3,18}$/.test(n)));
- assert.deepEqual([...new Set(db.users.filter(u=>u.isBot).map(u=>u.bot.risk))].sort(),['high','low','medium']);assert.equal(center.balance,990000);
+ assert.deepEqual([...new Set(db.users.filter(u=>u.isBot).map(u=>u.bot.risk))].sort(),['high','low','medium']);assert.equal(db.cenbWallet.credit,990000);
 });
 
 test('bots only fill thin tables: a real player is needed, a seat stays free, crowded tables are left to people',()=>{
@@ -395,20 +398,24 @@ test('decisions on the bot thread come back and the game plays on with them',asy
  assert.ok(acted,'the bot acted with the answer from its thread');
 });
 
-test('the center has no credit limit: a bot budget above its wallet creates the missing credit (MINT)',()=>{
- const {center,db,manager}=world();const total=()=>db.users.reduce((n,u)=>n+u.balance,0);db.moneyTotal=total();
- manager.route('/api/bots/create',{name:'Huge',budget:5000000,tableId:'1',buyin:40,stopLoss:30},center);
+test('crediting CENB beyond the centre wallet creates the missing credit (MINT); bots are funded from CENB',()=>{
+ const {center,db,manager}=world({credit:false});const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbWallet?.credit||0);db.moneyTotal=total();
+ manager.route('/api/bots/wallet',{action:'credit',amount:5000000},center);
  const mint=db.ledger.find(x=>x.type==='MINT');assert.ok(mint,'credit was created');assert.equal(mint.amount,500000000-1000000);
- assert.equal(center.balance,0,'the centre gave out everything it had plus what it created');assert.equal(total(),db.moneyTotal,'the money check total follows');
+ assert.equal(center.balance,0);assert.equal(db.cenbWallet.credit,500000000);assert.equal(total(),db.moneyTotal,'the money check total follows');
+ manager.route('/api/bots/create',{name:'Huge',budget:5000000,tableId:'1',buyin:40,stopLoss:30},center);assert.equal(db.cenbWallet.credit,0);
+ manager.route('/api/bots/delete',{id:db.users.find(u=>u.username==='Huge').id},center);assert.equal(db.cenbWallet.credit,500000000);
+ manager.route('/api/bots/wallet',{action:'return',amount:1000},center);assert.equal(center.balance,100000);
+ assert.throws(()=>manager.route('/api/bots/wallet',{action:'profit',amount:1},center),/profit wallet holds only/);
 });
 
 test('Rikrediti botat: bots go back to their funding, winners pay losers, the rest stays in the CENB wallet',()=>{
- const {center,db,manager}=world();const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbRake||0);
+ const {center,db,manager,total:all}=world();const total=()=>db.users.reduce((n,u)=>n+u.balance,0)+(db.cenbRake||0)+(db.cenbWallet?.credit||0)+(db.cenbWallet?.profit||0);
  manager.route('/api/bots/create',{name:'BotA',budget:100,tableId:'1',buyin:40,stopLoss:30},center);manager.route('/api/bots/create',{name:'BotB',budget:100,tableId:'1',buyin:40,stopLoss:30},center);
  const [a,b]=db.users.filter(u=>u.isBot);a.balance=13000;b.balance=6000;db.cenbRake=1500;// A won 30, B lost 40, bots paid 15 rake
  const before=total(),r=manager.route('/api/bots/restore',{},center);
- assert.deepEqual([a.balance,b.balance],[10000,10000],'both back to €100');assert.equal(db.cenbRake,500,'€5 left over stays in the CENB wallet');assert.equal(r.full,true);assert.equal(total(),before,'nothing created or lost');
- a.balance=7000;b.balance=5000;db.cenbRake=0;// not enough: €120 for €200 of funding
+ assert.deepEqual([a.balance,b.balance],[10000,10000],'both back to €100');assert.equal(db.cenbWallet.profit,500,'€5 left over goes to the profit wallet');assert.equal(db.cenbRake,0,'the rake of the bots went back to them');assert.equal(r.full,true);assert.equal(total(),before,'nothing created or lost');
+ a.balance=7000;b.balance=5000;db.cenbRake=0;db.cenbWallet.profit=0;// not enough: €120 for €200 of funding
  manager.route('/api/bots/restore',{},center);assert.deepEqual([a.balance,b.balance],[6000,6000],'the same share for each');assert.equal(db.cenbRake,0);
 });
 

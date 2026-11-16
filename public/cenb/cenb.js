@@ -53,19 +53,18 @@ $('#createMany').onsubmit=async e=>{e.preventDefault();try{const r=await api('bo
 
 // ---- Numbers at the top ----
 function renderKpis(){
- const g=data.guard,b=data.bots,playing=b.filter(x=>x.seatedAt).length,on=b.filter(x=>x.enabled).length,rake=b.reduce((n,x)=>n+x.rakePaid,0),house=b.reduce((n,x)=>n+x.house,0);
+ const g=data.guard,W=data.wallets||{credit:0,profit:0,rake:0,inBots:0},b=data.bots,playing=b.filter(x=>x.seatedAt).length,on=b.filter(x=>x.enabled).length,rake=b.reduce((n,x)=>n+x.rakePaid,0),house=b.reduce((n,x)=>n+x.house,0);
  const humans=data.tables.filter(t=>t.bots>0).reduce((n,t)=>n+t.humans,0);
  const meter=(v,limit)=>limit>0?'<div class="meter" title="'+Math.round(Math.max(0,-v)/limit*100)+'% e limitit"><i style="width:'+Math.min(100,Math.max(0,-v)/limit*100)+'%"></i></div>':'<span>pa limit</span>';
  $('#kpis').innerHTML=[
-  ['Shtëpia sot',signed(g.today),g.dailyLimit>0?'Limit '+eur(g.dailyLimit)+meter(g.today,g.dailyLimit):meter(0,0)],
-  ['Kjo javë',signed(g.week),g.weeklyLimit>0?'Limit '+eur(g.weeklyLimit)+meter(g.week,g.weeklyLimit):meter(0,0)],
-  ['Ky muaj',signed(g.month),g.monthlyLimit>0?'Limit '+eur(g.monthlyLimit)+meter(g.month,g.monthlyLimit):meter(0,0)],
+  ['Profit sot ↗',signed(data.profitToday?.profit||0),'<span>'+(data.profitToday?.hands||0)+' duar · tavolina '+signed(data.profitToday?.net||0).replace('<b','<i').replace('</b>','</i>')+' · rake '+eur(data.profitToday?.rake||0)+'</span>'+(g.dailyLimit>0?'<span>Limit humbjeje '+eur(g.dailyLimit)+'</span>'+meter(g.today,g.dailyLimit):''),'profitCard'],
+  ['Kuleta e kredisë','<b>'+eur(W.credit)+'</b>','<span>nga qendra · prej këtu financohen botat · në bota '+eur(W.inBots)+'</span><div class="miniRow"><button type="button" class="mini" data-wallet="credit">+ Nga qendra</button><button type="button" class="mini ghost" data-wallet="return"'+(W.credit>0?'':' disabled')+'>Kthe te qendra</button></div>'],
+  ['Kuleta e fitimit','<b class="'+(W.profit>0?'up':'')+'">'+eur(W.profit)+'</b>','<span>fitimet e CENB pas rikreditimit të botave</span><div class="miniRow"><button type="button" class="mini" data-wallet="profit"'+(W.profit>0?'':' disabled')+'>Dërgo te qendra</button></div>'],
   ['Botat','<b>'+playing+' <small class="muted">/ '+on+' / '+b.length+'</small></b>','<span>në tavolinë / ndezur / gjithsej</span>'],
   ['Lojtarë që luajnë me bota','<b>'+humans+'</b>','<span>lojtarë të vërtetë në tavolina me bota</span>'],
-  ['Kuleta e CENB','<b>'+eur(data.cenbRake||0)+'</b>','<span>rake i botave + teprica pas rikreditimit · rake gjithsej nga botat '+eur(rake)+'</span><button type="button" id="sendRake" class="mini"'+((data.cenbRake||0)>0?'':' disabled')+'>Dërgo te qendra</button>'],
+  ['Rake i botave','<b>'+eur(data.cenbRake||0)+'</b>','<span>i ndarë nga fitimi · u kthehet botave me Rikrediti · gjithsej '+eur(rake)+'</span><button type="button" id="sendRake" class="mini"'+((data.cenbRake||0)>0?'':' disabled')+'>Dërgo te qendra</button>'],
   ['Kthyer te lojtarët','<b>'+eur(b.reduce((n,x)=>n+(x.returned||0),0))+'</b>','<span>Objektivi '+Number(g.returnPercent||0)+'% · në dispozicion '+eur(b.reduce((n,x)=>n+(x.returnAvailable||0),0))+'</span>'],
-  ['Kredia e qendrës','<b>'+eur(data.centerBalance)+'</b>','<span>nga këtu financohen botat</span>'],
- ].map(([k,v,s])=>'<div class="kpi"><small>'+k+'</small>'+v.replace(/^<b class/,'<b class')+s+'</div>').join('');
+ ].map(([k,v,s,cls])=>'<div class="kpi'+(cls?' '+cls:'')+'"'+(cls==='profitCard'?' role="button" tabindex="0" title="Hap detajet e profitit"':'')+'><small>'+k+'</small>'+v.replace(/^<b class/,'<b class')+s+'</div>').join('');
  const stopped=g.stopped||[];$('#banner').classList.toggle('hidden',!stopped.length);$('#banner').textContent=stopped.length?'Limiti i shtëpisë u arrit ('+stopped.map(x=>x.replace('House ','').replace(' limit reached','')).join(', ')+'): të gjithë botat u ndalën dhe nisin vetë në periudhën tjetër.':'';
 }
 
@@ -74,8 +73,8 @@ const statusSq=s=>s.replace('Playing at','Luan te').replace('Looking for a table
 function renderBots(force=false){
  const list=$('#botList');if(!force&&editing&&list.querySelector('[data-edit]'))return;
  const focused=document.activeElement?.closest('#botList [data-act]'),focusId=focused?.closest('[data-id]')?.dataset.id,focusAct=focused?.dataset.act;
- $('#nBots').textContent=data.bots.length;
- list.innerHTML=data.bots.length?data.bots.map(b=>{const err=!b.enabled&&b.status!=='Stopped';
+ $('#nBots').textContent=data.bots.length;const shown=filterBots(data.bots);$('#bfCount').textContent=shown.length+' nga '+data.bots.length;
+ list.innerHTML=shown.length?shown.map(b=>{const err=!b.enabled&&b.status!=='Stopped';
   const open=expandedBot===b.id;
   return '<article class="bot'+(b.seatedAt?' on':'')+(err?' err':'')+'" data-id="'+safe(b.id)+'" role="listitem"><button type="button" class="botRow" data-act="details" aria-expanded="'+open+'" aria-controls="bot-details-'+safe(b.id)+'">'
   +'<span class="botIdentity"><span class="avatar">'+safe(b.name[0].toUpperCase())+'</span><span class="botName"><strong>'+safe(b.name)+'</strong><span class="pill'+(b.enabled?' on':err?' warn':'')+'">'+(b.enabled?'Ndezur':'Fikur')+'</span><small>'+safe(statusSq(b.status))+'</small></span></span>'
@@ -90,7 +89,7 @@ function renderBots(force=false){
   +'<div class="stats returnStats"><div><small>Kthyer te lojtarët</small><b>'+eur(b.returned)+'</b></div><div><small>Në dispozicion për kthim</small><b>'+eur(b.returnAvailable)+'</b></div></div>'
   +'<div class="botBtns">'+(b.enabled?'<button class="small danger" data-act="stop">■ Ndalo</button>':'<button class="small gold" data-act="start">▶ Nis</button>')+'<button class="small" data-act="edit"'+(b.enabled||b.seatedAt?' disabled title="Ndale botin dhe prit sa të ngrihet"':'')+'>Ndrysho</button><button class="small" data-act="topup"'+(b.seatedAt?' disabled':'')+'>+ Para</button><button class="small ghost" data-act="delete"'+(b.enabled||b.seatedAt?' disabled':'')+'>Fshi</button></div>'
   +(b.enabled||b.seatedAt?'<p class="editHint">Për të ndryshuar konfigurimin, ndale botin dhe prit të largohet nga tavolina.</p>':'')
-  +(editing===b.id?'<form class="edit grid" data-edit>'+configFields(b)+'<button class="gold">Ruaj</button><button type="button" class="ghost" data-act="cancel">Anulo</button></form>':''):'')+'</div></article>';}).join(''):'<div class="card empty">Nuk ka bota ende. Hap "Krijo".</div>';
+  +(editing===b.id?'<form class="edit grid" data-edit>'+configFields(b)+'<button class="gold">Ruaj</button><button type="button" class="ghost" data-act="cancel">Anulo</button></form>':''):'')+'</div></article>';}).join(''):'<div class="card empty">'+(data.bots.length?'Asnjë bot nuk përputhet me filtrat.':'Nuk ka bota ende. Hap "Krijo".')+'</div>';
  const f=list.querySelector('[data-edit]');if(f)bindConfig(f);
  if(focused){const row=[...list.querySelectorAll('[data-id]')].find(x=>x.dataset.id===focusId);row?.querySelector('[data-act="'+focusAct+'"]')?.focus({preventScroll:true});}
 }
@@ -106,12 +105,12 @@ $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn
   await refresh();
  }catch(err){toast(err.message,true);}};
 $('#botList').onsubmit=async e=>{e.preventDefault();const id=e.target.closest('[data-id]').dataset.id;try{await api('bots/configure',{id,...formBody(e.target)});editing=null;toast('U ruajt');await refresh();}catch(err){toast(err.message,true);}};
-$('#reclaimAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat dhe t\'i kthehet qendrës gjithë kredia e tyre?\n\nBotat që janë në një dorë ngrihen sapo të mbarojë dora, dhe kredia e tyre kthehet vetë pas kësaj. Llogaritë e botave mbeten, me €0.'))return;try{const r=await api('bots/reclaim');toast('U kthyen €'+r.returned.toLocaleString('en-US',{minimumFractionDigits:2})+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}};
+$('#reclaimAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat dhe kredia e tyre të kthehet te kuleta e kredisë së CENB?\n\nBotat që janë në një dorë ngrihen sapo të mbarojë dora, dhe kredia e tyre kthehet vetë pas kësaj. Llogaritë e botave mbeten, me €0.'))return;try{const r=await api('bots/reclaim');toast('U kthyen €'+r.returned.toLocaleString('en-US',{minimumFractionDigits:2})+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}};
 document.addEventListener('click',async e=>{if(!e.target.closest('#sendRake'))return;const pool=data.cenbRake||0;if(!(pool>0))return;
  const v=prompt('Sa të dërgohet nga kuleta e CENB te qendra? Kuleta ka '+eur(pool)+'.\nLëre bosh për të gjithë shumën.',String(pool));if(v===null)return;
  try{const r=await api('bots/sendrake',v.trim()===''?{}:{amount:Number(v.replace(',','.'))});toast(eur(r.sent)+' u dërguan te qendra · mbeten '+eur(r.left));await refresh();}catch(err){toast(err.message,true);}});
 $('#restoreBots').onclick=async()=>{if(!confirm('Të rikreditohen botat?\n\n• Çdo bot që nuk është në tavolinë kthehet te kredia me të cilën u financua.\n• Botat që fituan u japin atyre që humbën, dhe rake-u i botave u kthehet atyre.\n• Ajo që mbetet plus shkon te kuleta e CENB.\n\nBotat në tavolinë nuk preken: për t\'i përfshirë, shtyp më parë "Ndalo të gjithë".'))return;
- try{const r=await api('bots/restore');toast(r.bots+' bota u rikredituan'+(r.full?'':' (pjesërisht: kredia nuk mjaftonte)')+' · kuleta e CENB '+(r.walletChange>=0?'+':'')+eur(r.walletChange)+' = '+eur(r.wallet)+(r.seated?' · '+r.seated+' në tavolinë nuk u prekën':''));await refresh();}catch(err){toast(err.message,true);}};
+ try{const r=await api('bots/restore');toast(r.bots+' bota u rikredituan'+(r.full?'':' (pjesërisht: kredia nuk mjaftonte)')+' · kuleta e fitimit +'+eur(r.walletChange)+' = '+eur(r.wallet)+(r.seated?' · '+r.seated+' në tavolinë nuk u prekën':''));await refresh();}catch(err){toast(err.message,true);}};
 $('#stopAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;try{const r=await api('bots/stopall');toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}};
 $('#startAll').onclick=async()=>{try{const r=await api('bots/startall');toast(r.started+' bota u nisën');await refresh();}catch(err){toast(err.message,true);}};
 
@@ -226,3 +225,53 @@ $('#seatTables').addEventListener('click',e=>{const c=e.target.closest('[data-bo
  $('#botDlgStop').disabled=!s.on&&!!s.leaving;$('#botDialog').showModal();});
 $('#botDlgClose').onclick=()=>$('#botDialog').close();
 $('#botDlgStop').onclick=async()=>{if(!botPick)return;const btn=$('#botDlgStop');btn.disabled=true;try{await api('bots/status',{id:botPick.id,enabled:false});$('#botDialog').close();toast(botPick.name+' u ndal · ngrihet sapo të mbarojë dora');await loadSeats(true);refresh();}catch(err){toast(err.message,true);}finally{btn.disabled=false;}};
+
+// ---- Bots: filters ----
+const BF={q:'',status:'',style:'',table:'',sort:'name'};
+function filterBots(list){const q=BF.q.toLowerCase();
+ const st=b=>b.seatedAt?'playing':!b.enabled?(b.status!=='Stopped'?'err':'off'):'waiting';
+ let out=list.filter(b=>(!q||b.name.toLowerCase().includes(q))&&(!BF.style||b.risk===BF.style)&&(!BF.table||b.seatedAt===BF.table||b.tableName===BF.table)
+  &&(!BF.status||(BF.status==='on'?b.enabled:st(b)===BF.status)));
+ const key={name:b=>b.name.toLowerCase(),total:b=>-b.total,session:b=>-b.session,hands:b=>-b.hands,equity:b=>-b.equity}[BF.sort]||(b=>b.name);
+ return out.sort((a,b)=>{const x=key(a),y=key(b);return x<y?-1:x>y?1:0;});}
+function fillBotFilters(){if(!data)return;const st=$('#bfStyle'),tb=$('#bfTable');
+ const styles=Object.entries(data.styles||{}),tables=[...new Set(data.bots.map(b=>b.seatedAt||b.tableName).filter(x=>x&&x!=='—'&&x!=='Auto'))].sort();
+ const keepS=st.value,keepT=tb.value;st.innerHTML='<option value="">Çdo stil</option>'+styles.map(([k,v])=>'<option value="'+k+'">'+safe(v)+'</option>').join('');st.value=keepS;
+ tb.innerHTML='<option value="">Çdo tavolinë</option>'+tables.map(t=>'<option>'+safe(t)+'</option>').join('');tb.value=tables.includes(keepT)?keepT:'';}
+for(const [id,k] of [['#bfSearch','q'],['#bfStatus','status'],['#bfStyle','style'],['#bfTable','table'],['#bfSort','sort']])$(id).addEventListener('input',e=>{BF[k]=e.target.value;renderBots(true);});
+{const r0=refresh;refresh=async(...a)=>{await r0(...a);fillBotFilters();};}
+
+// ---- Wallets ----
+document.addEventListener('click',async e=>{const w=e.target.closest('[data-wallet]');if(!w||w.disabled)return;const W=data?.wallets||{};const action=w.dataset.wallet;
+ const ask={credit:'Sa kredi t\'i jepet CENB nga qendra?',return:'Sa kredi të kthehet te qendra? Kuleta e kredisë ka '+eur(W.credit),profit:'Sa fitim të dërgohet te qendra? Kuleta e fitimit ka '+eur(W.profit)}[action];
+ const def={credit:'',return:String(W.credit||''),profit:String(W.profit||'')}[action];const v=prompt(ask,def);if(v===null||!v.trim())return;
+ try{const r=await api('bots/wallet',{action,amount:Number(v.replace(',','.'))});toast({credit:'CENB u kreditua',return:'Kredia u kthye te qendra',profit:'Fitimi u dërgua te qendra'}[action]+' · kredi '+eur(r.wallets.credit)+' · fitim '+eur(r.wallets.profit));await refresh();}catch(err){toast(err.message,true);}});
+
+// ---- Profit ----
+const tiranaDay=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane'}).format(t);
+const addDay=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+function presetRange(p){const today=tiranaDay(Date.now());if(p==='today')return [today,today];if(p==='yesterday'){const y=addDay(today,-1);return [y,y];}
+ if(p==='7')return [addDay(today,-6),today];if(p==='30')return [addDay(today,-29),today];if(p==='month')return [today.slice(0,8)+'01',today];
+ if(p==='lastmonth'){const first=today.slice(0,8)+'01',last=addDay(first,-1);return [last.slice(0,8)+'01',last];}return [today,today];}
+let pfBusy=false;
+async function loadProfit(){if(pfBusy)return;pfBusy=true;try{const r=await api('bots/profit',{from:$('#pfFrom').value,to:$('#pfTo').value,botId:$('#pfBot').value,tableId:$('#pfTable').value});renderProfit(r);}catch(err){toast(err.message,true);}finally{pfBusy=false;}}
+function renderProfit(r){
+ const fill=(sel,list,all)=>{const keep=sel.value;sel.innerHTML='<option value="">'+all+'</option>'+list.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');sel.value=list.some(x=>x.id===keep)?keep:'';};
+ fill($('#pfBot'),r.choices.bots,'Të gjithë botat');fill($('#pfTable'),r.choices.tables,'Të gjitha tavolinat');
+ const T=r.totals;$('#pfTotals').innerHTML=[['Profiti',signed(T.profit)],['Në tavolina (pas rake)',signed(T.net)],['Rake i botave',  '<b>'+eur(T.rake)+'</b>'],['Duar','<b>'+T.hands+'</b>'],['Duar të fituara','<b>'+T.winRate+'%</b>'],['Bota · tavolina','<b>'+T.bots+' · '+T.tables+'</b>'],['Kuleta e fitimit','<b>'+eur(r.wallets.profit)+'</b>']]
+  .map(([k,v])=>'<div class="kpi"><small>'+k+'</small>'+v+'</div>').join('');
+ const max=Math.max(1,...r.days.map(d=>Math.abs(d.profit)));
+ $('#pfChart').innerHTML=r.days.length>1?r.days.map(d=>'<div class="pfBar" title="'+d.day+' · '+eur(d.profit)+'"><i class="'+(d.profit<0?'down':'up')+'" style="height:'+Math.max(2,Math.round(Math.abs(d.profit)/max*100))+'%"></i><small>'+d.day.slice(8)+'</small></div>').join(''):'';
+ const row=(cells)=>'<tr>'+cells.join('')+'</tr>';const n=v=>'<td class="num">'+v+'</td>',s=v=>'<td class="num">'+signed(v)+'</td>';
+ $('#pfDays').innerHTML=table(['Dita','Duar ','Në tavolina ','Rake ','Profiti '],r.days.slice().reverse().map(d=>row(['<td>'+d.day+'</td>',n(d.hands),s(d.net),n(eur(d.rake)),s(d.profit)])),'Asnjë dorë në këtë periudhë.');
+ $('#pfBots').innerHTML=table(['Boti','Duar ','Të fituara ','Në tavolina ','Rake ','Profiti '],r.bots.map(b=>row(['<td>'+safe(b.name)+'</td>',n(b.hands),n(b.won||0),s(b.net),n(eur(b.rake)),s(b.profit)])),'Asnjë bot nuk ka luajtur në këtë periudhë.');
+ $('#pfTables').innerHTML=table(['Tavolina','Duar e botave ','Në tavolina ','Rake ','Profiti '],r.tables.map(t=>row(['<td>'+safe(t.name)+'</td>',n(t.hands),s(t.net),n(eur(t.rake)),s(t.profit)])),'Asnjë tavolinë në këtë periudhë.');}
+function setPreset(p){$$('#pfPresets [data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));const [f,t]=presetRange(p);$('#pfFrom').value=f;$('#pfTo').value=t;loadProfit();}
+$('#pfPresets').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(b)setPreset(b.dataset.p);});
+for(const id of ['#pfFrom','#pfTo'])$(id).addEventListener('change',()=>{$$('#pfPresets [data-p]').forEach(b=>b.classList.remove('on'));loadProfit();});
+for(const id of ['#pfBot','#pfTable'])$(id).addEventListener('change',loadProfit);
+const openProfit=()=>{$('#tabs [data-tab="profit"]').click();};
+document.addEventListener('click',e=>{if(e.target.closest('.profitCard')&&!e.target.closest('button'))openProfit();});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest?.('.profitCard')){e.preventDefault();openProfit();}});
+$('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="profit"]')){if(!$('#pfFrom').value)setPreset('today');else loadProfit();}});
+setInterval(()=>{if(tab==='profit'&&!document.hidden&&$('#pfTo').value===tiranaDay(Date.now()))loadProfit();},10000);

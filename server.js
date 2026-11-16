@@ -277,7 +277,7 @@ setInterval(guarded('save retry',()=>{if(saveFailed&&!replaced)save();}),5000).u
 function checkOwner(){let owner=true;try{owner=store.isOwner();}catch{}if(owner||replaced)return;replaced=true;draining=true;console.log('[Suprem Poker] A newer server took over the database. This one has stopped.');for(const res of tableSubs.keys())res.end();tableSubs.clear();for(const res of inspectSubs.keys())res.end();inspectSubs.clear();for(const res of rakeClients.keys())res.end();rakeClients.clear();}
 setInterval(guarded('owner check',checkOwner),1000).unref();
 // Table-filling bots act from the server; they are never logged in.
-const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake(),decider:workerDecider()});
+const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRake(),store,decider:workerDecider()});
 // CENB is bundled at /cenb/ and at the root of cenb.suprempoker.com.
 // It reaches the bots only through /api/cenb/..., behind its own sign-in (cenb.js).
 const cenb=createCenb({db,bots:botManager,save,fail,checkCenter:(name,password)=>{const c=db.users.find(x=>x.role==='CENTER'&&x.username.toLowerCase()===String(name).trim().toLowerCase());try{return !!c&&samePassword(c,password);}catch{return false;}}});
@@ -286,7 +286,7 @@ setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.er
 const payments=createPayments({db,save,fail});
 // Money only moves between accounts, it is never made or lost: wallets, chips on the tables
 // (stacks, and the pot of a running hand) and withdrawals waiting must always add up the same.
-const moneyNow=()=>db.users.reduce((n,u)=>n+u.balance,0)+[...runtime.values()].reduce((n,t)=>n+t.seats.reduce((m,s)=>m+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0),0)+payments.held()+(Number(db.cenbRake)||0);
+const moneyNow=()=>db.users.reduce((n,u)=>n+u.balance,0)+[...runtime.values()].reduce((n,t)=>n+t.seats.reduce((m,s)=>m+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0),0)+payments.held()+(Number(db.cenbRake)||0)+(Number(db.cenbWallet?.credit)||0)+(Number(db.cenbWallet?.profit)||0);
 export function checkMoney(){const now=moneyNow();if(db.moneyTotal==null){db.moneyTotal=now;save();return true;}if(now===db.moneyTotal)return !db.moneyMismatch;
  if(!db.moneyMismatch){db.moneyMismatch={expected:db.moneyTotal,actual:now,at:Date.now()};noteError('money check',Error('the total changed by '+clean(now-db.moneyTotal).toFixed(2)+' €'));save();}return false;}
 const serverStatus=()=>{const ts=[...runtime.values()];return {on:maintenance,live:ts.filter(t=>LIVE.includes(t.phase)).length,seated:ts.reduce((n,t)=>n+t.seats.filter(Boolean).length,0),money:{total:clean(moneyNow()),ok:!db.moneyMismatch,mismatch:db.moneyMismatch?{difference:clean(db.moneyMismatch.actual-db.moneyMismatch.expected),at:db.moneyMismatch.at}:null}};};

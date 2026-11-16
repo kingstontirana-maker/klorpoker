@@ -30,7 +30,7 @@ export const EDIT_RULES={
  meta:{update:false,insert:false,delete:false,key:'rowid'},
 };
 const LOCKED_USER=new Set(['id','salt','passHash','username_lower']);
-const KEPT_SETTINGS=new Set(['cenbRake','cenbFlow','rakePercent','moneyTotal','nextTable','tableCatalog','crypto','escrow','botGuard','botProfiles','cenbLog','signupAgentId','handSeq','cashouts','maxBuyin','minBuyin']);
+const KEPT_SETTINGS=new Set(['cenbRake','cenbWallet','cenbFlow','rakePercent','moneyTotal','nextTable','tableCatalog','crypto','escrow','botGuard','botProfiles','cenbLog','signupAgentId','handSeq','cashouts','maxBuyin','minBuyin']);
 const MASK='••••••';
 // What the form sends is text: numbers, true/false, null and JSON become values again.
 export function parseCell(v){if(v===null||v===undefined)return null;if(typeof v!=='string')return v;const s=v.trim();if(s==='')return '';if(s==='null'||s==='NULL')return null;if(s==='true')return true;if(s==='false')return false;if(/^-?\d+(\.\d+)?$/.test(s)&&String(Number(s))===s)return Number(s);if(/^[[{]/.test(s)){try{return JSON.parse(s);}catch{}}return v;}
