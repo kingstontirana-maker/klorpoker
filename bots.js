@@ -190,7 +190,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   return {id:u.id,name:u.username,risk:u.bot.risk,style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',waitForPlayers:!!u.bot.waitForPlayers,enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
    buyin:(u.bot.buyin||0)/100,buyinBB:u.bot.buyinBB||null,maxBB:(u.bot.maxBB||0)/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,
    session:sessionOf(u)/100,total:(played?(played.get(u.id)||0):eq-u.bot.funded)/100+r.rake/100,net:(played?(played.get(u.id)||0):eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:((played?(played.get(u.id)||0):eq-u.bot.funded)+r.rake)/100,hands:u.bot.hands||0,
-   status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null};});}
+   status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null,seatedId:at?.t.id||null};});}
  function configure(b,body){
   if(body.tableId!==undefined&&String(body.tableId)!==b.bot.pinned)delete b.bot.pinned;
   const risk=body.risk??b.bot.risk??'medium';if(!STYLES[risk])fail('Invalid style');
@@ -329,16 +329,36 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    const n=cents(body.amount,'Amount');periods();
    if(a==='credit'){centerFunds(db,c,n,'cenb credit');if(n>c.balance)fail('The center does not have enough credit');c.balance-=n;W.credit+=n;moveStarts(n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_CREDIT',from:c.id,to:'cenb',amount:n,time:Date.now()});}
    else if(a==='return'){if(n>W.credit)fail('The credit wallet holds only €'+(W.credit/100).toFixed(2));W.credit-=n;c.balance+=n;moveStarts(-n);db.ledger.push({id:crypto.randomUUID(),type:'CENB_RETURN',from:'cenb',to:c.id,amount:n,time:Date.now()});}
+   // rake: the bots' rake moves into the CENB wallet. It stays inside CENB, so nothing changes for the periods.
+   else if(a==='rake'){const have=Number(db.cenbRake)||0;if(n>have)fail('The bots\' rake holds only €'+(have/100).toFixed(2));db.cenbRake=have-n;W.credit+=n;db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',from:'cenb-rake',to:'cenb',amount:n,time:Date.now()});}
    else fail('Unknown wallet action');save();return {ok:true,wallets:wallets()};}
   if(p==='/api/bots/profit')return profitReport(body);
+  if(p==='/api/bots/watch'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);
+   const view=engine.snapshot(t,null,false);delete view.chat;
+   const info={};for(const s of t.seats){if(!s?.isBot)continue;const b=bots().find(x=>x.id===s.userId);if(!b)continue;
+    info[s.id]={id:b.id,risk:b.bot.risk||'medium',style:STYLES[b.bot.risk]?.label||b.bot.risk,mode:b.bot.mode||'play',enabled:!!b.bot.enabled,balance:b.balance/100,stopLoss:b.bot.stopLoss/100,stopWin:(b.bot.stopWin||0)/100,session:sessionOf(b)/100,hands:b.bot.hands||0,addChips:(b.bot.addChips||0)/100,error:b.bot.error||null};}
+   return {...view,bots:info,maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);
   if(p==='/api/bots/configure'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table before changing it');configure(b,body);audit('BOT_MANAGE',b);}
+  // Live, also while it plays: style, mode and limits. It plays its next decision with them.
+  else if(p==='/api/bots/live'){const risk=body.risk??b.bot.risk??'medium',mode=body.mode??b.bot.mode??'play';
+   if(!STYLES[risk])fail('Invalid style');if(!['play','seat'].includes(mode))fail('Invalid mode');
+   const stopLoss=body.stopLoss===undefined?b.bot.stopLoss:cents(body.stopLoss,'Loss limit'),stopWin=body.stopWin===undefined?(b.bot.stopWin||0):cents(body.stopWin,'Win limit',true);
+   const at=seatOf(b);if(at&&b.bot.mode==='seat'&&mode==='play'&&at.s.sittingOut)engine.sitOut(at.t,b,false);
+   Object.assign(b.bot,{risk,mode,stopLoss,stopWin});audit('BOT_MANAGE',b,0,{risk,mode,live:true});}
+  // Credit out of a bot, also while it plays: only from its wallet. The chips on the table stay
+  // in the game (no player may take chips off the table); they come back when it leaves.
+  else if(p==='/api/bots/withdraw'){const n=cents(body.amount,'Amount');if(n>b.balance)fail('The bot wallet holds only €'+(b.balance/100).toFixed(2)+'. Chips on the table come back when it leaves the table.');
+   b.balance-=n;W.credit+=n;b.bot.funded=Math.max(0,b.bot.funded-n);b.bot.baseline-=n;audit('BOT_REFUND',b,n,{from:b.id,to:'cenb'});}
   else if(p==='/api/bots/status'){if(typeof body.enabled!=='boolean')fail('Invalid status');
    if(body.enabled){if(/^House /.test(b.bot.error||''))fail('The house limit is reached: raise it or wait for the next period');if(b.bot.tableId!=='auto'&&b.balance<b.bot.buyin&&!seatOf(b))fail('The bot wallet is smaller than its buy-in');b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);}
    b.bot.enabled=body.enabled;b.bot.error=null;if(!body.enabled){const at=seatOf(b);if(at)engine.leave(at.t,b);}audit('BOT_MANAGE',b,0,{enabled:body.enabled});}
-  else if(p==='/api/bots/topup'){if(seatOf(b))fail('Let the bot leave the table first');const n=cents(body.amount,'Amount');need(n);W.credit-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;audit('BOT_FUND',b,n,{from:'cenb'});}
+  else if(p==='/api/bots/topup'){const n=body.amount===undefined&&body.toTable?0:cents(body.amount,'Amount'),at=seatOf(b);
+   if(n){need(n);W.credit-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;audit('BOT_FUND',b,n,{from:'cenb'});}
+   if(body.toTable===true){if(!at)fail('The bot is not at a table');const chips=cents(body.chips??body.amount,'Chips');if(chips>b.balance)fail('The bot wallet holds only €'+(b.balance/100).toFixed(2));
+    b.bot.addChips=(b.bot.addChips||0)+chips;const now=!LIVE.includes(at.t.phase)||!at.s.inHand,added=now?chipsToTable(b,at):0;save();return {ok:true,added:added/100,pending:!now};}}
   else if(p==='/api/bots/delete'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table first');W.credit+=b.balance;audit('BOT_REFUND',b,b.balance,{from:b.id,to:'cenb'});db.users.splice(db.users.indexOf(b),1);rakeTotal-=rakeMap.get(b.id)?.rake||0;rakeMap.delete(b.id);}
   else fail('Not found',404);
   save();return {ok:true};}
@@ -368,6 +388,11 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   }
   if(changed)save();
  }
+ // Chips asked for at the table: from the bot's wallet to its stack, only between hands (a player
+ // may add chips only then) and up to the table's maximum; what does not fit stays in the wallet.
+ function chipsToTable(b,at){const want=b.bot.addChips;delete b.bot.addChips;
+  const n=Math.min(want,b.balance,engine.buyinLimits(at.t).max-at.s.stack);
+  if(n>0)try{engine.rebuy(at.t,b,n/100);return n;}catch{}save();return 0;}
  const think=(d,v)=>{const big=d.type==='raise'&&d.amount*100>=v.stack+v.roundBet-1||d.type==='call'&&v.toCall>=v.stack*.5;
   return big?3000+random()*4000:d.type==='raise'?1500+random()*3000:d.type==='call'?1200+random()*2300:700+random()*1300;};
  function tick(now=Date.now()){
@@ -378,6 +403,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   for(const t of runtime.values())if(t.seats.some(Boolean))observe(t);
   for(const b of bots()){
    let at=seatOf(b);if(at)at.s.lastSeen=now;
+   if(b.bot.addChips&&at&&(!LIVE.includes(at.t.phase)||!at.s.inHand))chipsToTable(b,at);
    if(!b.bot.enabled)continue;
    try{
     const between=at&&(!LIVE.includes(at.t.phase)||!at.s.inHand),session=sessionOf(b);

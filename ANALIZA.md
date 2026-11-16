@@ -1006,4 +1006,16 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
 
 - **Kuleta e CENB** është kapitali i CENB. E krediton qendra, prej saj financohen botat dhe atje kthehen kur ndalen ose fshihen.
 - Teprica pas **Rikrediti botat** shkon tani te Kuleta e CENB. Kuleta e veçantë e fitimit u hoq, sepse fitimi lexohet te faqja **Profiti**. Shuma që kishte kuleta e vjetër e fitimit u kalua automatikisht te Kuleta e CENB.
-- **Rake i botave** është kapital për rikreditimin e botave. Nuk dërgohet më te qendra: u hoqën butoni "Dërgo te qendra" dhe rruga `/api/bots/sendrake`.
+- **Rake i botave** është kapital për rikreditimin e botave. Nuk dërgohet më te qendra: u hoqën butoni "Dërgo te qendra" dhe rruga `/api/bots/sendrake`. Butoni **Tërhiq te kuleta e CENB** (veprimi `rake` te `/api/bots/wallet`) e kalon rake-un, i gjithi ose një pjesë, te Kuleta e CENB. Paratë mbeten brenda CENB, prandaj profiti i periudhave nuk ndryshon.
+
+## CENB: hyrja live në tavolinë (2026-11-16)
+
+- Te **Tavolinat**, çdo tavolinë ka butonin **👁 Hyr**. Ai hap tavolinën live, me rifreskim çdo sekondë:
+  - vendet, chipsat, bastet, dealer-i, radha me kohën, letrat e tavolinës, pot-i dhe ngjarjet;
+  - pamja është ajo e një spektatori: letrat e fshehura nuk dërgohen kurrë, shihen vetëm ato që hapen në showdown;
+  - te **Botat**, një bot që luan ka butonin **👁 Tavolina**, që e hap direkt atje.
+- Shtyp një bot në tavolinë për ta kontrolluar në kohë reale:
+  - **+ Në tavolinë**: kredi nga Kuleta e CENB te chipsat. Nëse dora po luhet, shtohet sapo të mbarojë dora (rregulli i pokerit), deri te maksimumi i tavolinës; pjesa tjetër mbetet te portofoli.
+  - **+ Te portofoli** dhe **− Tërhiq**: nga portofoli i botit dhe drejt tij. Chipsat në tavolinë nuk tërhiqen gjatë lojës; kthehen kur boti ngrihet.
+  - **Stili, mënyra, humbje max, fitim max** ndryshojnë gjatë lojës dhe vlejnë nga vendimi i radhës. Tavolina dhe buy-in kërkojnë ende që boti të ndalet.
+- Rrugët e reja: `/api/bots/watch`, `/api/bots/live`, `/api/bots/withdraw`. `/api/bots/topup` lejohet edhe kur boti është ulur, me opsionin `toTable`.

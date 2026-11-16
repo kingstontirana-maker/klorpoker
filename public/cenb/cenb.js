@@ -61,7 +61,7 @@ function renderKpis(){
   ['Kuleta e CENB','<b>'+eur(W.credit)+'</b>','<span>kapitali i CENB · nga qendra + teprica pas rikreditimit · në bota '+eur(W.inBots)+'</span><div class="miniRow"><button type="button" class="mini" data-wallet="credit">+ Nga qendra</button><button type="button" class="mini ghost" data-wallet="return"'+(W.credit>0?'':' disabled')+'>Kthe te qendra</button></div>'],
   ['Botat','<b>'+playing+' <small class="muted">/ '+on+' / '+b.length+'</small></b>','<span>në tavolinë / ndezur / gjithsej</span>'],
   ['Lojtarë që luajnë me bota','<b>'+humans+'</b>','<span>lojtarë të vërtetë në tavolina me bota</span>'],
-  ['Rake i botave','<b>'+eur(data.cenbRake||0)+'</b>','<span>kapital për rikreditimin e botave · gjithsej '+eur(rake)+'</span>'],
+  ['Rake i botave','<b>'+eur(data.cenbRake||0)+'</b>','<span>kapital për rikreditimin e botave · gjithsej '+eur(rake)+'</span><div class="miniRow"><button type="button" class="mini" data-wallet="rake"'+((data.cenbRake||0)>0?'':' disabled')+'>Tërhiq te kuleta e CENB</button></div>'],
   ['Kthyer te lojtarët','<b>'+eur(b.reduce((n,x)=>n+(x.returned||0),0))+'</b>','<span>Objektivi '+Number(g.returnPercent||0)+'% · në dispozicion '+eur(b.reduce((n,x)=>n+(x.returnAvailable||0),0))+'</span>'],
  ].map(([k,v,s,cls])=>'<div class="kpi'+(cls?' '+cls:'')+'"'+(cls==='profitCard'?' role="button" tabindex="0" title="Hap detajet e profitit"':'')+'><small>'+k+'</small>'+v.replace(/^<b class/,'<b class')+s+'</div>').join('');
  const stopped=g.stopped||[];$('#banner').classList.toggle('hidden',!stopped.length);$('#banner').textContent=stopped.length?'Limiti i shtëpisë u arrit ('+stopped.map(x=>x.replace('House ','').replace(' limit reached','')).join(', ')+'): të gjithë botat u ndalën dhe nisin vetë në periudhën tjetër.':'';
@@ -86,8 +86,8 @@ function renderBots(force=false){
   +'<div id="bot-details-'+safe(b.id)+'" class="botDetails"'+(open?'':' hidden')+'>'+(open?'<h2>Statistikat · '+safe(b.name)+'</h2><div class="tag">'+(b.tableId==='auto'?'Auto · '+b.buyinBB+' BB'+(b.maxBB>0?' · deri '+eur(b.maxBB)+' BB':''):safe(b.tableName)+' · '+eur(b.buyin))+' · humbje max '+eur(b.stopLoss)+(b.stopWin>0?' · fitim max '+eur(b.stopWin):'')+' · '+(b.waitForPlayers?'ulet direkt':'ulet kur ka lojtarë')+'</div>'
   +'<div class="stats"><div><small>Portofol + stack</small><b>'+eur(b.equity)+'</b></div><div><small>Kjo seancë</small>'+signed(b.session)+'</div><div><small>Që nga krijimi</small>'+signed(b.total)+'</div><div><small>Duar</small><b>'+b.hands+'</b></div><div><small>Rake i paguar · mbetet te CENB</small><b>'+eur(b.rakePaid)+'</b></div><div><small>Pa e numëruar rake-un</small>'+signed(b.net??0)+'</div></div>'
   +'<div class="stats returnStats"><div><small>Kthyer te lojtarët</small><b>'+eur(b.returned)+'</b></div><div><small>Në dispozicion për kthim</small><b>'+eur(b.returnAvailable)+'</b></div></div>'
-  +'<div class="botBtns">'+(b.enabled?'<button class="small danger" data-act="stop">■ Ndalo</button>':'<button class="small gold" data-act="start">▶ Nis</button>')+'<button class="small" data-act="edit"'+(b.enabled||b.seatedAt?' disabled title="Ndale botin dhe prit sa të ngrihet"':'')+'>Ndrysho</button><button class="small" data-act="topup"'+(b.seatedAt?' disabled':'')+'>+ Para</button><button class="small ghost" data-act="delete"'+(b.enabled||b.seatedAt?' disabled':'')+'>Fshi</button></div>'
-  +(b.enabled||b.seatedAt?'<p class="editHint">Për të ndryshuar konfigurimin, ndale botin dhe prit të largohet nga tavolina.</p>':'')
+  +'<div class="botBtns">'+(b.enabled?'<button class="small danger" data-act="stop">■ Ndalo</button>':'<button class="small gold" data-act="start">▶ Nis</button>')+'<button class="small" data-act="edit"'+(b.enabled||b.seatedAt?' disabled title="Ndale botin dhe prit sa të ngrihet"':'')+'>Ndrysho</button><button class="small" data-act="topup">+ Kredi</button><button class="small" data-act="withdraw"'+(b.balance>0?'':' disabled title="Portofoli është bosh"')+'>− Tërhiq</button>'+(b.seatedId?'<button class="small gold" data-act="watch">👁 Tavolina</button>':'')+'<button class="small ghost" data-act="delete"'+(b.enabled||b.seatedAt?' disabled':'')+'>Fshi</button></div>'
+  +(b.enabled||b.seatedAt?'<p class="editHint">Stilin, mënyrën dhe limitet i ndryshon live te <b>👁 Tavolina</b>. Për tavolinën dhe buy-in, ndale botin dhe prit të largohet.</p>':'')
   +(editing===b.id?'<form class="edit grid" data-edit>'+configFields(b)+'<button class="gold">Ruaj</button><button type="button" class="ghost" data-act="cancel">Anulo</button></form>':''):'')+'</div></article>';}).join(''):'<div class="card empty">'+(data.bots.length?'Asnjë bot nuk përputhet me filtrat.':'Nuk ka bota ende. Hap "Krijo".')+'</div>';
  const f=list.querySelector('[data-edit]');if(f)bindConfig(f);
  if(focused){const row=[...list.querySelectorAll('[data-id]')].find(x=>x.dataset.id===focusId);row?.querySelector('[data-act="'+focusAct+'"]')?.focus({preventScroll:true});}
@@ -99,7 +99,9 @@ $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn
   else if(act==='stop'){await api('bots/status',{id,enabled:false});toast(b.name+' u ndal');}
   else if(act==='edit'){editing=editing===id?null:id;renderBots(true);return;}
   else if(act==='cancel'){editing=null;renderBots(true);return;}
-  else if(act==='topup'){const v=prompt('Sa euro të shtohen te '+b.name+'? (nga kredia e qendrës)');if(!v)return;await api('bots/topup',{id,amount:v});toast('U shtuan '+eur(v));}
+  else if(act==='topup'){const v=prompt('Sa kredi të shtohet te portofoli i '+b.name+'? (nga Kuleta e CENB)');if(!v)return;await api('bots/topup',{id,amount:v});toast('U shtuan '+eur(v)+' te '+b.name);}
+  else if(act==='withdraw'){const v=prompt('Sa kredi të tërhiqet nga portofoli i '+b.name+'? Ka '+eur(b.balance)+'. Chipsat në tavolinë nuk preken.',String(b.balance));if(!v)return;await api('bots/withdraw',{id,amount:v});toast('U tërhoqën '+eur(v)+' te Kuleta e CENB');}
+  else if(act==='watch'){openLive(b.seatedId,id);return;}
   else if(act==='delete'){if(!confirm('Të fshihet '+b.name+'? Paratë e tij kthehen te qendra.'))return;await api('bots/delete',{id});toast(b.name+' u fshi');}
   await refresh();
  }catch(err){toast(err.message,true);}};
@@ -195,7 +197,7 @@ async function loadSeats(force){if(seatBusy||(!force&&(tab!=='tables'||document.
 function renderSeats(){if(!seatData)return;const q=$('#seatSearch').value.trim().toLowerCase(),max=Number($('#seatStake').value)||0,freeOnly=$('#seatFreeOnly').checked;
  const prev=Number($('#seatStake').selectedOptions[0]?.previousElementSibling?.value)||0;
  const rows=seatData.tables.filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!max||(t.bb<=max&&(max===9999?t.bb>2:t.bb>prev)))&&(!freeOnly||t.seats.some(s=>!s)));
- $('#seatTables').innerHTML=rows.length?rows.map(t=>'<div class="seatRow"><div class="seatName"><b>'+safe(t.name)+'</b><small>'+eur(t.sb)+' / '+eur(t.bb)+' · '+t.size+' vende'+(t.waiting?' · '+t.waiting+' në pritje':'')+(t.live?' · <span class="pill on">në lojë</span>':'')+'</small></div><div class="seatChips">'
+ $('#seatTables').innerHTML=rows.length?rows.map(t=>'<div class="seatRow"><div class="seatName"><b>'+safe(t.name)+'</b><button type="button" class="small gold enterBtn" data-watch="'+safe(t.id)+'">👁 Hyr</button><small>'+eur(t.sb)+' / '+eur(t.bb)+' · '+t.size+' vende'+(t.waiting?' · '+t.waiting+' në pritje':'')+(t.live?' · <span class="pill on">në lojë</span>':'')+'</small></div><div class="seatChips">'
   +t.seats.map((s,i)=>s?(s.bot?'<button type="button" class="seatChip bot'+(s.out?' out':'')+(s.leaving||!s.on?' leaving':'')+'" data-bot="'+safe(s.id||'')+'" data-bot-table="'+safe(t.id)+'" title="Shtyp për ta ndaluar"><i>'+(i+1)+'</i>'+safe(s.name)+(s.leaving||!s.on?' · ngrihet':'')+'</button>':'<span class="seatChip human'+(s.out?' out':'')+'" title="Lojtar · '+eur(s.stack)+'"><i>'+(i+1)+'</i>'+safe(s.name)+'</span>'):'<button type="button" class="seatChip empty" data-seat="'+safe(t.id)+':'+i+'"'+(t.waiting?' disabled title="Një lojtar pret radhën"':'')+'><i>'+(i+1)+'</i>＋ Ulu</button>').join('')+'</div></div>').join(''):'<div class="empty">Asnjë tavolinë nuk përputhet.</div>';}
 for(const id of ['#seatSearch','#seatStake','#seatFreeOnly'])$(id).addEventListener('input',renderSeats);
 $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="tables"]'))loadSeats(true);});
@@ -239,9 +241,9 @@ for(const [id,k] of [['#bfSearch','q'],['#bfStatus','status'],['#bfStyle','style
 
 // ---- Wallets ----
 document.addEventListener('click',async e=>{const w=e.target.closest('[data-wallet]');if(!w||w.disabled)return;const W=data?.wallets||{};const action=w.dataset.wallet;
- const ask={credit:'Sa kredi t\'i jepet CENB nga qendra?',return:'Sa kredi të kthehet te qendra? Kuleta e kredisë ka '+eur(W.credit)}[action];
- const def={credit:'',return:String(W.credit||'')}[action];const v=prompt(ask,def);if(v===null||!v.trim())return;
- try{const r=await api('bots/wallet',{action,amount:Number(v.replace(',','.'))});toast({credit:'CENB u kreditua',return:'Kredia u kthye te qendra'}[action]+' · kredi '+eur(r.wallets.credit));await refresh();}catch(err){toast(err.message,true);}});
+ const ask={credit:'Sa kredi t\'i jepet CENB nga qendra?',return:'Sa kredi të kthehet te qendra? Kuleta e CENB ka '+eur(W.credit),rake:'Sa rake të tërhiqet te kuleta e CENB? Rake i botave ka '+eur(W.rake)}[action];
+ const def={credit:'',return:String(W.credit||''),rake:String(W.rake||'')}[action];const v=prompt(ask,def);if(v===null||!v.trim())return;
+ try{const r=await api('bots/wallet',{action,amount:Number(v.replace(',','.'))});toast({credit:'CENB u kreditua',return:'Kredia u kthye te qendra',rake:'Rake-u u tërhoq te kuleta e CENB'}[action]+' · kuleta e CENB '+eur(r.wallets.credit));await refresh();}catch(err){toast(err.message,true);}});
 
 // ---- Profit ----
 const tiranaDay=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane'}).format(t);
@@ -271,3 +273,67 @@ document.addEventListener('click',e=>{if(e.target.closest('.profitCard')&&!e.tar
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest?.('.profitCard')){e.preventDefault();openProfit();}});
 $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="profit"]')){if(!$('#pfFrom').value)setPreset('today');else loadProfit();}});
 setInterval(()=>{if(tab==='profit'&&!document.hidden&&$('#pfTo').value===tiranaDay(Date.now()))loadProfit();},10000);
+
+// ---- Live table: the table as a spectator sees it (no hidden cards), refreshed every second.
+// The bots there can be changed while they play: credit in and out, style, mode, limits.
+const live={id:null,pick:null,v:null,timer:null,busy:false,formFor:null};
+const SUIT={s:'♠',h:'♥',d:'♦',c:'♣'},PHASE={waiting:'Në pritje',preflop:'Preflop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown',finished:'Dora mbaroi'};
+const lcard=c=>c==='BACK'?'<span class="lc back"></span>':'<span class="lc'+('hd'.includes(c[1])?' red':'')+'">'+(c[0]==='T'?'10':c[0])+'<i>'+SUIT[c[1]]+'</i></span>';
+const ACT={FOLD:'Fold','AUTO-FOLD':'Fold',CHECK:'Check','AUTO-CHECK':'Check',CALL:'Call',BET:'Bet',RAISE:'Raise','ALL-IN':'All-in',SB:'SB',BB:'BB'};
+function openLive(tableId,botId=null){live.id=tableId;live.pick=null;live.v=null;live.formFor=null;live.want=botId;$('#liveFelt').innerHTML='';$('#liveEvents').innerHTML='';$('#liveCtrl').innerHTML='<p class="muted">Duke hapur tavolinën…</p>';
+ if(!$('#liveDialog').open)$('#liveDialog').showModal();clearInterval(live.timer);live.timer=setInterval(pollLive,1000);pollLive();}
+$('#liveClose').onclick=()=>$('#liveDialog').close();
+$('#liveDialog').addEventListener('close',()=>{clearInterval(live.timer);live.id=null;live.pick=null;});
+async function pollLive(){if(!live.id||live.busy||document.hidden)return;live.busy=true;const id=live.id;
+ try{const v=await api('bots/watch',{tableId:id});if(live.id!==id)return;live.v=v;
+  if(live.want){const s=v.seats.find(x=>x&&v.bots[x.id]?.id===live.want);if(s)live.pick=s.id;live.want=null;}
+  renderLive();}catch(err){toast(err.message,true);if(/not found/i.test(err.message))$('#liveDialog').close();}finally{live.busy=false;}}
+function renderLive(){const v=live.v;if(!v)return;const n=v.seats.length;
+ $('#liveName').textContent=v.name;$('#liveSub').textContent=eur(v.sb)+' / '+eur(v.bb)+' · '+(v.game==='omaha'?'Omaha':"Hold'em")+' · dora #'+v.hand+' · '+(PHASE[v.phase]||v.phase);
+ const pos=i=>{const a=Math.PI/2+i*2*Math.PI/n;return [50+43*Math.cos(a),50+39*Math.sin(a)];};
+ const left=v.actionDeadline?Math.max(0,Math.min(1,(v.actionDeadline-v.serverNow)/v.actionDuration)):0;
+ let h='<div class="lCenter"><div class="lBoard">'+v.board.map(lcard).join('')+Array(Math.max(0,5-v.board.length)).fill('<span class="lc slot"></span>').join('')+'</div><div class="lPot">Pot <b>'+eur(v.pot+v.seats.reduce((m,s)=>m+(s?.bet||0),0))+'</b></div>'
+  +(v.phase==='finished'&&v.lastResult?.winnerIds?.length?'<div class="lWin">🏆 '+safe(v.lastResult.winnerIds.map(id=>v.seats.find(x=>x&&x.id===id)?.username||'').filter(Boolean).join(', '))+(v.lastResult.winningHands&&Object.values(v.lastResult.winningHands)[0]?.rank?' · '+safe(Object.values(v.lastResult.winningHands)[0].rank):'')+'</div>':'')+'</div>';
+ v.seats.forEach((s,i)=>{const [x,y]=pos(i);
+  if(!s){h+='<div class="lseat empty" style="left:'+x+'%;top:'+y+'%"><small>Vend '+(i+1)+'</small></div>';return;}
+  const b=v.bots[s.id],turn=v.turn===i&&v.actionDeadline,cards=s.cards.length?s.cards:(s.inHand&&!s.folded?Array(s.cardCount).fill('BACK'):[]);
+  const la=s.lastAction&&v.phase!=='waiting'?(ACT[s.lastAction.type]||s.lastAction.type)+(s.lastAction.amount?' '+eur(s.lastAction.amount):''):'';
+  h+='<'+(b?'button type="button" data-lseat="'+safe(s.id)+'"':'div')+' class="lseat'+(b?' bot':'')+(turn?' turn':'')+(s.folded?' folded':'')+(s.sittingOut?' out':'')+(live.pick===s.id?' pick':'')+'" style="left:'+x+'%;top:'+y+'%">'
+   +'<span class="lcards">'+cards.map(lcard).join('')+'</span><span class="lname">'+safe(s.username)+'</span>'
+   +(b?'<em class="lbot'+(b.enabled?'':' off')+'">BOT · '+safe(b.style)+(b.mode==='seat'?' · vetëm vend':'')+(b.enabled?'':' · i ndalur')+'</em>':'<em class="lhuman">Lojtar</em>')
+   +'<b class="lstack">'+eur(s.stack)+'</b>'+(s.sittingOut?'<small class="lact">jashtë loje</small>':la?'<small class="lact">'+safe(la)+'</small>':'')
+   +(turn?'<i class="ltime" style="--p:'+left+'"></i>':'')+'</'+(b?'button':'div')+'>';
+  if(s.bet>0){h+='<span class="lbet" style="left:'+(50+(x-50)*.58)+'%;top:'+(50+(y-50)*.58)+'%">'+eur(s.bet)+'</span>';}
+  if(v.button===i){h+='<span class="ldealer" style="left:'+(50+(x-50)*.74+5)+'%;top:'+(50+(y-50)*.74)+'%">D</span>';}});
+ $('#liveFelt').innerHTML=h;
+ $('#liveEvents').innerHTML=(v.events||[]).slice(0,18).map(e=>'<li><small>'+ago(e.at)+'</small> '+safe(e.text)+'</li>').join('')||'<li class="muted">Asgjë ende.</li>';
+ renderLiveCtrl();}
+function renderLiveCtrl(){const v=live.v,s=v?.seats.find(x=>x&&x.id===live.pick),b=s&&v.bots[s.id];const box=$('#liveCtrl');
+ if(!b){live.formFor=null;box.innerHTML='<p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p>';return;}
+ const info='<div class="lInfo"><h3>'+safe(s.username)+' <span class="pill '+(b.enabled?'on':'')+'">'+(b.enabled?'luan':'i ndalur')+'</span></h3>'
+  +'<div class="lStats"><div><small>Portofoli</small><b>'+eur(b.balance)+'</b></div><div><small>Chips në tavolinë</small><b>'+eur(s.stack)+'</b></div><div><small>Kjo seancë</small>'+signed(b.session)+'</div><div><small>Duar</small><b>'+b.hands+'</b></div></div>'
+  +(b.addChips>0?'<p class="lNote">'+eur(b.addChips)+' presin të shkojnë në tavolinë sapo të mbarojë dora.</p>':'')+(b.error?'<p class="lNote bad">'+safe(b.error)+'</p>':'')+'</div>';
+ const formAlive=live.formFor===s.id&&box.querySelector('form');
+ if(formAlive){box.querySelector('.lInfo').outerHTML=info;return;}
+ live.formFor=s.id;
+ box.innerHTML=info+'<form id="liveForm" class="lForm"><h4>Kredi · në kohë reale</h4><label>Shuma (€)<input name="amount" type="number" min="0.01" step="0.01" placeholder="p.sh. 20"></label>'
+  +'<div class="lBtns"><button type="button" class="small gold" data-lc="table" title="Nga Kuleta e CENB te chipsat e botit; nëse dora po luhet, shtohen sapo të mbarojë">+ Në tavolinë</button><button type="button" class="small" data-lc="wallet" title="Nga Kuleta e CENB te portofoli i botit">+ Te portofoli</button><button type="button" class="small" data-lc="out" title="Nga portofoli i botit te Kuleta e CENB">− Tërhiq</button></div>'
+  +'<p class="lHint">Chipsat në tavolinë nuk tërhiqen gjatë lojës (asnjë lojtar s\'mund t\'i heqë). Kthehen kur boti ngrihet.</p>'
+  +'<h4>Stili dhe limitet · vlejnë nga vendimi i radhës</h4><div class="lGrid"><label>Stili<select name="risk">'+Object.entries(v.styles).map(([k,l])=>'<option value="'+k+'"'+(k===b.risk?' selected':'')+'>'+safe(l)+'</option>').join('')+'</select></label>'
+  +'<label>Mënyra<select name="mode"><option value="play"'+(b.mode==='play'?' selected':'')+'>Luan duar</option><option value="seat"'+(b.mode==='seat'?' selected':'')+'>Vetëm zë vend</option></select></label>'
+  +'<label>Humbje max (€)<input name="stopLoss" type="number" min="0.01" step="0.01" value="'+b.stopLoss+'"></label><label>Fitim max (€) · 0 = pa kufi<input name="stopWin" type="number" min="0" step="0.01" value="'+b.stopWin+'"></label></div>'
+  +'<div class="lBtns"><button class="small gold">Ruaj tani</button>'+(b.enabled?'<button type="button" class="small danger" data-lc="stop">■ Ndalo</button>':'<button type="button" class="small" data-lc="start">▶ Nis</button>')+'</div></form>';}
+$('#liveFelt').addEventListener('click',e=>{const c=e.target.closest('[data-lseat]');if(!c)return;live.pick=live.pick===c.dataset.lseat?null:c.dataset.lseat;renderLive();});
+async function liveDo(fn){const bodyEl=$('#liveForm');bodyEl?.querySelectorAll('button').forEach(x=>x.disabled=true);try{await fn();live.formFor=null;await pollLive();refresh();}catch(err){toast(err.message,true);}finally{$('#liveForm')?.querySelectorAll('button').forEach(x=>x.disabled=false);}}
+$('#liveCtrl').addEventListener('click',e=>{const btn=e.target.closest('[data-lc]');if(!btn)return;const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;
+ const amount=$('#liveForm [name=amount]').value.trim(),a=btn.dataset.lc;
+ if(['table','wallet','out'].includes(a)&&!(Number(amount)>0)){toast('Shkruaj shumën',true);return;}
+ liveDo(async()=>{
+  if(a==='wallet'){await api('bots/topup',{id:b.id,amount});toast(eur(amount)+' te portofoli i '+s.username);}
+  else if(a==='table'){const r=await api('bots/topup',{id:b.id,amount,toTable:true});toast(r.pending?eur(amount)+' shtohen në tavolinë sapo të mbarojë dora':eur(r.added)+' u shtuan në tavolinë'+(r.added<Number(amount)?' · pjesa tjetër mbeti te portofoli (maksimumi i tavolinës)':''));}
+  else if(a==='out'){await api('bots/withdraw',{id:b.id,amount});toast(eur(amount)+' u tërhoqën te Kuleta e CENB');}
+  else if(a==='stop'){await api('bots/status',{id:b.id,enabled:false});toast(s.username+' u ndal · ngrihet pas dorës');}
+  else if(a==='start'){await api('bots/status',{id:b.id,enabled:true});toast(s.username+' u nis');}});});
+$('#liveCtrl').addEventListener('submit',e=>{e.preventDefault();const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;const f=new FormData(e.target);
+ liveDo(async()=>{await api('bots/live',{id:b.id,risk:f.get('risk'),mode:f.get('mode'),stopLoss:f.get('stopLoss'),stopWin:f.get('stopWin')||0});toast(s.username+' u ndryshua · luan me të tani');});});
+$('#seatTables').addEventListener('click',e=>{const w=e.target.closest('[data-watch]');if(w)openLive(w.dataset.watch);});

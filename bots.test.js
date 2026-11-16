@@ -437,3 +437,33 @@ test('every new bot gets a profile picture from the platform, the least used one
  manager.route('/api/bots/seat',{tableId:'1',position:2,name:'PicSeat',budget:100,buyin:40},center);
  const b=db.users.find(u=>u.username==='PicSeat'),t=[...manager.runtime?.values?.()||[]][0];assert.ok(avatarExists(b.avatar));
 });
+
+test('the bots\' rake can be moved into the CENB wallet; it stays inside CENB',()=>{
+ const {center,db,manager}=world();db.cenbRake=2500;const c0=db.cenbWallet.credit;
+ const r=manager.route('/api/bots/wallet',{action:'rake',amount:15},center);
+ assert.equal(db.cenbRake,1000);assert.equal(db.cenbWallet.credit,c0+1500);assert.equal(r.wallets.rake,10);
+ assert.throws(()=>manager.route('/api/bots/wallet',{action:'rake',amount:20},center),/rake holds only/);
+});
+
+test('CENB at the table: watch shows no hidden cards; credit in and out, style and limits change while the bot plays',()=>{
+ const {center,db,engine,t,manager,human,total}=world();
+ manager.route('/api/bots/seat',{tableId:'1',position:0,name:'LiveBot',budget:100,buyin:40},center);
+ const b=db.users.find(u=>u.username==='LiveBot');const h=human(1);engine.sit(t,h,1,40,[t]);
+ manager.tick?.();engine.startHand(t);const all=total();
+ const v=manager.route('/api/bots/watch',{tableId:'1'},center);
+ assert.ok(v.seats.filter(Boolean).every(s=>s.cards.length===0),'no hole card is shown');assert.equal(v.myCards.length,0);assert.equal(v.chat,undefined);
+ const seat=t.seats.find(s=>s?.userId===b.id);assert.equal(v.bots[seat.id].id,b.id);
+ // style, mode and limits while it plays
+ manager.route('/api/bots/live',{id:b.id,risk:'high',stopLoss:25,stopWin:10},center);
+ assert.equal(b.bot.risk,'high');assert.equal(b.bot.stopLoss,2500);assert.equal(b.bot.stopWin,1000);
+ assert.throws(()=>manager.route('/api/bots/live',{id:b.id,risk:'crazy'},center),/Invalid style/);
+ // credit into the wallet and out of it while seated; the stack is never touched
+ const stack=seat.stack,w0=b.balance,c0=db.cenbWallet.credit;
+ manager.route('/api/bots/topup',{id:b.id,amount:10},center);assert.equal(b.balance,w0+1000);assert.equal(db.cenbWallet.credit,c0-1000);
+ manager.route('/api/bots/withdraw',{id:b.id,amount:5},center);assert.equal(b.balance,w0+500);assert.equal(db.cenbWallet.credit,c0-500);assert.equal(seat.stack,stack);
+ assert.throws(()=>manager.route('/api/bots/withdraw',{id:b.id,amount:1000},center),/wallet holds only/);
+ // chips to the table during a hand wait for the hand to end
+ const r=manager.route('/api/bots/topup',{id:b.id,amount:5,toTable:true},center);assert.equal(r.pending,true);assert.equal(seat.stack,stack);assert.equal(b.bot.addChips,500);
+ assert.equal(total(),all,'no money appears or disappears');
+ t.phase='waiting';for(const x of t.seats)if(x)x.inHand=false;t.pot=0;manager.tick();assert.equal(seat.stack,stack+500,'added between hands');assert.equal(b.bot.addChips,undefined);
+});
