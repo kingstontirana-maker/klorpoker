@@ -173,12 +173,13 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
 
  // ---- Where a bot sits ----
  const humansAt=t=>t.seats.filter(isHuman).length,botsAt=t=>t.seats.filter(s=>s&&!isHuman(s)).length,freeAt=t=>t.seats.filter(s=>!s).length;
+ const aloneDeadlines=new WeakMap(),leftAlone=new WeakSet();
  const crowd=t=>t.seats.length===2?2:Math.ceil(t.seats.length*.67);
  const fillPolicy=t=>db.botFill?.tables?.[t.id];
  const perTable=t=>fillPolicy(t)?Math.max(0,t.seats.length-fillPolicy(t).emptySeats-humansAt(t)):Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
- const canJoin=(t,b)=>stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ const canJoin=(t,b)=>(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
@@ -416,6 +417,12 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     if(at&&between){
      if(b.bot.stopWin>0&&session>=b.bot.stopWin){stop(b,'Win limit reached',at);continue;}
      if(-session>=b.bot.stopLoss){stop(b,'Loss limit reached',at);continue;}
+     if(at.t.seats.filter(Boolean).length===1){
+      if(!aloneDeadlines.has(at.s))aloneDeadlines.set(at.s,now+3000+random()*2000);
+      if(now>=aloneDeadlines.get(at.s)){engine.leave(at.t,b);leftAlone.add(b);save();}
+      continue;
+     }
+     aloneDeadlines.delete(at.s);
      if(shouldLeave(at.t,b,at.s)){engine.leave(at.t,b);save();continue;}}
     if(!at){
      if(-session>=b.bot.stopLoss){stop(b,'Loss limit reached');continue;}

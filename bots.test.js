@@ -53,7 +53,27 @@ test('bots only fill thin tables: a real player is needed, a seat stays free, cr
  engine.sit(t,human(3),t.seats.findIndex(s=>!s),100,[t]);manager.tick();
  assert.ok(t.seats.filter(s=>s?.isBot).length<=2,'four real players on six seats: bots make room');
  for(const id of ['h1','h2','h3'])engine.leave(t,db.users.find(u=>u.id===id));manager.tick();
+ manager.tick(Date.now()+5001);
  assert.equal(t.seats.filter(Boolean).length,0,'when the real players leave, the bots stand up too');
+});
+
+test('a lone bot leaves after 3–5 seconds and waits for company before rejoining',()=>{
+ for(const random of [()=>0,()=>.999]){
+  const {center,db,engine,t,manager,human}=world({random});
+  const {id}=manager.route('/api/bots/create',{name:'LoneBot',budget:300,tableId:'1',buyin:100,stopLoss:300,waitForPlayers:true},center);
+  manager.route('/api/bots/status',{id,enabled:true},center);
+  const now=Date.now();manager.tick(now);manager.tick(now);
+  manager.tick(now+2999);assert.equal(t.seats.filter(Boolean).length,1);
+  manager.tick(now+5000);assert.equal(t.seats.filter(Boolean).length,0);
+  manager.tick(now+6000);assert.equal(t.seats.filter(Boolean).length,0);
+  engine.sit(t,human(1),0,100,[t]);manager.tick(now+7000);
+  assert.ok(t.seats.some(s=>s?.userId===id));
+  engine.leave(t,db.users.find(u=>u.id==='h1'));manager.tick(now+8000);
+  engine.sit(t,human(2),0,100,[t]);manager.tick(now+9000);
+  engine.leave(t,db.users.find(u=>u.id==='h2'));manager.tick(now+10000);
+  manager.tick(now+12999);assert.equal(t.seats.filter(Boolean).length,1,'company resets the delay');
+  manager.tick(now+15000);assert.equal(t.seats.filter(Boolean).length,0);
+ }
 });
 
 test('direct seating bots wait alone, play with other bots and preserve credit',()=>{
