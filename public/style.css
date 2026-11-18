@@ -484,3 +484,65 @@ html{touch-action:manipulation}
 .navItem.active>span.navIcon{color:#75e4b4}
 .statCard i .uiIcon{width:18px;height:18px}
 .statCard i:has(.uiIcon){display:inline-grid;place-items:center;padding:6px}
+/* ---- Centre: grouped menu, users, report, dashboard ---- */
+.subTabs{display:flex;gap:6px;flex-wrap:wrap;margin:-6px 0 22px;padding:4px;border:1px solid var(--line);border-radius:12px;background:#0d1615;width:fit-content;max-width:100%}
+.subTabs button{border:0;background:transparent;color:#9bb0a7;padding:8px 14px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer}
+.subTabs button:hover{color:#dff}.subTabs button.on{background:#1b372b;color:#92efbf;box-shadow:inset 0 0 0 1px #31523f}
+.ckpi{display:grid;gap:6px;align-content:start}.ckpi>small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.ckpi strong{font-size:24px;line-height:1.15}
+.ckpi>div{display:flex;flex-direction:column;gap:3px;font-size:12px}.ckpi>div small{color:var(--muted)}
+.ckpi em,.sTable em{font-style:normal;font-weight:700;font-size:12px}.ckpi em.up,.sTable em.up{color:#5ef0a8}.ckpi em.down,.sTable em.down{color:#ff8b95}.ckpi em.flat,.sTable em.flat{color:var(--muted)}
+.ckpi b.up{color:#7dffc4}.ckpi b.down{color:#ff9aa2}
+.ckpi.hero{background:linear-gradient(160deg,#173b2d,#0f201b);border-color:#2f6a4f}.ckpi.hero strong{font-size:30px;color:#9df5c9}
+.ckpi.warn{border-color:#a8792f;background:linear-gradient(160deg,#2c2312,#151410)}.ckpi.warn strong{color:#ffd07a}
+.homeKpis,.sHero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px}
+.homeChart{margin-bottom:22px}
+.cbars{position:relative;display:flex;align-items:flex-end;gap:6px;height:170px;padding-top:22px}
+.cbar{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;min-width:0}
+.cbar i{display:block;width:100%;max-width:46px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#5ef0a8,#239866);transition:height .3s}
+.cbar small{font-size:10.5px;color:var(--muted);white-space:nowrap}.cbar:hover i{filter:brightness(1.2)}
+.cbarMax{position:absolute;top:0;right:0;font-size:11px;color:var(--muted)}
+.linkBtn{border:0;background:none;padding:0;color:#ffd07a;font:inherit;cursor:pointer;text-decoration:underline}
+.uCounts{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.uCount{display:grid;gap:2px;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:inherit;cursor:pointer}
+.uCount strong{font-size:22px}.uCount small{color:var(--muted);font-size:11.5px}.uCount:hover{border-color:#3e5a52}.uCount.on{border-color:#4fbf8a;background:#132a22}
+.uTools{display:grid;grid-template-columns:minmax(180px,2fr) repeat(5,minmax(120px,1fr)) auto;gap:8px;margin-bottom:10px}
+.uTools input,.uTools select{min-width:0;width:100%;background:#0b1413;border:1px solid var(--line);color:inherit;border-radius:8px;padding:9px 10px;font:inherit;font-size:12.5px}
+.uTable tbody tr{cursor:pointer}.uTable tbody tr:hover td,.clickRow:hover td{background:#13211f}.clickRow{cursor:pointer}
+.uTable td{vertical-align:middle}.uTable .accountCell>div{display:grid}
+.uNet{font-size:11.5px;color:#b9cfc7}.uNet span{display:block;white-space:nowrap}.uNet small{color:var(--muted)}
+.dataTable .num,.dataTable th.num{text-align:right;white-space:nowrap}
+.uMore{margin-top:12px}
+.roleBadge.roleUSER{background:#16313f;color:#9fd6ff}.roleBadge.roleAGENT{background:#1b372b;color:#92efbf}.roleBadge.roleMANAGER{background:#2f2a14;color:#ffd98a}.roleBadge.roleADMIN{background:#33182b;color:#ffadd8}
+.userDrawer{margin:0 0 0 auto;height:100vh;max-height:100vh;width:min(760px,100vw);max-width:100vw;padding:0;border:0;border-left:1px solid var(--line);background:#0b1312;color:inherit;overflow:auto}
+.userDrawer::backdrop{background:#000a}
+.userDrawer[open]{animation:udIn .2s ease-out}@keyframes udIn{from{transform:translateX(40px);opacity:.4}}
+#udBody{padding:22px 24px 40px}.udLoading{padding:40px 0}
+.udHead{display:flex;gap:14px;align-items:flex-start}.udHead>div{flex:1;min-width:0}.udHead h2{margin:0 0 6px;font-size:22px}.udHead p{margin:0 0 4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.accountAvatar.big{width:52px;height:52px;font-size:22px;flex-shrink:0}
+.udClose{border:1px solid var(--line);background:transparent;color:inherit;width:36px;height:36px;border-radius:10px;cursor:pointer}
+.udChain{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 16px;font-size:12px}.udChain i{color:var(--muted);font-style:normal}
+.chainBtn{border:1px solid var(--line);background:#0f1b19;color:#cfe;border-radius:999px;padding:4px 10px;font-size:12px}button.chainBtn{cursor:pointer}button.chainBtn:hover{border-color:#4fbf8a}
+.udKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.udKpis .ckpi{padding:14px}.udKpis .ckpi strong{font-size:19px}
+.udActions{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:14px;border:1px solid var(--line);border-radius:12px;background:#0e1918}
+.udActions label{display:grid;gap:4px;font-size:11.5px;color:var(--muted)}.udActions input{width:130px;background:#0b1413;border:1px solid var(--line);color:inherit;border-radius:8px;padding:9px 10px;font:inherit}
+.udHint{font-size:11.5px;margin:8px 0 0}
+#udBody h3{margin:22px 0 10px;font-size:15px}
+.udStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}.udStats div{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#0e1918;display:grid;gap:2px}.udStats small{color:var(--muted);font-size:11px}
+.udChildren{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.udChildren button{display:grid;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#0e1918;color:inherit;cursor:pointer}.udChildren button:hover{border-color:#4fbf8a}.udChildren small{color:var(--muted);font-size:11px}
+.ccard{display:inline-block;min-width:24px;padding:1px 4px;margin-right:3px;border-radius:4px;background:#f4f6f5;color:#111;font-size:11.5px;text-align:center}.ccard.red{color:#c8102e}
+.sGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}.sGrid>.surface{margin:0}
+.sTable td small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.sTable tr.strong td{font-weight:700;color:#fff;border-top:1px solid #2f4a43}.sTable tr.strong td.num{color:#9df5c9}
+.sNote{font-size:12px;margin:10px 0 0}
+.okBadge{background:#173b2d!important;color:#7dffc4!important;border-color:#2f6a4f!important}.warnBadge{background:#3a2a10!important;color:#ffd07a!important;border-color:#a8792f!important}
+.sDaily tfoot td{font-weight:700;border-top:1px solid #2f4a43}
+.barCell{width:16%;min-width:70px}.barCell i{display:block;height:8px;border-radius:4px;background:linear-gradient(90deg,#239866,#5ef0a8)}
+@media(max-width:1200px){.uCounts{grid-template-columns:repeat(4,minmax(0,1fr))}.uTools{grid-template-columns:1fr 1fr 1fr}.uTools input{grid-column:1/-1}}
+@media(max-width:900px){.homeKpis,.sHero{grid-template-columns:1fr 1fr}.sGrid{grid-template-columns:1fr}.udKpis{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.uCounts{grid-template-columns:repeat(2,minmax(0,1fr))}.uTools{grid-template-columns:1fr 1fr}.udStats{grid-template-columns:1fr 1fr}#udBody{padding:16px}.ckpi strong{font-size:20px}.ckpi.hero strong{font-size:24px}.subTabs{width:100%;overflow-x:auto;flex-wrap:nowrap}.subTabs button{flex-shrink:0}}
+.statCard.ckpi>div{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:3px;text-align:left;letter-spacing:0}
+.statCard.ckpi>strong{margin:6px 0 4px}.statCard.ckpi>div small{font-size:11.5px;letter-spacing:0}
+.sTable{white-space:normal}.sTable td{padding:11px 10px}.sTable td:first-child{width:46%}.sTable th{white-space:nowrap}
+.sPeriod{margin:-6px 0 12px;font-size:12px;color:var(--muted)}.sPeriod b{color:#cfe;font-weight:600}
+#udBody h3{letter-spacing:0;text-transform:none}
+@media(max-width:560px){.uCounts{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.uCount{padding:8px}.uCount strong{font-size:17px}.uCount small{font-size:10px;line-height:1.2}}

@@ -89,7 +89,7 @@ test('hierarchy, credit gating, rebuy, server timeout and persisted escrow', asy
     }
     assert.equal((await call('table/1/state',tokens[0])).status,403);
     assert.equal((await call('table/1/state',tokens[3])).status,403);
-    assert.equal((await call('transfer',tokens[0],{userId:'3',direction:'send',amount:100})).status,404);
+    assert.equal((await call('transfer',tokens[1],{userId:'3',direction:'send',amount:100})).status,404,'staff below the centre manage only their own accounts');
     for(const [from,to] of [[0,1],[1,2],[2,3]])assert.equal((await call('transfer',tokens[from],{userId:String(to),direction:'send',amount:100})).status,200);
     assert.equal((await call('table/1/state',tokens[3])).status,200);
     assert.equal((await call('table/1/sit',tokens[3],{position:0,buyin:20})).status,200);

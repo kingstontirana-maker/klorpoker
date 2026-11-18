@@ -102,6 +102,11 @@ export function openStore(file){
   ping:()=>sql.prepare('SELECT 1 AS ok').get().ok===1,
   // Transactions older than the ones in memory.
   olderRake:()=>sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND seq<? ORDER BY seq").all(oldestSeq).map(r=>JSON.parse(r.data)),
+  // For the centre's report: entries of some types since a moment that are no longer in memory,
+  // and the hand history by the hour (hands, hands with a real player, the bots' result; and who played).
+  ledgerOlder:(types,since=0)=>types.length?sql.prepare('SELECT data FROM ledger WHERE seq<? AND time>=? AND type IN ('+types.map(()=>'?').join(',')+') ORDER BY seq').all(oldestSeq,since,...types).map(r=>JSON.parse(r.data)):[],
+  handHours:(since,until)=>sql.prepare('SELECT started_at/3600000 AS h,COUNT(DISTINCT hand_id) AS hands,COUNT(DISTINCT CASE WHEN bot=0 THEN hand_id END) AS humanHands,COALESCE(SUM(CASE WHEN bot=1 THEN result END),0) AS botNet FROM hand_players WHERE started_at>=? AND started_at<? GROUP BY h').all(since,until).map(r=>({...r})),
+  playerHours:(since,until)=>sql.prepare('SELECT DISTINCT started_at/3600000 AS h,user_id AS id FROM hand_players WHERE bot=0 AND started_at>=? AND started_at<?').all(since,until).map(r=>({...r})),
   olderLedger(before=Infinity,size=2000){const rows=sql.prepare('SELECT seq,data FROM ledger WHERE seq<? ORDER BY seq DESC LIMIT ?').all(Math.min(before,oldestSeq),size).reverse();return {rows:rows.map(r=>JSON.parse(r.data)),seq:rows[0]?.seq??0};},
   // Sessions: only a hash of the token is stored, so the file cannot be used to sign in.
   sessions:()=>sql.prepare('SELECT key,data FROM sessions').all().map(r=>[r.key,JSON.parse(r.data)]),

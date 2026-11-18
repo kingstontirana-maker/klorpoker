@@ -1019,3 +1019,54 @@ Matur në Chrome me CPU 4 herë më të ngadaltë (si një telefon mesatar), në
   - **+ Te portofoli** dhe **− Tërhiq**: nga portofoli i botit dhe drejt tij. Chipsat në tavolinë nuk tërhiqen gjatë lojës; kthehen kur boti ngrihet.
   - **Stili, mënyra, humbje max, fitim max** ndryshojnë gjatë lojës dhe vlejnë nga vendimi i radhës. Tavolina dhe buy-in kërkojnë ende që boti të ndalet.
 - Rrugët e reja: `/api/bots/watch`, `/api/bots/live`, `/api/bots/withdraw`. `/api/bots/topup` lejohet edhe kur boti është ulur, me opsionin `toTable`.
+
+## Qendra: big update (2026-11-18)
+
+**Menuja.** Nga 16 faqe u bë me 8 grupe. Faqet e ngjashme shfaqen si nën-tab-e brenda grupit (vetëm për qendrën; menuja e adminëve, menaxherëve dhe agjentëve mbetet si ishte):
+
+| Grupi | Nën-tab-et |
+|---|---|
+| Dashboard | — |
+| Users | All users · Create & credit |
+| Reports | Summary · By network · Players · Credit movements |
+| Tables | Tables · Live · Hand history |
+| Payments | — |
+| Security | Fair play · Chat reports · Activity log |
+| System | Commission · Database |
+| My account | — |
+
+Faqja "Rake" nuk është më në menu: përmbajtja e saj gjendet te Summary dhe By network.
+
+**Dashboard.** Shfaq:
+- sa mbajti qendra sot (krahasuar me dje) dhe rake-un nga lojtarët;
+- lojtarët sot, sa janë online tani, paratë në platformë;
+- depozitat, tërheqjet që presin pagesë, rezultatin e botëve CENB;
+- grafikun e 14 ditëve të fundit.
+
+**All users.** Përfshin çdo llogari të platformës: lojtarë, agjentë, menaxherë dhe administratorë.
+- Për secilën: zinxhiri (agjenti · menaxheri · admini), portofoli, chipsat në tavolina, duart, fitimi ose humbja, rake-u, hera e fundit online.
+- Filtra: emër ose email, rol, status (online, në tavolinë, i bllokuar, i regjistruar vetë, s'ka hyrë kurrë, pa duar), "nën" një anëtar të rrjetit, periudha, renditja. Eksport CSV.
+- Hapja e një llogarie tregon profilin e plotë:
+  - zinxhirin, që mund të klikohet;
+  - paratë dhe statistikat e lojës;
+  - duart e fundit me letrat;
+  - lëvizjet e kreditit;
+  - llogaritë direkt poshtë saj;
+  - hyrjet: adresat dhe numrin e pajisjeve.
+- Veprimet: dërgo ose merr kredi, fjalëkalim i ri, blloko ose zhblloko (edhe me gjithë rrjetin), mute.
+
+**Summary.** Një raport i qartë për çdo periudhë, i krahasuar me periudhën e mëparshme:
+1. Të ardhurat: rake-u nga lojtarët − pjesa e adminëve − menaxherëve − agjentëve = sa mbajti qendra. Rake-u i botëve tregohet veçmas.
+2. Paratë që hynë dhe dolën: depozita dhe tërheqje crypto, kredi drejt rrjetit dhe e kthyer, cash-out, CENB, kredi e re e krijuar.
+3. Loja: duar, lojtarë, lojtarë të rinj, rake mesatar për dorë.
+4. Ku janë paratë tani: çdo euro e platformës. Totali krahasohet me kreditin e krijuar ndonjëherë ("✓ RECONCILED").
+5. Ditë për ditë, me eksport CSV.
+6. Rrjeti dhe lojtarët me më shumë rake.
+
+Gjithçka lexohet nga ledger-i dhe historiku i duarve. Ditët janë sipas orës së Tiranës.
+
+**Të drejtat.** Qendra tani vepron mbi çdo llogari të platformës: kredi, fjalëkalim, bllokim. Botët mbeten nën CENB. Adminët, menaxherët dhe agjentët vazhdojnë të veprojnë vetëm mbi llogaritë e tyre direkte.
+
+**Të tjera.**
+- Llogaritë e reja ruajnë datën e krijimit.
+- Rrugët e reja: `/api/center/users`, `/api/center/user`, `/api/center/report`.

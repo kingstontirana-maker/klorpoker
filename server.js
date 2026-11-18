@@ -2,6 +2,7 @@ import {STAFF,rakeReport,revenueReport,pct,isUnder} from './rake.js';
 import {createBots,workerDecider} from './bots.js';
 import {createCenb,cenbDocument} from './cenb.js';
 import {createPayments} from './payments.js';
+import {createCenter} from './center.js';
 import {openStore} from './store.js';
 import {seatedFromSameDevice,descendants,recordSeen,sharedGroups,pairSignals,handSummaryFor,handFor,SIGNALS} from './security.js';
 import {Worker} from 'node:worker_threads';
@@ -90,7 +91,7 @@ const PASSWORD_RULE='Enter a password.';
 function leaveAllTables(user,reason){for(const t of runtime.values())if(t.seats.some(s=>s?.userId===user.id)){try{engine.leave(t,user);}catch{}}}const roleCheck=(u,...roles)=>{if(!roles.includes(u.role))fail('Forbidden',403);};const childOf=(u,p)=>u.parentId===p.id;
 // A player who registered alone holds their own money: only the centre manages that account.
 // Their agent keeps the rake share and can see and mute them, but cannot touch wallet or login.
-const manages=(u,x)=>x.email?u.role==='CENTER':childOf(x,u);
+const manages=(u,x)=>u.role==='CENTER'?!x.isBot&&x.role!=='CENTER':!x.email&&childOf(x,u);
 // Cash-out: the agent asks, and the money moves only when the player confirms.
 const CASHOUT_MS=900000,pendingCashouts=()=>(db.cashouts||[]).filter(c=>c.expires>Date.now());
 const cashoutFor=u=>{const c=pendingCashouts().find(x=>x.userId===u.id);return c?{id:c.id,amount:clean(c.cents),agent:db.users.find(x=>x.id===c.agentId)?.username||'Your agent',expires:c.expires}:null;};
@@ -161,6 +162,9 @@ if(p==='/api/state')return stateFor(u);
 // The centre chooses the agent who receives every new player.
 if(p==='/api/signup/agents'){roleCheck(u,'CENTER');return {agentId:signupAgent()?.id||null,mail:mailConfigured(),agents:db.users.filter(x=>x.role==='AGENT'&&!x.blocked).map(x=>({id:x.id,username:x.username}))};}
 if(p==='/api/signup/agent'){roleCheck(u,'CENTER');const id=String(body.id||''),a=db.users.find(x=>x.id===id&&x.role==='AGENT'&&!x.blocked);if(!a)fail('Choose an active agent');db.signupAgentId=a.id;save();return {agentId:a.id};}
+if(p==='/api/center/users'){roleCheck(u,'CENTER');return centerView.directory({days:[7,30,90].includes(Number(body.days))?Number(body.days):30});}
+if(p==='/api/center/user'){roleCheck(u,'CENTER');const a=centerView.account(body.id);if(!a)fail('Account not found',404);return a;}
+if(p==='/api/center/report'){roleCheck(u,'CENTER');return centerView.report(body);}
 if(p==='/api/users'){roleCheck(u,'CENTER','ADMIN','MANAGER','AGENT');return db.users.filter(x=>(x.parentId===u.id||(u.role==='CENTER'&&x.email))&&!x.isBot).map(x=>({id:x.id,username:x.username,role:x.role,direct:!!x.email,...(x.email&&u.role==='AGENT'?{cashout:cashoutFor(x)}:{}),balance:clean(x.balance),...(STAFF.includes(x.role)?{share:pct(x.share)}:{}),blocked:!!x.blocked,below:STAFF.includes(x.role)?descendants(db.users,x.id).filter(d=>!d.isBot).length:0,mutedUntil:x.mutedUntil>Date.now()?x.mutedUntil:null,lastLoginAt:x.lastLoginAt||null,online:[...tokens.values()].some(s=>s.userId===x.id)}));}
 // Your own password; other sessions of the account are signed out.
 if(p==='/api/password'){if(!samePassword(u,String(body.current||'')))fail('The current password is wrong',400);if(!strongEnough(body.next))fail(PASSWORD_RULE);u.salt=secret();u.passHash=hash(body.next,u.salt);endUserSessions(u.id,'Your password was changed. Please sign in again.',token);save();return {ok:true};}
@@ -175,7 +179,7 @@ if(p==='/api/users/create'){roleCheck(u,'CENTER','ADMIN','MANAGER','AGENT');cons
  // Optional starting credit: checked before the account exists, then sent from the creator's
  // wallet in the same step (the centre creates what it lacks).
  const credit=body.credit===undefined||body.credit===null||body.credit===''?0:money(body.credit);if(!Number.isSafeInteger(credit)||credit<0)fail('Invalid starting credit');if(credit&&u.role==='CENTER')centerFunds(db,u,credit,'transfer');if(credit>u.balance)fail('Insufficient balance for the starting credit');
- const child={id:uid(),username,role:expected,parentId:u.id,salt,passHash:hash(password,salt),balance:0,...(share!==null?{share}:{}),};db.users.push(child);
+ const child={id:uid(),username,role:expected,parentId:u.id,salt,passHash:hash(password,salt),balance:0,createdAt:Date.now(),...(share!==null?{share}:{}),};db.users.push(child);
  if(credit){u.balance-=credit;child.balance+=credit;db.ledger.push({id:uid(),type:'TRANSFER',from:u.id,to:child.id,amount:credit,time:Date.now()});}
  save();return {ok:true,role:expected,share,credit:clean(credit)};}
 // Change a direct admin's or agent's percentage. Lowering an admin below its agents
@@ -284,6 +288,10 @@ const cenb=createCenb({db,bots:botManager,save,fail,checkCenter:(name,password)=
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail});
+// The centre's view of everything: all accounts, one account in full, the report.
+let onlineAt=0,onlineSet=new Set();const onlineIds=()=>{if(Date.now()-onlineAt>1000){onlineSet=new Set([...tokens.values()].map(s=>s.userId));onlineAt=Date.now();}return onlineSet;};
+const centerView=createCenter({db,store,runtime,online:id=>onlineIds().has(id),held:()=>payments.held(),
+ cenbValue:()=>({wallet:(Number(db.cenbWallet?.credit)||0)+(Number(db.cenbWallet?.profit)||0),rake:Number(db.cenbRake)||0,bots:db.users.filter(u=>u.isBot).reduce((n,u)=>n+u.balance,0)})});
 // Money only moves between accounts, it is never made or lost: wallets, chips on the tables
 // (stacks, and the pot of a running hand) and withdrawals waiting must always add up the same.
 const moneyNow=()=>db.users.reduce((n,u)=>n+u.balance,0)+[...runtime.values()].reduce((n,t)=>n+t.seats.reduce((m,s)=>m+(s?s.stack:0),0)+(LIVE.includes(t.phase)?t.pot:0),0)+payments.held()+(Number(db.cenbRake)||0)+(Number(db.cenbWallet?.credit)||0)+(Number(db.cenbWallet?.profit)||0);
