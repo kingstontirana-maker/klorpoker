@@ -107,7 +107,7 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   // Where the money is right now.
   const role=r=>db.users.filter(u=>u.role===r&&!u.isBot).reduce((n,u)=>n+u.balance,0);
   let chips=0,botChips=0,pots=0;for(const t of runtime.values()){for(const s of t.seats)if(s){if(s.isBot)botChips+=s.stack;else chips+=s.stack;}if(LIVE.includes(t.phase))pots+=t.pot;}
-  const cenb=cenbValue(),pending=(db.crypto?.withdrawals||[]).filter(w=>w.status==='pending');
+  const cenb=cenbValue(),pending=(db.crypto?.withdrawals||[]).filter(w=>['pending','approved','verifying'].includes(w.status));
   const nowMoney={center:eur(role('CENTER')),admins:eur(role('ADMIN')),managers:eur(role('MANAGER')),agents:eur(role('AGENT')),players:eur(role('USER')),onTables:eur(chips),pots:eur(pots),
    cenb:{wallet:eur(cenb.wallet),rake:eur(cenb.rake),bots:eur(cenb.bots+botChips)},held:eur(held()),created:eur(creditCreated(db))};
   nowMoney.total=Math.round((nowMoney.center+nowMoney.admins+nowMoney.managers+nowMoney.agents+nowMoney.players+nowMoney.onTables+nowMoney.pots+nowMoney.cenb.wallet+nowMoney.cenb.rake+nowMoney.cenb.bots+nowMoney.held)*100)/100;

@@ -1070,3 +1070,32 @@ Gjithçka lexohet nga ledger-i dhe historiku i duarve. Ditët janë sipas orës 
 **Të tjera.**
 - Llogaritë e reja ruajnë datën e krijimit.
 - Rrugët e reja: `/api/center/users`, `/api/center/user`, `/api/center/report`.
+
+## Crypto: pagesa super të sigurta (2026-11-18)
+
+**Depozitat: vetëm USDT i vërtetë.**
+- Transferta numërohet vetëm nëse ngjarja Transfer vjen nga kontrata zyrtare USDT (TR7NHq…jLj6t). Tokenët "USDT" nga kontrata të tjera refuzohen.
+- **Pa "flash USDT".** Kreditohet vetëm pasi transaksioni të jetë në një bllok final (solidified, i pakthyeshëm) plus N blloqe shtesë (parazgjedhja 20 ≈ 1 minutë, ndryshohet te Settings). Transfertat e pakonfirmuara, të dështuara ose të kthyera nuk numërohen kurrë.
+- Çdo transaksion mbahet mend përgjithmonë (`db.crypto.txs`): asnjë transfertë nuk kreditohet dy herë, edhe pasi pastrohen të dhënat e vjetra.
+- Ruhet adresa që dërgoi paratë. Del alarm kur e njëjta adresë përdoret nga disa lojtarë.
+- Tentativat e rreme listohen te "Blocked fakes".
+- Kufij: depozita minimale dhe maksimale.
+
+**Tërheqjet: miratohen nga qendra.**
+- Hapat: kërkesë (kredia mbahet) → qendra **miraton** ose refuzon → qendra paguan nga wallet-i dhe vendos hash-in → serveri e **verifikon në blockchain** → paguar.
+- "Paid" shënohet vetëm kur një bllok final tregon USDT të vërtetë, për të gjithë shumën, që arrin te adresa e lojtarit, pas kërkesës. I njëjti transaksion nuk mund të paguajë dy tërheqje.
+- Nëse blloku s'është ende final, statusi bëhet "Checking" dhe mbyllet vetë nga skanimi i rregullt.
+- Para miratimit, qendra sheh kontrollin e rrezikut:
+  - depozitat dhe tërheqjet e lojtarit;
+  - duart që nga depozita e fundit (depoziton dhe tërheq pa luajtur);
+  - mosha e llogarisë;
+  - adresa e përdorur edhe nga llogari të tjera;
+  - llogaria e bllokuar.
+- Lojtari mund ta anulojë kërkesën vetëm para miratimit. Limit ditor për lojtar sipas dëshirës.
+- Refuzohen adresa e vetë platformës dhe adresa e kontratës USDT.
+
+**Faqja e qendrës** (`public/crypto-admin.js`) përmban:
+- wallet-in, të lexuar nga blockchain-i (USDT dhe TRX për fee);
+- sa u detyrohet lojtarëve, dhe nëse wallet-i e mbulon;
+- KPI për 24 orë, 7 ditë dhe 30 ditë;
+- tab-et: Withdrawals (To approve / To pay / Checking / History), Deposits, Without a deposit, Blocked fakes, Settings, How it is protected.

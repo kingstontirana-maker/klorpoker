@@ -546,3 +546,40 @@ html{touch-action:manipulation}
 .sPeriod{margin:-6px 0 12px;font-size:12px;color:var(--muted)}.sPeriod b{color:#cfe;font-weight:600}
 #udBody h3{letter-spacing:0;text-transform:none}
 @media(max-width:560px){.uCounts{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.uCount{padding:8px}.uCount strong{font-size:17px}.uCount small{font-size:10px;line-height:1.2}}
+/* ---- Centre: crypto desk ---- */
+.cxTop{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+.cxTop>div{padding:20px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(140deg,#15231f,#0f1a18)}
+.cxWallet h2{margin:8px 0 4px;font-size:34px}.cxWallet h2 small{font-size:15px;color:var(--muted)}.cxWallet p{margin:0;font-size:12.5px}
+.cxState{font-size:11px;font-weight:700;letter-spacing:.08em}.cxState.on{color:#5ef0a8}.cxState.off{color:#ff9aa2}
+.cxOwed,.cxScan{display:grid;gap:4px;align-content:start}.cxOwed small,.cxScan small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.cxOwed strong,.cxScan strong{font-size:22px}
+.cxOwed span{font-size:12px;color:#7dffc4}.cxOwed.bad{border-color:#a8792f!important}.cxOwed.bad span{color:#ffd07a}.cxScan button{justify-self:start;margin-top:6px}
+.cxKpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:18px}.cxKpis .ckpi{padding:16px}.cxKpis .ckpi strong{font-size:20px}.cxKpis .ckpi strong small{font-size:12px;color:var(--muted)}
+.cxTabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.cxTabs button{border:0;border-bottom:2px solid transparent;background:none;color:#9bb0a7;padding:10px 14px;font-weight:600;font-size:13px;cursor:pointer;border-radius:0}
+.cxTabs button.on{color:#92efbf;border-bottom-color:#5ef0a8}.cxTabs i{font-style:normal;margin-left:4px;padding:1px 7px;border-radius:9px;background:#d9534f;color:#fff;font-size:10.5px}
+.cxFilters{margin-bottom:14px}.cxIntro{margin:0 0 12px}
+.cxCards{display:grid;gap:14px}.cxCard{margin:0;display:grid;gap:12px}.cxEmpty{color:var(--muted)}
+.cxHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.cxHead>div{display:grid;gap:3px}.cxHead small{color:var(--muted);font-size:11.5px}
+.cxName{font-size:17px;font-weight:700;text-decoration:none;color:#fff}.cxAmount{text-align:right}.cxAmount strong{font-size:22px;color:#9df5c9}
+.cxAddr{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px}.cxAddr>span{color:var(--muted)}.cxAddr .cdAddr{max-width:100%;overflow-wrap:anywhere}
+.cxLink{color:#8fd3ff;font-size:12px;text-decoration:none;white-space:nowrap}.cxLink:hover{text-decoration:underline}
+.cxRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cxRow input{flex:1;min-width:220px;background:#0b1413;border:1px solid var(--line);color:inherit;border-radius:8px;padding:10px 12px;font:inherit;font-size:12.5px}
+.cxRisk{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#0e1918}.cxRisk.danger{border-color:#a23a44;background:#2a1216}.cxRisk.warn{border-color:#a8792f;background:#241d10}.cxRisk.ok{border-color:#2f6a4f}
+.cxRiskHead{margin-bottom:6px;font-size:13px}.cxRisk.danger .cxRiskHead{color:#ff9aa2}.cxRisk.warn .cxRiskHead{color:#ffd07a}.cxRisk.ok .cxRiskHead{color:#7dffc4}
+.cxRisk ul{margin:0 0 8px;padding-left:18px;font-size:12.5px;display:grid;gap:3px}.cxRisk li.danger{color:#ffb3b9}.cxRisk li.warn{color:#ffe0a3}.cxRisk li.info{color:#cfe}.cxRisk li.ok{color:#a9f5cf}
+.cxFacts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}.cxFacts b{color:#e6f2ee;font-weight:600}
+.cxPay{display:grid;grid-template-columns:132px 1fr;gap:16px;align-items:start}.cxPay p{margin:0 0 8px}.cxQr{background:#fff;border-radius:10px;padding:8px}.cxQr svg{display:block;width:100%;height:auto}
+.cxCopyAmt{border:1px solid #2f6a4f;background:#173b2d;color:#9df5c9;border-radius:8px;padding:2px 8px;font-weight:700;cursor:pointer}
+.cxHint{font-size:11.5px;margin:6px 0 0}.cxWarn{color:#ffd07a;font-size:12px}
+.cxChecking{display:flex;gap:8px;align-items:center;margin:0;color:#cfe;font-size:13px}.cxSpin{width:14px;height:14px;border-radius:50%;border:2px solid #2f6a4f;border-top-color:#5ef0a8;animation:cxspin 1s linear infinite}@keyframes cxspin{to{transform:rotate(360deg)}}
+.cxPill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;background:#1c2a27;color:#cfe;white-space:nowrap}
+.cxPill.credited,.cxPill.paid{background:#173b2d;color:#7dffc4}.cxPill.pending,.cxPill.approved,.cxPill.open{background:#3a2a10;color:#ffd07a}.cxPill.verifying{background:#13304a;color:#9fd6ff}.cxPill.rejected,.cxPill.expired,.cxPill.cancelled{background:#2a1216;color:#ff9aa2}
+.cxToolbar{margin-bottom:10px}.cxToolbar input{width:100%;max-width:420px;background:#0b1413;border:1px solid var(--line);color:inherit;border-radius:8px;padding:9px 12px;font:inherit}
+.cxSettings{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}.cxSettings label{display:grid;gap:5px;font-size:12px;color:var(--muted)}.cxSettings input:not([type=checkbox]){background:#0b1413;border:1px solid var(--line);color:inherit;border-radius:8px;padding:10px 12px;font:inherit}.cxWide{grid-column:1/-1}.cxSettings .lobbyCheck{display:flex;align-items:center;gap:8px;color:#e6f2ee}
+.cxSecurity h3{margin:4px 0 10px}.cxSecurity ul{margin:0 0 18px;padding-left:20px;display:grid;gap:8px;font-size:13px;line-height:1.5;color:#cfe}
+.cwSteps{list-style:none;margin:10px 0;padding:0;display:grid;gap:6px;text-align:left}.cwSteps li{padding-left:24px;position:relative;color:var(--muted);font-size:13px}
+.cwSteps li::before{content:'';position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:50%;border:2px solid #34433e}.cwSteps li.done{color:#7dffc4}.cwSteps li.done::before{background:#5ef0a8;border-color:#5ef0a8}.cwSteps li.now{color:#ffd07a}.cwSteps li.now::before{border-color:#ffd07a;animation:lpulse 1.4s infinite}
+@media(max-width:1100px){.cxTop{grid-template-columns:1fr 1fr}.cxWallet{grid-column:1/-1}.cxKpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){.cxKpis{grid-template-columns:1fr 1fr}.cxPay{grid-template-columns:1fr}.cxQr{max-width:160px}.cxSettings{grid-template-columns:1fr}.cxHead{flex-direction:column}.cxAmount{text-align:left}.cxWallet h2{font-size:26px}}
+@keyframes lpulse{50%{opacity:.4}}
+.cxName{justify-self:start;text-align:left;padding:0}

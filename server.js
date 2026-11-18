@@ -287,7 +287,7 @@ const botManager=createBots({db,runtime,engine,save,olderRake:()=>store.olderRak
 const cenb=createCenb({db,bots:botManager,save,fail,checkCenter:(name,password)=>{const c=db.users.find(x=>x.role==='CENTER'&&x.username.toLowerCase()===String(name).trim().toLowerCase());try{return !!c&&samePassword(c,password);}catch{return false;}}});
 setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.error('[Suprem Poker] bots',err);}},500).unref();
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
-const payments=createPayments({db,save,fail});
+const payments=createPayments({db,save,fail,playSince:(id,since)=>{try{const t=store.playerStats(id,since);return {hands:t.hands,net:Math.round((t.net||0)*100)/100};}catch{return null;}}});
 // The centre's view of everything: all accounts, one account in full, the report.
 let onlineAt=0,onlineSet=new Set();const onlineIds=()=>{if(Date.now()-onlineAt>1000){onlineSet=new Set([...tokens.values()].map(s=>s.userId));onlineAt=Date.now();}return onlineSet;};
 const centerView=createCenter({db,store,runtime,online:id=>onlineIds().has(id),held:()=>payments.held(),
