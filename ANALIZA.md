@@ -1112,7 +1112,6 @@ Gjithçka lexohet nga ledger-i dhe historiku i duarve. Ditët janë sipas orës 
   - kur boti fiton, paratë vijnë nga ata që humbën në atë dorë, në proporcion me humbjen;
   - kur humbet, shkojnë te fituesit, dhe pjesa tjetër është rake.
   Për të gjithë botët, bot kundër bot shfaqet veçmas, sepse ato para mbeten te CENB.
-- Për një bot: çdo dorë, me letrat, tabelën, kundërshtarët dhe rezultatin e secilit.
 - **Lëvizjet e kredisë**: kredi nga CENB, kredi e marrë mbrapsht, kthime te lojtarët, rikreditim. Për të gjithë botët shfaqen edhe qendra ↔ CENB dhe rake → kuleta.
 - "Rikrediti botat" tani regjistron lëvizjen për çdo bot (`BOT_RESTORE`).
 - Rruga e re: `/api/bots/report`.

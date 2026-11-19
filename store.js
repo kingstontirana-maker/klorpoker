@@ -202,8 +202,6 @@ export function openStore(file){
     SUM(CASE WHEN hs.L>0 AND a.result<0 AND o.result>0 THEN (-a.result)*o.result/hs.L ELSE 0 END) AS lost
    FROM hand_players a JOIN hand_players o ON o.hand_id=a.hand_id AND o.user_id<>a.user_id JOIN hs ON hs.hand_id=a.hand_id
    WHERE a.bot=1 AND a.started_at>=? AND a.started_at<? AND (?='' OR a.user_id=?) GROUP BY a.user_id,o.user_id`).all(since,until,since,until,botId,botId).map(r=>({...r}));},
-  // One bot's hands in a period, newest first.
-  botHands(botId,since,until,before=Number.MAX_SAFE_INTEGER,limit=50){return sql.prepare('SELECT h.data FROM hand_players p JOIN hands h ON h.id=p.hand_id WHERE p.user_id=? AND p.started_at>=? AND p.started_at<? AND p.hand_id<? ORDER BY p.hand_id DESC LIMIT ?').all(botId,since,until,before,limit).map(r=>JSON.parse(r.data));},
   botRake(since,until){return sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND time>=? AND time<? AND instr(data,'\"bot\":true')>0").all(since,until).map(r=>{const x=JSON.parse(r.data);return {time:x.time,tableId:x.tableId,allocations:(x.allocations||[]).filter(a=>a.bot)};});},
   close(){sql.close();},
  };

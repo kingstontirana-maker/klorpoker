@@ -254,6 +254,4 @@ article.bot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:ce
 .rpBot>div{flex:1;min-width:0;display:grid}.rpBot small{color:var(--muted)}.rpBot .avatar{flex-shrink:0}
 .kpi>span{display:block;margin-top:4px;font-size:11.5px;color:var(--muted)}
 .rpNote{margin:-4px 0 10px;font-size:12px}
-.rc{display:inline-block;min-width:22px;padding:1px 3px;margin-right:2px;border-radius:4px;background:#f4f6f5;color:#111;font-size:11px;text-align:center}.rc.red{color:#c8102e}
-.rpOpp{font-size:12px;white-space:nowrap}.rpOpp b.up{color:var(--green)}.rpOpp b.down{color:var(--red)}
 @media(max-width:640px){.botReport{margin-right:10px;width:34px;height:34px}}

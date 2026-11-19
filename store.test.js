@@ -110,7 +110,7 @@ test('database browser: every table, newest first, secrets masked, read-only',as
  s.close();fs.rmSync(dir,{recursive:true,force:true});
 });
 
-test('who each bot won from and lost to, hand by hand; its hands in a period',()=>{
+test('who each bot won from and lost to, hand by hand',()=>{
  const s=openStore(path.join(tmp(),'bots.db'));s.commit(sample());
  const P=(id,name,result,bot)=>({userId:id,username:name,result,...(bot?{bot:true}:{})});
  // Hand 1: the bot wins 3: Ana lost 2, Besi lost 1 → 2 from Ana, 1 from Besi.
@@ -123,6 +123,5 @@ test('who each bot won from and lost to, hand by hand; its hands in a period',()
  assert.deepEqual([by('u').hands,by('u').won,by('u').lost],[2,2,3],'Ana gave it 2 and took 3');
  assert.deepEqual([by('v').won,by('v').lost],[1,0]);assert.deepEqual([by('c2').won,by('c2').isBot],[2,1]);
  assert.equal(s.botOpponents(0,1500,'b').length,2,'only the period');
- assert.deepEqual(s.botHands('b',0,10000).map(h=>h.id),[3,2,1]);assert.deepEqual(s.botHands('b',1500,10000,3).map(h=>h.id),[2]);
  s.close();
 });

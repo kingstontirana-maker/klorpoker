@@ -170,12 +170,8 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
    detail:x.type==='BOT_RETURN'?'hand '+(x.hand??'')+(x.tableId?' · '+(runtime.get(String(x.tableId))?.name||''):''):x.type==='BOT_REFUND'&&x.reclaim?'collected':x.type==='CENB_RESTORE'?(x.bots||0)+' bots':''}));
   const sum=t=>rows.filter(x=>x.type===t).reduce((n,x)=>n+(x.amount||0),0)/100;
   const credit={funded:sum('BOT_FUND'),taken:sum('BOT_REFUND'),returned:sum('BOT_RETURN'),restored:rows.filter(x=>x.type==='BOT_RESTORE').reduce((n,x)=>n+(x.amount||0),0)/100};
-  // One bot: its hands, with the opponents and what each won or lost.
-  let hands=[];if(botId&&store?.botHands)hands=store.botHands(botId,since,until,Number(body.before)||Number.MAX_SAFE_INTEGER,60).map(h=>{const me=(h.players||[]).find(p=>p.userId===botId);
-   return {id:h.id,time:h.startedAt,table:h.table,hand:h.hand,cards:me?.cards||[],board:h.board||[],result:Number(me?.result)||0,folded:!!me?.folded,
-    opponents:(h.players||[]).filter(p=>p.userId!==botId).map(p=>({name:name(p.userId)||p.username,bot:!!p.bot,result:Number(p.result)||0}))};});
   const bot=botId?list().find(b=>b.id===botId)||null:null;
-  return {...P,bot,opponents,vsPlayers:Math.round(vsPlayers*100)/100,internal:{hands:internal.hands,moved:internal.moved/100},credit,moves,hands};}
+  return {...P,bot,opponents,vsPlayers:Math.round(vsPlayers*100)/100,internal:{hands:internal.hands,moved:internal.moved/100},credit,moves};}
  function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
