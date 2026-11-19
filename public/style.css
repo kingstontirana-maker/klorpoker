@@ -583,3 +583,7 @@ html{touch-action:manipulation}
 @media(max-width:640px){.cxKpis{grid-template-columns:1fr 1fr}.cxPay{grid-template-columns:1fr}.cxQr{max-width:160px}.cxSettings{grid-template-columns:1fr}.cxHead{flex-direction:column}.cxAmount{text-align:left}.cxWallet h2{font-size:26px}}
 @keyframes lpulse{50%{opacity:.4}}
 .cxName{justify-self:start;text-align:left;padding:0}
+/* The centre's cards keep one column on phones too (label, number, note). */
+.statCard.ckpi{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;align-items:start}
+.statCard.ckpi>strong{grid-column:auto;grid-row:auto}.statCard.ckpi>small{margin-top:0}
+@media(max-width:760px){.statCard.ckpi{padding:14px}.statCard.ckpi>strong{font-size:20px;margin:4px 0 2px}.cxKpis .ckpi strong{font-size:18px}.cxTop>div{padding:16px}.cxOwed strong,.cxScan strong{font-size:18px}.cxTabs{flex-wrap:nowrap;overflow-x:auto}.cxTabs button{flex-shrink:0;padding:10px 10px}}
