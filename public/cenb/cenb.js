@@ -198,12 +198,15 @@ if(token)start().catch(()=>signOut());else showSignIn();
 // ---- Tables tab: every seat, and seating a bot on a chosen one ----
 let seatData=null,seatPick=null,seatBusy=false;
 async function loadSeats(force){if(seatBusy||(!force&&(tab!=='tables'||document.hidden||$('#seatDialog').open)))return;seatBusy=true;try{seatData=await api('bots/tables');renderSeats();}catch(err){if(force)toast(err.message,true);}finally{seatBusy=false;}}
-function renderSeats(){if(!seatData)return;const q=$('#seatSearch').value.trim().toLowerCase(),max=Number($('#seatStake').value)||0,freeOnly=$('#seatFreeOnly').checked;
+function renderSeats(){if(!seatData)return;const q=$('#seatSearch').value.trim().toLowerCase(),max=Number($('#seatStake').value)||0,freeOnly=$('#seatFreeOnly').checked,botsOnly=$('#seatBotsOnly').checked;
  const prev=Number($('#seatStake').selectedOptions[0]?.previousElementSibling?.value)||0;
- const rows=seatData.tables.filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!max||(t.bb<=max&&(max===9999?t.bb>2:t.bb>prev)))&&(!freeOnly||t.seats.some(s=>!s)));
+ const rows=seatData.tables.filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!max||(t.bb<=max&&(max===9999?t.bb>2:t.bb>prev)))&&(!freeOnly||t.seats.some(s=>!s))&&(!botsOnly||t.seats.some(s=>s?.bot)));
+ $('#seatCount').textContent=rows.length+' nga '+seatData.tables.length+' tavolina · '+seatData.tables.filter(t=>t.seats.some(s=>s?.bot)).length+' me bota';
  $('#seatTables').innerHTML=rows.length?rows.map(t=>'<div class="seatRow"><div class="seatName"><b>'+safe(t.name)+'</b><button type="button" class="small gold enterBtn" data-watch="'+safe(t.id)+'">👁 Hyr</button><small>'+eur(t.sb)+' / '+eur(t.bb)+' · '+t.size+' vende'+(t.waiting?' · '+t.waiting+' në pritje':'')+(t.live?' · <span class="pill on">në lojë</span>':'')+'</small></div><div class="seatChips">'
   +t.seats.map((s,i)=>s?(s.bot?'<button type="button" class="seatChip bot'+(s.out?' out':'')+(s.leaving||!s.on?' leaving':'')+'" data-bot="'+safe(s.id||'')+'" data-bot-table="'+safe(t.id)+'" title="Shtyp për ta ndaluar"><i>'+(i+1)+'</i>'+safe(s.name)+(s.leaving||!s.on?' · ngrihet':'')+'</button>':'<span class="seatChip human'+(s.out?' out':'')+'" title="Lojtar · '+eur(s.stack)+'"><i>'+(i+1)+'</i>'+safe(s.name)+'</span>'):'<button type="button" class="seatChip empty" data-seat="'+safe(t.id)+':'+i+'"'+(t.waiting?' disabled title="Një lojtar pret radhën"':'')+'><i>'+(i+1)+'</i>＋ Ulu</button>').join('')+'</div></div>').join(''):'<div class="empty">Asnjë tavolinë nuk përputhet.</div>';}
-for(const id of ['#seatSearch','#seatStake','#seatFreeOnly'])$(id).addEventListener('input',renderSeats);
+// Only the tables where bots sit now; the free-seats filter would hide the full ones, so it is switched off.
+$('#seatBotsOnly').addEventListener('change',()=>{if($('#seatBotsOnly').checked)$('#seatFreeOnly').checked=false;});
+for(const id of ['#seatSearch','#seatStake','#seatFreeOnly','#seatBotsOnly'])$(id).addEventListener('input',renderSeats);
 $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="tables"]'))loadSeats(true);});
 setInterval(()=>loadSeats(),4000);
 const seatMode=m=>{$$('[data-seatmode]').forEach(b=>b.classList.toggle('on',b.dataset.seatmode===m));$$('[data-seatpane]').forEach(p=>p.classList.toggle('hidden',p.dataset.seatpane!==m));$('#seatForm').dataset.mode=m;};
