@@ -110,12 +110,15 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   const cenb=cenbValue(),pending=(db.crypto?.withdrawals||[]).filter(w=>['pending','approved','verifying'].includes(w.status));
   const nowMoney={center:eur(role('CENTER')),admins:eur(role('ADMIN')),managers:eur(role('MANAGER')),agents:eur(role('AGENT')),players:eur(role('USER')),onTables:eur(chips),pots:eur(pots),
    cenb:{wallet:eur(cenb.wallet),rake:eur(cenb.rake),bots:eur(cenb.bots+botChips)},held:eur(held()),created:eur(creditCreated(db))};
-  nowMoney.total=Math.round((nowMoney.center+nowMoney.admins+nowMoney.managers+nowMoney.agents+nowMoney.players+nowMoney.onTables+nowMoney.pots+nowMoney.cenb.wallet+nowMoney.cenb.rake+nowMoney.cenb.bots+nowMoney.held)*100)/100;
+  // The centre does not hold money: it creates credit. Its own balance is only a technical number, so
+  // the total is the credit in circulation: everything outside the centre.
+  nowMoney.total=Math.round((nowMoney.admins+nowMoney.managers+nowMoney.agents+nowMoney.players+nowMoney.onTables+nowMoney.pots+nowMoney.cenb.wallet+nowMoney.cenb.rake+nowMoney.cenb.bots+nowMoney.held)*100)/100;
   const out=v=>({rake:eur(v.rake),shares:eur(v.shares),byRole:{ADMIN:eur(v.ADMIN),MANAGER:eur(v.MANAGER),AGENT:eur(v.AGENT)},center:eur(v.center),bots:eur(v.bots),rakeHands:v.rakeHands,
    minted:eur(v.minted),toNetwork:eur(v.toNetwork),fromNetwork:eur(v.fromNetwork),toCenb:eur(v.toCenb),fromCenb:eur(v.fromCenb),deposits:eur(v.deposits),depositCount:v.depositCount,withdrawals:eur(v.withdrawals),withdrawalCount:v.withdrawalCount,cashouts:eur(v.cashouts),
+   created:eur(v.toNetwork+v.deposits+v.toCenb),returned:eur(v.fromNetwork+v.withdrawals+v.fromCenb),net:eur(v.toNetwork+v.deposits+v.toCenb-v.fromNetwork-v.withdrawals-v.fromCenb-v.center),
    hands:v.hands,humanHands:v.humanHands,players:v.players,newPlayers:v.newPlayers,cenbResult:eur(v.cenbResult),avgRake:v.rakeHands?eur(v.rake/v.rakeHands):0});
   return {from:P.from,to:P.to,days:P.days,previous:{from:P.prev.from,to:P.prev.to},current:out(cur),before:out(prev),
-   daily:[...daily.values()].map(d=>({day:d.day,...out(d)})),now:nowMoney,
+   daily:[...daily.values()].map(d=>({day:d.day,...out(d)})),now:{...nowMoney,ok:!db.moneyMismatch},
    pending:{withdrawals:pending.length,amount:eur(pending.reduce((n,w)=>n+(w.cents||0),0))},
    network:[...agents.values()].map(a=>({id:a.id,username:a.username,role:a.role,rake:eur(a.rake),earned:eur(a.earned),players:a.players.size})).sort((a,b)=>b.rake-a.rake||b.earned-a.earned).slice(0,50),
    players:[...players.values()].map(p=>({...p,rake:eur(p.rake)})).sort((a,b)=>b.rake-a.rake).slice(0,50)};

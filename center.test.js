@@ -38,7 +38,8 @@ test('the report: rake, what the network earned, what the centre keeps, money fl
  assert.equal(c.hands,12);assert.equal(c.humanHands,10);assert.equal(c.players,1);assert.equal(c.newPlayers,1);assert.equal(c.cenbResult,-1.5);
  assert.equal(r.before.rake,0.5,'yesterday');assert.equal(r.before.center,0.5);assert.equal(r.before.withdrawals,9);
  assert.equal(r.now.players,30);assert.equal(r.now.onTables,4);assert.equal(r.now.cenb.bots,10,'bot wallets and their chips');
- assert.equal(r.now.total,1000+50+30+30+4+10+10+0.3,'every euro on the platform');
+ assert.equal(r.now.total,50+30+30+4+10+10+0.3,'credit in circulation: everything outside the centre');assert.equal(r.now.ok,true);
+ assert.equal(c.created,65,'created: 40 to the network + 25 for deposits');assert.equal(c.returned,5);assert.equal(c.net,59.4,'created − returned − what the centre kept');
  const agent=r.network.find(x=>x.username==='agt');assert.equal(agent.rake,1);assert.equal(agent.earned,0.2);assert.equal(agent.players,1);
  assert.equal(r.network.find(x=>x.username==='adm').rake,1,'the admin counts the players of its agents');
  assert.deepEqual(r.players.map(p=>[p.username,p.rake,p.agent]),[['pl',1,'agt']]);
