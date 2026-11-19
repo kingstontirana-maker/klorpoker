@@ -79,7 +79,7 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
     kpi('Credit in circulation',fmt(t.now.total),'<small>players '+fmt(t.now.players)+' · tables '+fmt(t.now.onTables)+' · created today '+fmt(c.created)+'</small>'),
     kpi('Deposits today',fmt(c.deposits),'<small>'+c.depositCount+' · withdrawals '+fmt(c.withdrawals)+'</small>'),
     kpi('Withdrawals to pay',t.pending.withdrawals,t.pending.withdrawals?'<small><button type="button" class="linkBtn" data-panel="crypto">'+fmt(t.pending.amount)+' · open payments →</button></small>':'<small>nothing waiting</small>',t.pending.withdrawals?'warn':''),
-    kpi('CENB bots today',signed(c.cenbResult),'<small>against players · bot rake '+fmt(c.bots)+'</small>')].join('');
+    kpi('CENB bots today',signed(c.cenbResult),'<small>against real players · their rake '+fmt(c.bots)+' stays in CENB</small>')].join('');
    bars($('#homeChart'),w.daily.map(d=>({label:day(d.day).slice(0,5),value:d.center,note:fmt(d.center)+' kept · '+fmt(d.rake)+' rake · '+d.players+' players'})));
    if(!dir)loadDir().then(()=>{if($('[data-page="overview"]').hidden===false)loadHome();});
   }catch(err){toast(err.message);}}
@@ -182,7 +182,7 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
     +kpi('Active players',c.players,delta(c.players,b.players)+'<small>'+c.newPlayers+' new in the period</small>')+kpi('Hands played',c.humanHands,delta(c.humanHands,b.humanHands)+'<small>with players · '+c.hands+' with bots too</small>')+'</div>'
    +'<div class="sGrid"><article class="surface"><div class="sectionHead"><div><h2>1 · Revenue</h2><p class="muted">The rake real players paid, how it was shared, and what the centre kept.</p></div></div>'+head+'<tbody>'
     +line('Rake paid by players',c.rake,b.rake,{strong:true})+line('Administrators\' share',c.byRole.ADMIN,b.byRole.ADMIN,{neg:true})+line('Managers\' share',c.byRole.MANAGER,b.byRole.MANAGER,{neg:true})+line('Agents\' share',c.byRole.AGENT,b.byRole.AGENT,{neg:true})
-    +line('= Centre kept',c.center,b.center,{strong:true})+'</tbody></table><p class="muted sNote">Rake the CENB bots paid: '+fmt(c.bots)+'. It is the house paying itself, so it is not counted as revenue. Bots against players: '+signed(c.cenbResult)+'.</p></article>'
+    +line('= Centre kept',c.center,b.center,{strong:true})+'</tbody></table><p class="muted sNote">Rake the CENB bots paid: '+fmt(c.bots)+'. It is the house paying itself: it stays in CENB, so it is neither revenue nor a loss. Bots against real players: '+signed(c.cenbResult)+'.</p></article>'
    +'<article class="surface"><div class="sectionHead"><div><h2>2 · Credit created and returned</h2><p class="muted">The centre creates credit: when it gives it, it comes into circulation; when it comes back, it leaves circulation.</p></div></div>'+head+'<tbody>'
     +line('Credit created for the network',c.toNetwork,b.toNetwork,{note:'centre → administrators, agents, players'})+line('Credit created for crypto deposits',c.deposits,b.deposits,{note:c.depositCount+' payments'})+line('Credit created for CENB',c.toCenb,b.toCenb)
     +line('= Credit created',c.created,b.created,{strong:true})

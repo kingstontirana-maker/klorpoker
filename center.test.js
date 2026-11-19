@@ -35,7 +35,7 @@ test('the report: rake, what the network earned, what the centre keeps, money fl
  assert.equal(c.rake,1,'only the players\' rake');assert.equal(c.bots,0.3,'the bots\' rake apart');
  assert.equal(c.shares,0.4);assert.deepEqual(c.byRole,{ADMIN:0.2,MANAGER:0,AGENT:0.2});assert.equal(c.center,0.6,'rake − shares');
  assert.equal(c.minted,100);assert.equal(c.toNetwork,40);assert.equal(c.fromNetwork,5);assert.equal(c.cashouts,3);assert.equal(c.deposits,25);assert.equal(c.withdrawals,0);
- assert.equal(c.hands,12);assert.equal(c.humanHands,10);assert.equal(c.players,1);assert.equal(c.newPlayers,1);assert.equal(c.cenbResult,-1.5);
+ assert.equal(c.hands,12);assert.equal(c.humanHands,10);assert.equal(c.players,1);assert.equal(c.newPlayers,1);assert.equal(c.cenbResult,-1.2,'the bots result with their rake counted back (−1.50 + 0.30)');
  assert.equal(r.before.rake,0.5,'yesterday');assert.equal(r.before.center,0.5);assert.equal(r.before.withdrawals,9);
  assert.equal(r.now.players,30);assert.equal(r.now.onTables,4);assert.equal(r.now.cenb.bots,10,'bot wallets and their chips');
  assert.equal(r.now.total,50+30+30+4+10+10+0.3,'credit in circulation: everything outside the centre');assert.equal(r.now.ok,true);

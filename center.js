@@ -98,6 +98,7 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
    else if(x.type==='CENB_RETURN')both(v=>v.fromCenb+=x.amount);
    else if(x.type==='CRYPTO_DEPOSIT')both(v=>{v.deposits+=x.amount;v.depositCount++;});
    else if(x.type==='CRYPTO_WITHDRAW')both(v=>{v.withdrawals+=x.amount;v.withdrawalCount++;});}
+  // The bots' result counts their rake back: it stays in CENB, so it is not a loss (as in the CENB profit page).
   // Hands and players from the hand history, by the hour (Tirana is a whole number of hours from UTC).
   for(const [range,b,isCur] of [[P,cur,true],[P.prev,prev,false]]){
    for(const h of store?.handHours?store.handHours(range.since,range.until):[]){const v=Math.round((h.botNet||0)*100);b.hands+=h.hands;b.humanHands+=h.humanHands;b.cenbResult+=v;if(isCur){const d=daily.get(tiranaDay(h.h*3600000));if(d){d.hands+=h.hands;d.humanHands+=h.humanHands;d.cenbResult+=v;}}}
@@ -116,7 +117,7 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   const out=v=>({rake:eur(v.rake),shares:eur(v.shares),byRole:{ADMIN:eur(v.ADMIN),MANAGER:eur(v.MANAGER),AGENT:eur(v.AGENT)},center:eur(v.center),bots:eur(v.bots),rakeHands:v.rakeHands,
    minted:eur(v.minted),toNetwork:eur(v.toNetwork),fromNetwork:eur(v.fromNetwork),toCenb:eur(v.toCenb),fromCenb:eur(v.fromCenb),deposits:eur(v.deposits),depositCount:v.depositCount,withdrawals:eur(v.withdrawals),withdrawalCount:v.withdrawalCount,cashouts:eur(v.cashouts),
    created:eur(v.toNetwork+v.deposits+v.toCenb),returned:eur(v.fromNetwork+v.withdrawals+v.fromCenb),net:eur(v.toNetwork+v.deposits+v.toCenb-v.fromNetwork-v.withdrawals-v.fromCenb-v.center),
-   hands:v.hands,humanHands:v.humanHands,players:v.players,newPlayers:v.newPlayers,cenbResult:eur(v.cenbResult),avgRake:v.rakeHands?eur(v.rake/v.rakeHands):0});
+   hands:v.hands,humanHands:v.humanHands,players:v.players,newPlayers:v.newPlayers,cenbResult:eur(v.cenbResult+v.bots),avgRake:v.rakeHands?eur(v.rake/v.rakeHands):0});
   return {from:P.from,to:P.to,days:P.days,previous:{from:P.prev.from,to:P.prev.to},current:out(cur),before:out(prev),
    daily:[...daily.values()].map(d=>({day:d.day,...out(d)})),now:{...nowMoney,ok:!db.moneyMismatch},
    pending:{withdrawals:pending.length,amount:eur(pending.reduce((n,w)=>n+(w.cents||0),0))},
