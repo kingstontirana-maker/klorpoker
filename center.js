@@ -42,12 +42,14 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
  function rakeSince(since){const paid=new Map(),earned=new Map();for(const x of ledgerSince(['RAKE'],since)){for(const a of x.allocations||[])if(!a.bot)paid.set(a.userId,(paid.get(a.userId)||0)+a.amount);for(const s of x.shares||[])earned.set(s.userId,(earned.get(s.userId)||0)+s.amount);}return {paid,earned};}
 
  // ---- Every account on the platform ----
- function directory({days=30}={}){
+ // rootId: only the accounts under that member (its network); without it, the whole platform.
+ const under=(ids,id,rootId)=>{for(let x=ids.get(ids.get(id)?.parentId),i=0;x&&i<50;x=ids.get(x.parentId),i++)if(x.id===rootId)return true;return false;};
+ function directory({days=30,rootId=null}={}){
   const ids=byId(),seats=seatsOf(),since=Date.now()-days*864e5,{paid,earned}=rakeSince(since);
   const totals=new Map((store?.playerTotals?store.playerTotals(since):[]).map(t=>[t.id,t]));
   const below=new Map();for(const u of db.users){if(u.isBot)continue;for(let p=ids.get(u.parentId),i=0;p&&i<50;p=ids.get(p.parentId),i++)below.set(p.id,(below.get(p.id)||0)+1);}
-  const rows=db.users.filter(u=>!u.isBot&&u.role!=='CENTER').map(u=>{const s=seats.get(u.id),t=totals.get(u.id),up=upline(ids,u);
-   return {id:u.id,username:u.username,role:u.role,email:u.email||null,direct:!!u.email,balance:eur(u.balance),chips:eur(s?.chips||0),tables:s?.tables||[],
+  const rows=db.users.filter(u=>!u.isBot&&u.role!=='CENTER'&&(!rootId||under(ids,u.id,rootId))).map(u=>{const s=seats.get(u.id),t=totals.get(u.id),up=upline(ids,u);
+   return {id:u.id,username:u.username,role:u.role,email:rootId?null:u.email||null,direct:!!u.email,balance:eur(u.balance),chips:eur(s?.chips||0),tables:s?.tables||[],
     ...up,share:STAFF.includes(u.role)?pct(u.share):null,blocked:!!u.blocked,muted:u.mutedUntil>Date.now(),online:online(u.id),lastLoginAt:u.lastLoginAt||null,created:created(u),
     below:below.get(u.id)||0,hands:t?.hands||0,net:Math.round((t?.net||0)*100)/100,rake:eur(paid.get(u.id)||0),earned:eur(earned.get(u.id)||0),lastPlayed:t?.last||null};});
   const count=r=>rows.filter(r).length;
@@ -55,10 +57,10 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
  }
 
  // ---- One account in full ----
- function account(id){
-  const ids=byId(),u=ids.get(String(id||''));if(!u||u.isBot||u.role==='CENTER')return null;
+ function account(id,rootId=null){
+  const ids=byId(),u=ids.get(String(id||''));if(!u||u.isBot||u.role==='CENTER')return null;if(rootId&&!under(ids,u.id,rootId))return null;
   const seats=seatsOf().get(u.id),since30=Date.now()-30*864e5,{paid,earned}=rakeSince(since30);
-  const path=[];for(let x=ids.get(u.parentId),i=0;x&&i<50;x=ids.get(x.parentId),i++)path.unshift({id:x.id,username:x.username,role:x.role});
+  const path=[];for(let x=ids.get(u.parentId),i=0;x&&i<50;x=ids.get(x.parentId),i++){path.unshift({id:x.id,username:x.username,role:x.role});if(rootId&&x.id===rootId)break;}
   const children=db.users.filter(x=>x.parentId===u.id&&!x.isBot).map(x=>({id:x.id,username:x.username,role:x.role,balance:eur(x.balance),blocked:!!x.blocked,online:online(x.id)}));
   const network=[];if(u.role!=='USER'){const seen=new Set([u.id]);for(let added=true;added;){added=false;for(const x of db.users)if(seen.has(x.parentId)&&!seen.has(x.id)&&!x.isBot){seen.add(x.id);network.push(x);added=true;}}}
   const name=x=>x==null?null:ids.get(x)?.username||(x==='cenb'?'CENB':String(x));
@@ -69,8 +71,9 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   const hands=(store?.playerHands?store.playerHands(u.id,Infinity,15):[]).map(h=>{const p=(h.players||[]).find(x=>x.userId===u.id);return {id:h.id,time:h.startedAt||null,table:h.table||db.tables.find(t=>t.id===h.tableId)?.name||'',result:Math.round((Number(p?.result)||0)*100)/100,cards:p?.cards||[],won:(h.winners||[]).includes(u.username)};});
   const stats30=store?.playerStats?store.playerStats(u.id,since30):null,statsAll=store?.playerStats?store.playerStats(u.id,0):null;
   const pick=s=>s?{hands:s.hands,won:s.won,vpip:s.vpip,net:Math.round((s.net||0)*100)/100,best:Math.round((s.best||0)*100)/100,worst:Math.round((s.worst||0)*100)/100,days:s.days||[]}:null;
-  return {user:{id:u.id,username:u.username,role:u.role,email:u.email||null,direct:!!u.email,balance:eur(u.balance),chips:eur(seats?.chips||0),tables:seats?.tables||[],share:STAFF.includes(u.role)?pct(u.share):null,
-    blocked:!!u.blocked,mutedUntil:u.mutedUntil>Date.now()?u.mutedUntil:null,online:online(u.id),lastLoginAt:u.lastLoginAt||null,created:created(u),ips:u.seenIps||[],devices:(u.seenDevices||[]).length},
+  const priv=!!rootId;
+  return {user:{id:u.id,username:u.username,role:u.role,email:priv?null:u.email||null,direct:!!u.email,balance:eur(u.balance),chips:eur(seats?.chips||0),tables:seats?.tables||[],share:STAFF.includes(u.role)?pct(u.share):null,
+    blocked:!!u.blocked,mutedUntil:u.mutedUntil>Date.now()?u.mutedUntil:null,online:online(u.id),lastLoginAt:u.lastLoginAt||null,created:created(u),ips:priv?[]:u.seenIps||[],devices:priv?null:(u.seenDevices||[]).length},
    path,children,network:u.role==='USER'?null:{accounts:network.length,players:network.filter(x=>x.role==='USER').length,balance:eur(network.reduce((n,x)=>n+x.balance,0)),
     rake:eur(network.reduce((n,x)=>n+(paid.get(x.id)||0),0))},
    rake30:eur(paid.get(u.id)||0),earned30:eur(earned.get(u.id)||0),stats30:pick(stats30),statsAll:pick(statsAll),hands,ledger:mine};

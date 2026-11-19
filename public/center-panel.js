@@ -2,8 +2,10 @@
 // profile, one clear report and a dashboard that answers "how are we doing" at a glance.
 import {icon} from './icons.js';
 
-export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHand}){
+export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHand,role=()=>'CENTER'}){
  const $=s=>document.querySelector(s);
+ // Administrators and managers see their own network here, read-only; the centre sees everything and acts.
+ const staff=()=>role()!=='CENTER';
  const when=t=>t?new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
  const day=d=>{const [y,m,dd]=d.split('-');return dd+'.'+m+'.'+y;};
  const ago=t=>{if(!t)return 'never';const s=Math.max(0,(Date.now()-t)/1000);return s<90?'just now':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':Math.round(s/86400)+' days ago';};
@@ -42,7 +44,7 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
  // ---- Pages made here ----
  function ensurePages(){
   if($('[data-page="users"]'))return;
-  $('[data-page="overview"]').insertAdjacentHTML('afterbegin','<div id="homeKpis" class="homeKpis"></div><article class="surface homeChart"><div class="sectionHead"><div><h2>Last 14 days</h2><p class="muted">What the centre kept each day, after the network\'s shares.</p></div><button type="button" class="ghostButton" data-panel="summary">Open the report →</button></div><div id="homeChart" class="cbars"></div></article>');
+  if(!staff())$('[data-page="overview"]').insertAdjacentHTML('afterbegin','<div id="homeKpis" class="homeKpis"></div><article class="surface homeChart"><div class="sectionHead"><div><h2>Last 14 days</h2><p class="muted">What the centre kept each day, after the network\'s shares.</p></div><button type="button" class="ghostButton" data-panel="summary">Open the report →</button></div><div id="homeChart" class="cbars"></div></article>');
   $('[data-page="overview"]').insertAdjacentHTML('afterend',`
 <section class="panelPage" data-page="users" hidden>
  <div id="uCounts" class="uCounts"></div>
@@ -53,10 +55,10 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
   <select id="uUnder"><option value="">Whole platform</option></select>
   <select id="uDays"><option value="7">Stats: 7 days</option><option value="30" selected>Stats: 30 days</option><option value="90">Stats: 90 days</option></select>
   <select id="uSort"><option value="balance">Sort: wallet</option><option value="rake">Sort: rake</option><option value="hands">Sort: hands</option><option value="net">Sort: won / lost</option><option value="login">Sort: last sign-in</option><option value="name">Sort: name</option></select>
-  <button type="button" class="ghostButton" id="uCsv">⬇ CSV</button></div>
+  <button type="button" class="ghostButton" id="uTree" aria-pressed="false">🌳 Hierarchy</button><button type="button" class="ghostButton" id="uCsv">⬇ CSV</button></div>
   <p class="muted" id="uInfo"></p>
   <div class="tableScroll"><table class="dataTable uTable"><thead><tr><th>Account</th><th>Role</th><th>Network</th><th>Wallet</th><th>On tables</th><th>Hands</th><th>Won / lost</th><th>Rake</th><th>Last seen</th></tr></thead><tbody id="uRows"></tbody></table></div>
-  <button type="button" class="ghostButton uMore" id="uMore" hidden>Show more</button></article>
+  <button type="button" class="ghostButton uMore" id="uMore" hidden>Show more</button><div id="uTreeBox" class="uTree" hidden></div></article>
 </section>
 <section class="panelPage" data-page="summary" hidden>
  <article class="surface revFilters"><div id="sPresets" class="revPresets" role="group" aria-label="Period">
@@ -88,17 +90,32 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
 
  // ---- Every user ----
  let dirCache=null,uLimit=100;
- async function loadDir(){dirCache=await api('center/users',{days:Number($('#uDays')?.value)||30});return dirCache;}
+ async function loadDir(){dirCache=await api(staff()?'network/users':'center/users',{days:Number($('#uDays')?.value)||30});return dirCache;}
  async function loadUsers(){try{$('#uInfo').textContent='Loading…';await loadDir();fillUnder();renderUsers();}catch(err){toast(err.message);}}
- function fillUnder(){const sel=$('#uUnder'),keep=sel.value,staff=dirCache.rows.filter(r=>r.role!=='USER').sort((a,b)=>['ADMIN','MANAGER','AGENT'].indexOf(a.role)-['ADMIN','MANAGER','AGENT'].indexOf(b.role)||a.username.localeCompare(b.username));
-  sel.innerHTML='<option value="">Whole platform</option>'+staff.map(s=>'<option value="'+safe(s.id)+'">Under '+safe(roleNames[s.role])+' '+safe(s.username)+' ('+s.below+')</option>').join('');sel.value=keep;}
+ function fillUnder(){const sel=$('#uUnder'),keep=sel.value,members=dirCache.rows.filter(r=>r.role!=='USER').sort((a,b)=>['ADMIN','MANAGER','AGENT'].indexOf(a.role)-['ADMIN','MANAGER','AGENT'].indexOf(b.role)||a.username.localeCompare(b.username));
+  sel.innerHTML='<option value="">'+(staff()?'Whole network':'Whole platform')+'</option>'+members.map(s=>'<option value="'+safe(s.id)+'">Under '+safe(roleNames[s.role])+' '+safe(s.username)+' ('+s.below+')</option>').join('');sel.value=keep;}
  function filtered(){const q=$('#uSearch').value.trim().toLowerCase(),role=$('#uRole').value,st=$('#uStatus').value,under=dirCache.rows.find(r=>r.id===$('#uUnder').value);
   const sorts={balance:(a,b)=>b.balance+b.chips-a.balance-a.chips,rake:(a,b)=>b.rake-a.rake,hands:(a,b)=>b.hands-a.hands,net:(a,b)=>b.net-a.net,login:(a,b)=>(b.lastLoginAt||0)-(a.lastLoginAt||0),name:(a,b)=>a.username.localeCompare(b.username)};
   return dirCache.rows.filter(r=>(!q||r.username.toLowerCase().includes(q)||(r.email||'').toLowerCase().includes(q))&&(!role||r.role===role)
    &&(!st||(st==='online'&&r.online)||(st==='playing'&&r.tables.length)||(st==='blocked'&&r.blocked)||(st==='direct'&&r.direct)||(st==='never'&&!r.lastLoginAt)||(st==='idle'&&r.role==='USER'&&!r.hands))
    &&(!under||r.parent?.id===under.id||r.agent===under.username||r.manager===under.username||r.admin===under.username)).sort(sorts[$('#uSort').value]||sorts.balance);}
- function renderUsers(){const d=dirCache,c=d.counts,rows=filtered();
-  $('#uCounts').innerHTML=[['All accounts',c.all,''],['Players',c.USER,'USER'],['Agents',c.AGENT,'AGENT'],['Managers',c.MANAGER,'MANAGER'],['Administrators',c.ADMIN,'ADMIN'],['Online now',c.online,'online'],['At a table',c.playing,'playing'],['Blocked',c.blocked,'blocked']]
+ let treeMode=false;
+ function renderTree(){const rows=dirCache.rows,q=$('#uSearch').value.trim().toLowerCase(),kids=new Map(),order=['ADMIN','MANAGER','AGENT','USER'];
+  for(const r of rows){const p=r.parent?.id||'';(kids.get(p)||kids.set(p,[]).get(p)).push(r);}
+  for(const list of kids.values())list.sort((a,b)=>order.indexOf(a.role)-order.indexOf(b.role)||a.username.localeCompare(b.username));
+  const total=new Map(),sum=r=>{if(total.has(r.id))return total.get(r.id);let t={credit:r.balance+r.chips,players:r.role==='USER'?1:0,online:r.online?1:0};for(const k of kids.get(r.id)||[]){const s=sum(k);t={credit:t.credit+s.credit,players:t.players+s.players,online:t.online+s.online};}total.set(r.id,t);return t;};
+  const hit=r=>q&&(r.username.toLowerCase().includes(q)||(r.email||'').toLowerCase().includes(q));
+  const has=r=>hit(r)||(kids.get(r.id)||[]).some(has);
+  const line=r=>{const t=sum(r);return '<span class="utName'+(hit(r)?' hit':'')+'"><button type="button" class="linkBtn" data-user="'+safe(r.id)+'">'+safe(r.username)+'</button>'+roleBadge(r.role,r.share)+(r.blocked?' <b class="statusBlocked">Blocked</b>':'')+(r.online?' <b class="statusOnline">●</b>':'')+'</span>'
+   +'<span class="utNums"><span>wallet <b>'+fmt(r.balance)+'</b></span>'+(r.chips?'<span>tables <b>'+fmt(r.chips)+'</b></span>':'')+(r.role!=='USER'?'<span>network <b>'+fmt(t.credit-r.balance-r.chips)+'</b></span><span><b>'+t.players+'</b> players'+(t.online?' · '+t.online+' online':'')+'</span>':'<span>'+(r.hands?r.hands+' hands · '+(r.net>=0?'+':'')+fmt(r.net):'no hands')+'</span>')+'</span>';};
+  const node=(r,depth)=>{const k=kids.get(r.id)||[];if(q&&!has(r))return '';
+   return k.length?'<details class="utNode"'+(depth<1||q?' open':'')+'><summary>'+line(r)+'</summary><div class="utKids">'+k.map(x=>node(x,depth+1)).join('')+'</div></details>':'<div class="utLeaf">'+line(r)+'</div>';};
+  const rootId=staff()?dirCache.root?.id:rows.find(r=>r.parent?.role==='CENTER')?.parent.id;
+  const top=kids.get(rootId)||[];
+  $('#uTreeBox').innerHTML='<div class="utRoot">'+(staff()?'You · '+safe(dirCache.root?.username||'')+' · '+safe(roleNames[dirCache.root?.role]||''):'Centre')+'</div>'+(top.map(r=>node(r,0)).join('')||'<p class="muted">No accounts below.</p>');}
+ function renderUsers(){if(treeMode){$('#uTreeBox').hidden=false;document.querySelector('.uTable').closest('.tableScroll').hidden=true;$('#uMore').hidden=true;}else{$('#uTreeBox').hidden=true;document.querySelector('.uTable').closest('.tableScroll').hidden=false;}
+  const d=dirCache,c=d.counts,rows=filtered();
+  $('#uCounts').innerHTML=[['All accounts',c.all,''],['Players',c.USER,'USER'],['Agents',c.AGENT,'AGENT'],...(staff()&&role()!=='ADMIN'?[]:[['Managers',c.MANAGER,'MANAGER']]),...(staff()?[]:[['Administrators',c.ADMIN,'ADMIN']]),['Online now',c.online,'online'],['At a table',c.playing,'playing'],['Blocked',c.blocked,'blocked']]
    .map(([l,n,f])=>'<button type="button" class="uCount'+((f&&($('#uRole').value===f||$('#uStatus').value===f))||(!f&&!$('#uRole').value&&!$('#uStatus').value)?' on':'')+'" data-uf="'+f+'"><strong>'+n+'</strong><small>'+l+'</small></button>').join('');
   const sum=rows.reduce((n,r)=>n+r.balance+r.chips,0);
   $('#uInfo').innerHTML=rows.length+' of '+d.rows.length+' accounts · credit of the ones shown '+fmt(sum)+' (wallets + chips) · hands, won / lost and rake over the last '+d.days+' days';
@@ -107,8 +124,10 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
    +'<td class="uNet">'+[r.agent&&'<span>A · '+safe(r.agent)+'</span>',r.manager&&'<span>M · '+safe(r.manager)+'</span>',r.admin&&'<span>AD · '+safe(r.admin)+'</span>'].filter(Boolean).join('')+(r.parent?.role==='CENTER'?'<span>Centre</span>':'')+(r.below?'<small>'+r.below+' below</small>':'')+'</td>'
    +'<td class="num">'+fmt(r.balance)+'</td><td class="num">'+(r.chips?fmt(r.chips)+'<small class="accountMeta">'+safe(r.tables.join(', '))+'</small>':'—')+'</td><td class="num">'+(r.hands||'—')+'</td><td class="num">'+(r.hands?signed(r.net):'—')+'</td><td class="num">'+(r.role==='USER'?fmt(r.rake):r.earned?'<span title="Earned from the rake">'+fmt(r.earned)+' earned</span>':'—')+'</td>'
    +'<td>'+(r.online?'<b class="statusOnline">● Online</b>':'<span class="muted">'+ago(r.lastLoginAt)+'</span>')+'</td></tr>').join('')||'<tr><td colspan="9" class="emptyState"><strong>No account matches.</strong></td></tr>';
-  $('#uMore').hidden=rows.length<=uLimit;$('#uMore').textContent='Show more ('+(rows.length-uLimit)+')';}
+  $('#uMore').hidden=treeMode||rows.length<=uLimit;$('#uMore').textContent='Show more ('+(rows.length-uLimit)+')';if(treeMode)renderTree();}
  function bindUsers(){
+  $('#uTree').onclick=()=>{treeMode=!treeMode;$('#uTree').setAttribute('aria-pressed',String(treeMode));$('#uTree').classList.toggle('on',treeMode);if(dirCache)renderUsers();};
+  $('#uTreeBox').onclick=e=>{const b=e.target.closest('[data-user]');if(b){e.preventDefault();openUser(b.dataset.user);}};
   for(const id of ['#uSearch','#uRole','#uStatus','#uUnder','#uSort'])$(id).addEventListener('input',()=>{uLimit=100;if(dirCache)renderUsers();});
   $('#uDays').onchange=loadUsers;$('#uMore').onclick=()=>{uLimit+=200;renderUsers();};
   $('#uCounts').onclick=e=>{const b=e.target.closest('[data-uf]');if(!b)return;const f=b.dataset.uf;$('#uRole').value=['USER','AGENT','MANAGER','ADMIN'].includes(f)?f:'';$('#uStatus').value=['online','playing','blocked'].includes(f)?f:'';renderUsers();};
@@ -122,25 +141,25 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
  let openId=null,openData=null;
  const TYPES={TRANSFER:'Credit',RAKE:'Rake',CRYPTO_DEPOSIT:'Crypto deposit',CRYPTO_WITHDRAW:'Crypto withdrawal',CRYPTO_WITHDRAW_HOLD:'Withdrawal requested',CRYPTO_WITHDRAW_REFUND:'Withdrawal refunded',BUY_IN:'Buy-in',CASH_OUT:'Left table',REBUY:'Rebuy',BLOCK:'Blocked',UNBLOCK:'Unblocked',SHARE:'Share changed',MINT:'Credit created',ADJUST:'Adjustment',REGISTER:'Registered'};
  async function openUser(id){openId=id;const dlg=$('#userDrawer');if(!dlg.open)dlg.showModal();$('#udBody').innerHTML='<p class="muted udLoading">Loading…</p>';
-  try{const a=await api('center/user',{id});if(openId!==id)return;openData=a;renderUser(a);}catch(err){$('#udBody').innerHTML='<p class="muted">'+safe(err.message)+'</p>';}}
+  try{const a=await api(staff()?'network/user':'center/user',{id});if(openId!==id)return;openData=a;renderUser(a);}catch(err){$('#udBody').innerHTML='<p class="muted">'+safe(err.message)+'</p>';}}
  function renderUser(a){const u=a.user,isPlayer=u.role==='USER',s30=a.stats30,all=a.statsAll;
-  const chain=[{username:'Centre',role:'CENTER'},...a.path.filter(p=>p.role!=='CENTER')].map(p=>p.id?'<button type="button" class="chainBtn" data-open="'+safe(p.id)+'">'+safe(roleNames[p.role])+' · '+safe(p.username)+'</button>':'<span class="chainBtn">Centre</span>').join('<i>›</i>');
+  const chain=(staff()?a.path.map((p,i)=>i===0?{username:p.username,role:p.role}:p):[{username:'Centre',role:'CENTER'},...a.path.filter(p=>p.role!=='CENTER')]).map(p=>p.id?'<button type="button" class="chainBtn" data-open="'+safe(p.id)+'">'+safe(roleNames[p.role])+' · '+safe(p.username)+'</button>':'<span class="chainBtn">'+(p.role==='CENTER'?'Centre':safe(roleNames[p.role])+' · '+safe(p.username)+' (you)')+'</span>').join('<i>›</i>');
   $('#udBody').innerHTML='<header class="udHead"><span class="accountAvatar big">'+safe(u.username[0].toUpperCase())+'</span><div><h2>'+safe(u.username)+'</h2><p>'+roleBadge(u.role,u.share)+' '+(u.blocked?'<b class="statusBlocked">● Blocked</b>':u.online?'<b class="statusOnline">● Online</b>':'<span class="muted">○ last sign-in '+ago(u.lastLoginAt)+'</span>')+(u.mutedUntil?' <span class="muted">🔇 muted until '+when(u.mutedUntil)+'</span>':'')+'</p>'
    +(u.email?'<p class="muted">'+safe(u.email)+' · registered alone</p>':'')+'</div><button type="button" class="udClose" data-ud="close" aria-label="Close">✕</button></header>'
    +'<div class="udChain">'+chain+'</div>'
    +'<div class="udKpis">'+kpi('Wallet',fmt(u.balance))+kpi('On tables',fmt(u.chips),u.tables.length?'<small>'+safe(u.tables.join(', '))+'</small>':'')
    +(isPlayer?kpi('Rake · 30 days',fmt(a.rake30))+kpi('Won / lost · 30 days',s30?signed(s30.net):'—','<small>'+(s30?.hands||0)+' hands</small>')
      :kpi('Earned · 30 days',fmt(a.earned30),'<small>its share of the rake</small>')+kpi('Its network',a.network.players+' players','<small>'+a.network.accounts+' accounts · credit '+fmt(a.network.balance)+' · rake 30 d '+fmt(a.network.rake)+'</small>'))+'</div>'
-   +'<div class="udActions"><label>Amount (€)<input type="number" id="udAmount" min="0.01" step="0.01" placeholder="0.00"></label><button type="button" class="sendButton" data-ud="send">+ Send credit</button><button type="button" data-ud="return">↙ Take back</button>'
+   +(staff()?'<p class="muted udHint">View only. You manage the accounts directly under you in <b>Accounts</b>.</p>':'<div class="udActions"><label>Amount (€)<input type="number" id="udAmount" min="0.01" step="0.01" placeholder="0.00"></label><button type="button" class="sendButton" data-ud="send">+ Send credit</button><button type="button" data-ud="return">↙ Take back</button>'
    +'<button type="button" class="ghostButton" data-ud="password">🔑 New password</button>'+(isPlayer?'<button type="button" class="ghostButton" data-ud="mute">🔇 '+(u.mutedUntil?'Unmute':'Mute')+'</button>':'')
    +(u.share!=null&&a.path.length===1?'<button type="button" class="ghostButton" data-ud="share">％ Share</button>':'')
    +'<button type="button" class="ghostButton '+(u.blocked?'':'dangerButton')+'" data-ud="block">'+(u.blocked?'✓ Unblock':'⛔ Block')+'</button></div>'
-   +'<p class="muted udHint">The centre can act on every account. Credit sent is created by the centre; credit taken back leaves circulation. Both are written in the credit history.</p>'
+   +'<p class="muted udHint">The centre can act on every account. Credit sent is created by the centre; credit taken back leaves circulation. Both are written in the credit history.</p>')
    +(isPlayer&&all?'<h3>Play</h3><div class="udStats"><div><small>Hands · all time</small><b>'+all.hands+'</b></div><div><small>Won / lost · all time</small>'+signed(all.net)+'</div><div><small>Hands won</small><b>'+(all.hands?Math.round(all.won/all.hands*100):0)+'%</b></div><div><small>Plays the hand (VPIP)</small><b>'+(all.hands?Math.round(all.vpip/all.hands*100):0)+'%</b></div><div><small>Best hand</small>'+signed(all.best)+'</div><div><small>Worst hand</small>'+signed(all.worst)+'</div></div>'
     +'<div class="tableScroll"><table class="dataTable"><thead><tr><th>When</th><th>Table</th><th>Cards</th><th>Result</th></tr></thead><tbody>'+(a.hands.map(h=>'<tr data-hand="'+h.id+'" class="clickRow"><td>'+when(h.time)+'</td><td>'+safe(h.table)+'</td><td>'+h.cards.map(card).join('')+'</td><td class="num">'+signed(h.result)+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">No hands yet.</td></tr>')+'</tbody></table></div>':'')
    +(a.children.length?'<h3>Directly below ('+a.children.length+')</h3><div class="udChildren">'+a.children.map(c=>'<button type="button" data-open="'+safe(c.id)+'"><b>'+safe(c.username)+'</b><small>'+safe(roleNames[c.role])+' · '+fmt(c.balance)+(c.blocked?' · blocked':c.online?' · online':'')+'</small></button>').join('')+'</div>':'')
    +'<h3>Credit movements</h3><div class="tableScroll"><table class="dataTable"><thead><tr><th>When</th><th>What</th><th>Details</th><th>Amount</th></tr></thead><tbody>'+(a.ledger.map(x=>'<tr><td>'+when(x.time)+'</td><td>'+safe(TYPES[x.type]||x.type)+(x.cash?' · cash-out':'')+'</td><td class="muted">'+safe(x.type==='RAKE'?(x.table||'')+(x.hand?' · hand '+x.hand:''):[x.from&&'from '+x.from,x.to&&'to '+x.to].filter(Boolean).join(' '))+'</td><td class="num">'+(x.amount?signed(x.amount):'—')+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">Nothing yet.</td></tr>')+'</tbody></table></div>'
-   +'<h3>Sign-ins</h3><p class="muted">Last sign-in '+when(u.lastLoginAt)+' · account since '+when(u.created)+' · '+u.devices+' device'+(u.devices===1?'':'s')+(u.ips.length?' · addresses: '+u.ips.map(safe).join(', '):'')+'</p>';}
+   +'<h3>Sign-ins</h3><p class="muted">Last sign-in '+when(u.lastLoginAt)+' · account since '+when(u.created)+(u.devices==null?'':' · '+u.devices+' device'+(u.devices===1?'':'s'))+(u.ips.length?' · addresses: '+u.ips.map(safe).join(', '):'')+'</p>';}
  async function drawerClick(e){
   if(e.target===$('#userDrawer')){$('#userDrawer').close();return;}
   const o=e.target.closest('[data-open]');if(o){openUser(o.dataset.open);return;}
@@ -206,5 +225,7 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
  function csv(name,head,rows){const esc=v=>{const s=String(v??'');return /[",\n;]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
   const blob=new Blob(['﻿'+[head,...rows].map(r=>r.map(esc).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 
- return {setupNav,onOpen,openUser};
+ // Administrators and managers: the network page and the profile drawer, without the centre's menu.
+ function setupStaff(){ensurePages();}
+ return {setupNav,onOpen,openUser,setupStaff,loadUsers};
 }

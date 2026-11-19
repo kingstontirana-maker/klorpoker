@@ -1115,3 +1115,12 @@ Gjithçka lexohet nga ledger-i dhe historiku i duarve. Ditët janë sipas orës 
 - **Lëvizjet e kredisë**: kredi nga CENB, kredi e marrë mbrapsht, kthime te lojtarët, rikreditim. Për të gjithë botët shfaqen edhe qendra ↔ CENB dhe rake → kuleta.
 - "Rikrediti botat" tani regjistron lëvizjen për çdo bot (`BOT_RESTORE`).
 - Rruga e re: `/api/bots/report`.
+
+## Rrjeti për adminin dhe menaxherin (2026-11-19)
+
+- Menyja "My network" (admin, menaxher) tregon këdo poshtë tyre, në çdo nivel: agjentët, lojtarët e tyre etj. Për secilin: portofoli, chipsat, duart, fitimi ose humbja, rake-u, zinxhiri.
+- Butoni **🌳 Hierarchy** e shfaq rrjetin si pemë, me kredinë dhe lojtarët e çdo dege.
+- Profili i një anëtari hapet vetëm për lexim. Veprimet mbi llogaritë direkte mbeten te "Accounts".
+- Privatësia: stafi nuk sheh email, adresa IP ose pajisje. Nuk sheh as llogari jashtë rrjetit të vet (`/api/network/users`, `/api/network/user`).
+- Qendra ka të njëjtën pamje 🌳 te "All users", për gjithë platformën.
+- Lart djathtas, qendra sheh kredinë në qarkullim.

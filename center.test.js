@@ -56,3 +56,12 @@ test('every account, with its chain, its money and what it played; one account i
  assert.equal(center.account('b'),null,'bots are CENB\'s');assert.equal(center.account('c'),null);
  const pl=center.account('p');assert.ok(pl.ledger.some(x=>x.type==='CRYPTO_DEPOSIT'&&x.amount===25));assert.ok(pl.ledger.some(x=>x.type==='RAKE'&&x.amount===-1));
 });
+
+test('a member sees only its own network, without e-mails, addresses or devices',()=>{
+ const {db,center}=world();db.users.find(u=>u.id==='p').email='pl@example.com';db.users.find(u=>u.id==='p').seenIps=['1.2.3.4'];
+ const d=center.directory({rootId:'a'});assert.deepEqual(d.rows.map(r=>r.username).sort(),['agt','old','pl'],'everyone under the admin, not the admin itself');
+ assert.equal(d.rows.find(r=>r.username==='pl').email,null);
+ assert.deepEqual(center.directory({rootId:'g'}).rows.map(r=>r.username).sort(),['old','pl']);
+ const a=center.account('p','a');assert.deepEqual(a.path.map(x=>x.username),['adm','agt'],'the chain starts at the member');assert.deepEqual(a.user.ips,[]);assert.equal(a.user.email,null);
+ assert.equal(center.account('a','g'),null,'nothing above or beside it');assert.deepEqual(center.account('p').user.ips,['1.2.3.4']);
+});

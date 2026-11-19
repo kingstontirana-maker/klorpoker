@@ -163,6 +163,8 @@ if(p==='/api/state')return stateFor(u);
 // The centre chooses the agent who receives every new player.
 if(p==='/api/signup/agents'){roleCheck(u,'CENTER');return {agentId:signupAgent()?.id||null,mail:mailConfigured(),agents:db.users.filter(x=>x.role==='AGENT'&&!x.blocked).map(x=>({id:x.id,username:x.username}))};}
 if(p==='/api/signup/agent'){roleCheck(u,'CENTER');const id=String(body.id||''),a=db.users.find(x=>x.id===id&&x.role==='AGENT'&&!x.blocked);if(!a)fail('Choose an active agent');db.signupAgentId=a.id;save();return {agentId:a.id};}
+if(p==='/api/network/users'){roleCheck(u,'ADMIN','MANAGER','AGENT');return {...centerView.directory({days:[7,30,90].includes(Number(body.days))?Number(body.days):30,rootId:u.id}),root:{id:u.id,username:u.username,role:u.role}};}
+if(p==='/api/network/user'){roleCheck(u,'ADMIN','MANAGER','AGENT');const a=centerView.account(body.id,u.id);if(!a)fail('This account is not in your network',404);return a;}
 if(p==='/api/center/users'){roleCheck(u,'CENTER');return centerView.directory({days:[7,30,90].includes(Number(body.days))?Number(body.days):30});}
 if(p==='/api/center/user'){roleCheck(u,'CENTER');const a=centerView.account(body.id);if(!a)fail('Account not found',404);return a;}
 if(p==='/api/center/report'){roleCheck(u,'CENTER');return centerView.report(body);}

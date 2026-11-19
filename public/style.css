@@ -587,3 +587,15 @@ html{touch-action:manipulation}
 .statCard.ckpi{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;align-items:start}
 .statCard.ckpi>strong{grid-column:auto;grid-row:auto}.statCard.ckpi>small{margin-top:0}
 @media(max-width:760px){.statCard.ckpi{padding:14px}.statCard.ckpi>strong{font-size:20px;margin:4px 0 2px}.cxKpis .ckpi strong{font-size:18px}.cxTop>div{padding:16px}.cxOwed strong,.cxScan strong{font-size:18px}.cxTabs{flex-wrap:nowrap;overflow-x:auto}.cxTabs button{flex-shrink:0;padding:10px 10px}}
+
+/* Network hierarchy */
+#uTree.on{background:#1b372b;border-color:#31523f;color:#92efbf}
+.uTree{display:grid;gap:6px;font-size:13px}.utRoot{font-weight:700;color:#92efbf;padding:6px 2px 4px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.utNode>summary,.utLeaf{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 14px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#0e1918;cursor:pointer;list-style:none}
+.utNode>summary::-webkit-details-marker{display:none}.utNode>summary::before{content:'▸';color:var(--muted);margin-right:-6px}.utNode[open]>summary::before{content:'▾'}
+.utLeaf{cursor:default;background:#0b1413}.utKids{display:grid;gap:6px;margin:6px 0 2px 22px;padding-left:12px;border-left:1px dashed #2f4a43}
+.utName{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;min-width:180px}.utName .linkBtn{color:#fff;font-weight:600;text-decoration:none}.utName .linkBtn:hover{text-decoration:underline}.utName.hit .linkBtn{color:#ffd07a}
+.utNums{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:12px}.utNums b{color:#e6f2ee;font-weight:600}
+@media(max-width:560px){.utKids{margin-left:8px;padding-left:8px}}
+.uTools{grid-template-columns:minmax(180px,2fr) repeat(5,minmax(110px,1fr)) auto auto}.uCounts{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+@media(max-width:1200px){.uTools{grid-template-columns:1fr 1fr 1fr}}@media(max-width:560px){.uTools{grid-template-columns:1fr 1fr}.uCounts{grid-template-columns:repeat(3,minmax(0,1fr))}}

@@ -24,5 +24,5 @@ const P={
 };
 export const icon=name=>P[name]?'<svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+P[name]+'</svg>':'';
 // Which icon each side-menu page shows.
-export const NAV_ICONS={overview:'overview',accounts:'users',reports:'report',moderation:'flag',history:'history',revenue:'revenue',rake:'percent',crypto:'wallet',tables:'table',inspect:'eye',hands:'cards',security:'shield',database:'database',activity:'activity',settings:'settings',profile:'account'};
+export const NAV_ICONS={overview:'overview',accounts:'users',users:'users',reports:'report',moderation:'flag',history:'history',revenue:'revenue',rake:'percent',crypto:'wallet',tables:'table',inspect:'eye',hands:'cards',security:'shield',database:'database',activity:'activity',settings:'settings',profile:'account'};
 export function paintNavIcons(root=document){for(const b of root.querySelectorAll('.navItem[data-panel]')){const s=b.querySelector('span:first-child'),n=NAV_ICONS[b.dataset.panel];if(s&&n&&!s.querySelector('svg')){s.innerHTML=icon(n);s.classList.add('navIcon');}}}
