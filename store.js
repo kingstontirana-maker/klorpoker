@@ -193,6 +193,17 @@ export function openStore(file){
   // Every bot's result over all the hands it ever finished (euros), for the bot list.
   botPlayTotals(){return sql.prepare('SELECT user_id AS id,COUNT(*) AS hands,SUM(result) AS net FROM hand_players WHERE bot=1 GROUP BY user_id').all();},
   botResults(since,until){return sql.prepare('SELECT hp.user_id AS id,hp.username AS name,h.table_id AS tableId,CAST(hp.started_at/3600000 AS INTEGER) AS hour,COUNT(*) AS hands,SUM(hp.result) AS net,SUM(hp.won) AS won FROM hand_players hp JOIN hands h ON h.id=hp.hand_id WHERE hp.bot=1 AND hp.started_at>=? AND hp.started_at<? GROUP BY hp.user_id,h.table_id,hour').all(since,until);},
+  // For each bot and each opponent who shared its hands: what the bot won from them and lost to them.
+  // In a hand, the bot's win comes from the players who lost, in proportion to what each lost;
+  // a bot's loss goes to the winners in proportion to what each won (the rest of it is the rake).
+  botOpponents(since,until,botId=''){return sql.prepare(`WITH hs AS (SELECT hand_id,SUM(CASE WHEN result<0 THEN -result ELSE 0 END) AS L FROM hand_players WHERE started_at>=? AND started_at<? GROUP BY hand_id)
+   SELECT a.user_id AS bot,o.user_id AS id,MAX(o.username) AS name,MAX(o.bot) AS isBot,COUNT(*) AS hands,
+    SUM(CASE WHEN hs.L>0 AND a.result>0 AND o.result<0 THEN a.result*(-o.result)/hs.L ELSE 0 END) AS won,
+    SUM(CASE WHEN hs.L>0 AND a.result<0 AND o.result>0 THEN (-a.result)*o.result/hs.L ELSE 0 END) AS lost
+   FROM hand_players a JOIN hand_players o ON o.hand_id=a.hand_id AND o.user_id<>a.user_id JOIN hs ON hs.hand_id=a.hand_id
+   WHERE a.bot=1 AND a.started_at>=? AND a.started_at<? AND (?='' OR a.user_id=?) GROUP BY a.user_id,o.user_id`).all(since,until,since,until,botId,botId).map(r=>({...r}));},
+  // One bot's hands in a period, newest first.
+  botHands(botId,since,until,before=Number.MAX_SAFE_INTEGER,limit=50){return sql.prepare('SELECT h.data FROM hand_players p JOIN hands h ON h.id=p.hand_id WHERE p.user_id=? AND p.started_at>=? AND p.started_at<? AND p.hand_id<? ORDER BY p.hand_id DESC LIMIT ?').all(botId,since,until,before,limit).map(r=>JSON.parse(r.data));},
   botRake(since,until){return sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND time>=? AND time<? AND instr(data,'\"bot\":true')>0").all(since,until).map(r=>{const x=JSON.parse(r.data);return {time:x.time,tableId:x.tableId,allocations:(x.allocations||[]).filter(a=>a.bot)};});},
   close(){sql.close();},
  };

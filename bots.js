@@ -150,6 +150,32 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
   return {from,to,today,tableId,botId,totals:{...out(T),bots:byBot.size,tables:byTable.size,winRate:T.hands?Math.round(T.won/T.hands*1000)/10:0},
    days,bots:[...byBot.values()].map(out).sort((a,b)=>b.profit-a.profit),tables:[...byTable.values()].map(out).sort((a,b)=>b.profit-a.profit),
    wallets:wallets(),choices:{bots:bots().map(b=>({id:b.id,name:b.username})).sort((a,b)=>a.name.localeCompare(b.name)),tables:[...runtime.values()].map(t=>({id:t.id,name:t.name}))}};}
+ // ---- One bot (or all of them) in full: result, who gave it money and who took it, every movement ----
+ const MOVES=['BOT_FUND','BOT_REFUND','BOT_RETURN','BOT_RESTORE'],CENB_MOVES=['CENB_CREDIT','CENB_RETURN','CENB_RAKE','CENB_RESTORE'];
+ function botReport(body={}){
+  const P=profitReport(body),botId=P.botId,since=dayStart(P.from),until=dayStart(new Date(Date.parse(P.to+'T12:00:00Z')+86400000).toISOString().slice(0,10));
+  const name=id=>db.users.find(u=>u.id===id)?.username;
+  // Who gave the bots money and who took it.
+  const opp=new Map();let internal={hands:0,moved:0};
+  for(const r of store?.botOpponents?store.botOpponents(since,until,botId||''):[]){
+   if(!botId&&r.isBot){internal.hands+=r.hands;internal.moved+=Math.round(r.won*100);continue;}// bots against bots: the money stays in CENB
+   const o=opp.get(r.id)||opp.set(r.id,{id:r.id,name:name(r.id)||r.name,bot:!!r.isBot,hands:0,won:0,lost:0}).get(r.id);o.hands+=r.hands;o.won+=Math.round(r.won*100);o.lost+=Math.round(r.lost*100);}
+  const opponents=[...opp.values()].map(o=>({...o,won:o.won/100,lost:o.lost/100,net:(o.won-o.lost)/100})).sort((a,b)=>Math.abs(b.net)-Math.abs(a.net)||b.hands-a.hands);
+  const vsPlayers=opponents.filter(o=>!o.bot).reduce((n,o)=>n+o.net,0);
+  // Every movement of credit: funding, taking back, re-crediting, returns to players; and CENB's own.
+  const types=botId?MOVES:[...MOVES,...CENB_MOVES],set=new Set(types);
+  const rows=[...(store?.ledgerOlder?store.ledgerOlder(types,since):[]),...db.ledger.filter(x=>set.has(x.type)&&x.time>=since)].filter(x=>x.time<until&&(!botId||x.to===botId));
+  const sign={BOT_FUND:1,BOT_REFUND:-1,BOT_RETURN:-1,BOT_RESTORE:1,CENB_CREDIT:1,CENB_RETURN:-1,CENB_RAKE:1,CENB_RESTORE:1};
+  const moves=rows.sort((a,b)=>b.time-a.time).slice(0,500).map(x=>({time:x.time,type:x.type,bot:x.type.startsWith('BOT_')?name(x.to)||'—':null,amount:(sign[x.type]||1)*(x.amount||0)/100,
+   detail:x.type==='BOT_RETURN'?'hand '+(x.hand??'')+(x.tableId?' · '+(runtime.get(String(x.tableId))?.name||''):''):x.type==='BOT_REFUND'&&x.reclaim?'collected':x.type==='CENB_RESTORE'?(x.bots||0)+' bots':''}));
+  const sum=t=>rows.filter(x=>x.type===t).reduce((n,x)=>n+(x.amount||0),0)/100;
+  const credit={funded:sum('BOT_FUND'),taken:sum('BOT_REFUND'),returned:sum('BOT_RETURN'),restored:rows.filter(x=>x.type==='BOT_RESTORE').reduce((n,x)=>n+(x.amount||0),0)/100};
+  // One bot: its hands, with the opponents and what each won or lost.
+  let hands=[];if(botId&&store?.botHands)hands=store.botHands(botId,since,until,Number(body.before)||Number.MAX_SAFE_INTEGER,60).map(h=>{const me=(h.players||[]).find(p=>p.userId===botId);
+   return {id:h.id,time:h.startedAt,table:h.table,hand:h.hand,cards:me?.cards||[],board:h.board||[],result:Number(me?.result)||0,folded:!!me?.folded,
+    opponents:(h.players||[]).filter(p=>p.userId!==botId).map(p=>({name:name(p.userId)||p.username,bot:!!p.bot,result:Number(p.result)||0}))};});
+  const bot=botId?list().find(b=>b.id===botId)||null:null;
+  return {...P,bot,opponents,vsPlayers:Math.round(vsPlayers*100)/100,internal:{hands:internal.hands,moved:internal.moved/100},credit,moves,hands};}
  function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
@@ -307,7 +333,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(!free.length)fail(seated?'Every bot is at a table: press "Ndalo të gjithë", wait for the hands to end, then try again':'There are no bots');
    const pool=free.reduce((n,b)=>n+b.balance,0)+wallet,need=free.reduce((n,b)=>n+Math.max(0,b.bot.funded||0),0);
    const ratio=need>0&&pool<need?pool/need:1;let given=0;
-   for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);b.balance=target;b.bot.baseline=target;b.bot.rakeBase=rakeOf(b.id);given+=target;}
+   for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);if(target!==b.balance)audit('BOT_RESTORE',b,target-b.balance,{before:b.balance,after:target});b.balance=target;b.bot.baseline=target;b.bot.rakeBase=rakeOf(b.id);given+=target;}
    const left=pool-given;db.cenbRake=0;W.credit+=left;
    db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,rakeUsed:wallet,toProfit:left,time:Date.now()});save();
    return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:W.credit/100,walletChange:left/100};}
@@ -339,6 +365,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    else if(a==='rake'){const have=Number(db.cenbRake)||0;if(n>have)fail('The bots\' rake holds only €'+(have/100).toFixed(2));db.cenbRake=have-n;W.credit+=n;db.ledger.push({id:crypto.randomUUID(),type:'CENB_RAKE',from:'cenb-rake',to:'cenb',amount:n,time:Date.now()});}
    else fail('Unknown wallet action');save();return {ok:true,wallets:wallets()};}
   if(p==='/api/bots/profit')return profitReport(body);
+  if(p==='/api/bots/report')return botReport(body);
   if(p==='/api/bots/watch'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);
    const view=engine.snapshot(t,null,false);delete view.chat;
    const info={};for(const s of t.seats){if(!s?.isBot)continue;const b=bots().find(x=>x.id===s.userId);if(!b)continue;

@@ -1099,3 +1099,20 @@ Gjithçka lexohet nga ledger-i dhe historiku i duarve. Ditët janë sipas orës 
 - sa u detyrohet lojtarëve, dhe nëse wallet-i e mbulon;
 - KPI për 24 orë, 7 ditë dhe 30 ditë;
 - tab-et: Withdrawals (To approve / To pay / Checking / History), Deposits, Without a deposit, Blocked fakes, Settings, How it is protected.
+
+## CENB: raporti i botëve (2026-11-19)
+
+- Çdo bot ka ikonën **📊**, që hap raportin e tij.
+- Tab-i **Raporti** te CENB: periudha (Sot, Dje, 7 ditë, 30 ditë, Ky muaj, Muaji i kaluar ose data me dorë), një bot ose të gjithë.
+- Raporti tregon:
+  - **Fitoi / humbi**: në tavolina + rake-un, që mbetet te CENB;
+  - **kundër lojtarëve të vërtetë**;
+  - duart dhe kreditin (dhënë / marrë mbrapsht).
+- **Kush i dha para dhe kush i mori**, llogaritur dorë për dorë nga historiku i duarve (`store.botOpponents`):
+  - kur boti fiton, paratë vijnë nga ata që humbën në atë dorë, në proporcion me humbjen;
+  - kur humbet, shkojnë te fituesit, dhe pjesa tjetër është rake.
+  Për të gjithë botët, bot kundër bot shfaqet veçmas, sepse ato para mbeten te CENB.
+- Për një bot: çdo dorë, me letrat, tabelën, kundërshtarët dhe rezultatin e secilit.
+- **Lëvizjet e kredisë**: kredi nga CENB, kredi e marrë mbrapsht, kthime te lojtarët, rikreditim. Për të gjithë botët shfaqen edhe qendra ↔ CENB dhe rake → kuleta.
+- "Rikrediti botat" tani regjistron lëvizjen për çdo bot (`BOT_RESTORE`).
+- Rruga e re: `/api/bots/report`.

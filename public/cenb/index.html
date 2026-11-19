@@ -21,8 +21,12 @@
   <div id="banner" class="banner hidden"></div>
   <section class="kpis" id="kpis"></section>
   <nav class="tabs" id="tabs">
-   <button data-tab="bots" class="on">Botat <em id="nBots">0</em></button><button data-tab="profit">Profiti</button><button data-tab="fill">Mbush tavolinat</button><button data-tab="new">Krijo</button><button data-tab="tables">Tavolinat <em id="nTables">0</em></button><button data-tab="players">Lojtarët</button><button data-tab="moves">Vendimet</button><button data-tab="limits">Limitet</button><button data-tab="log">Aktiviteti</button>
+   <button data-tab="bots" class="on">Botat <em id="nBots">0</em></button><button data-tab="profit">Profiti</button><button data-tab="report">Raporti</button><button data-tab="fill">Mbush tavolinat</button><button data-tab="new">Krijo</button><button data-tab="tables">Tavolinat <em id="nTables">0</em></button><button data-tab="players">Lojtarët</button><button data-tab="moves">Vendimet</button><button data-tab="limits">Limitet</button><button data-tab="log">Aktiviteti</button>
   </nav>
+  <section data-pane="report" class="hidden"><div class="card">
+   <div class="pfHead"><h2 id="rpTitle">Raporti i botëve</h2><div class="pfPresets" id="rpPresets"><button type="button" data-p="today" class="on">Sot</button><button type="button" data-p="yesterday">Dje</button><button type="button" data-p="7">7 ditë</button><button type="button" data-p="30">30 ditë</button><button type="button" data-p="month">Ky muaj</button><button type="button" data-p="lastmonth">Muaji i kaluar</button></div></div>
+   <div class="pfFilters"><label>Nga<input type="date" id="rpFrom"></label><label>Deri<input type="date" id="rpTo"></label><label>Boti<select id="rpBot"><option value="">Të gjithë botat</option></select></label></div>
+   <div id="rpBody"><div class="empty">Duke ngarkuar…</div></div></div></section>
   <section data-pane="profit" class="hidden"><div class="card">
    <div class="pfHead"><h2>Profiti i CENB</h2><div class="pfPresets" id="pfPresets"><button type="button" data-p="today" class="on">Sot</button><button type="button" data-p="yesterday">Dje</button><button type="button" data-p="7">7 ditë</button><button type="button" data-p="30">30 ditë</button><button type="button" data-p="month">Ky muaj</button><button type="button" data-p="lastmonth">Muaji i kaluar</button></div></div>
    <div class="pfFilters"><label>Nga<input type="date" id="pfFrom"></label><label>Deri<input type="date" id="pfTo"></label><label>Boti<select id="pfBot"><option value="">Të gjithë botat</option></select></label><label>Tavolina<select id="pfTable"><option value="">Të gjitha tavolinat</option></select></label></div>

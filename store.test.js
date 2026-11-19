@@ -109,3 +109,20 @@ test('database browser: every table, newest first, secrets masked, read-only',as
  assert.throws(()=>s.browseRows('users; DROP TABLE users'),/Unknown table/);assert.equal(s.browseRows('users').total,1,'nothing was dropped');
  s.close();fs.rmSync(dir,{recursive:true,force:true});
 });
+
+test('who each bot won from and lost to, hand by hand; its hands in a period',()=>{
+ const s=openStore(path.join(tmp(),'bots.db'));s.commit(sample());
+ const P=(id,name,result,bot)=>({userId:id,username:name,result,...(bot?{bot:true}:{})});
+ // Hand 1: the bot wins 3: Ana lost 2, Besi lost 1 → 2 from Ana, 1 from Besi.
+ s.addHand({id:1,tableId:'1',table:'One',startedAt:1000,players:[P('b','Bot1',3,true),P('u','Ana',-2),P('v','Besi',-1)],winners:['Bot1']});
+ // Hand 2: the bot loses 4: Ana won 3, rake 1 → 3 to Ana (the rest went to the rake).
+ s.addHand({id:2,tableId:'1',table:'One',startedAt:2000,players:[P('b','Bot1',-4,true),P('u','Ana',3)],winners:['Ana']});
+ // Hand 3: two bots: Bot1 wins 2 from Bot2.
+ s.addHand({id:3,tableId:'1',table:'One',startedAt:3000,players:[P('b','Bot1',2,true),P('c2','Bot2',-2,true)],winners:['Bot1']});
+ const rows=s.botOpponents(0,10000,'b'),by=id=>rows.find(r=>r.id===id);
+ assert.deepEqual([by('u').hands,by('u').won,by('u').lost],[2,2,3],'Ana gave it 2 and took 3');
+ assert.deepEqual([by('v').won,by('v').lost],[1,0]);assert.deepEqual([by('c2').won,by('c2').isBot],[2,1]);
+ assert.equal(s.botOpponents(0,1500,'b').length,2,'only the period');
+ assert.deepEqual(s.botHands('b',0,10000).map(h=>h.id),[3,2,1]);assert.deepEqual(s.botHands('b',1500,10000,3).map(h=>h.id),[2]);
+ s.close();
+});

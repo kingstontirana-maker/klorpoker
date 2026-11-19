@@ -85,7 +85,7 @@ function renderBots(force=false){
   +'<span class="rowMetric"><small>Kjo seancë</small>'+signed(b.session)+'</span>'
   +'<span class="rowMetric" title="Rake-u i paguar nga boti mbetet te CENB, prandaj nuk numërohet si humbje"><small>Fitimi total</small>'+signed(b.total)+'</span>'
   +'<span class="rowMetric"><small>Duar</small><strong>'+b.hands+'</strong></span>'
-  +'<span class="botChevron" aria-hidden="true">'+(open?'−':'+')+'</span></button>'
+  +'<span class="botChevron" aria-hidden="true">'+(open?'−':'+')+'</span></button><button type="button" class="botReport" data-act="report" title="Raporti i '+safe(b.name)+'" aria-label="Raporti i '+safe(b.name)+'">📊</button>'
   +'<div id="bot-details-'+safe(b.id)+'" class="botDetails"'+(open?'':' hidden')+'>'+(open?'<h2>Statistikat · '+safe(b.name)+'</h2><div class="tag">'+(b.tableId==='auto'?'Auto · '+b.buyinBB+' BB'+(b.maxBB>0?' · deri '+eur(b.maxBB)+' BB':''):safe(b.tableName)+' · '+eur(b.buyin))+' · humbje max '+eur(b.stopLoss)+(b.stopWin>0?' · fitim max '+eur(b.stopWin):'')+' · '+(b.waitForPlayers?'ulet direkt':'ulet kur ka lojtarë')+'</div>'
   +'<div class="stats"><div><small>Portofol + stack</small><b>'+eur(b.equity)+'</b></div><div><small>Kjo seancë</small>'+signed(b.session)+'</div><div><small>Që nga krijimi</small>'+signed(b.total)+'</div><div><small>Duar</small><b>'+b.hands+'</b></div><div><small>Rake i paguar · mbetet te CENB</small><b>'+eur(b.rakePaid)+'</b></div><div><small>Pa e numëruar rake-un</small>'+signed(b.net??0)+'</div></div>'
   +'<div class="stats returnStats"><div><small>Kthyer te lojtarët</small><b>'+eur(b.returned)+'</b></div><div><small>Në dispozicion për kthim</small><b>'+eur(b.returnAvailable)+'</b></div></div>'
@@ -98,6 +98,7 @@ function renderBots(force=false){
 $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn)return;const id=btn.closest('[data-id]').dataset.id,act=btn.dataset.act,b=data.bots.find(x=>x.id===id);
  try{
   if(act==='details'){expandedBot=expandedBot===id?null:id;editing=null;renderBots(true);return;}
+  if(act==='report'){openReport(id);return;}
   else if(act==='start'){await api('bots/status',{id,enabled:true});toast(b.name+' u nis');}
   else if(act==='stop'){await api('bots/status',{id,enabled:false});toast(b.name+' u ndal');}
   else if(act==='edit'){editing=editing===id?null:id;renderBots(true);return;}
@@ -340,3 +341,35 @@ $('#liveCtrl').addEventListener('click',e=>{const btn=e.target.closest('[data-lc
 $('#liveCtrl').addEventListener('submit',e=>{e.preventDefault();const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;const f=new FormData(e.target);
  liveDo(async()=>{await api('bots/live',{id:b.id,risk:f.get('risk'),botClash:f.get('botClash'),mode:f.get('mode'),stopLoss:f.get('stopLoss'),stopWin:f.get('stopWin')||0});toast(s.username+' u ndryshua · luan me të tani');});});
 $('#seatTables').addEventListener('click',e=>{const w=e.target.closest('[data-watch]');if(w)openLive(w.dataset.watch);});
+
+// ---- Report: one bot or all of them, for any period: result, who gave money and who took it, every movement ----
+const MOVE={BOT_FUND:'Kredi nga CENB',BOT_REFUND:'Kredi e marrë mbrapsht',BOT_RETURN:'Kthim te lojtari',BOT_RESTORE:'Rikreditim',CENB_CREDIT:'Qendra → CENB',CENB_RETURN:'CENB → qendra',CENB_RAKE:'Rake → kuleta CENB',CENB_RESTORE:'Rikreditimi i botëve'};
+const RSUIT={s:'♠',h:'♥',d:'♦',c:'♣'},rc=c=>'<b class="rc'+('hd'.includes(c[1])?' red':'')+'">'+(c[0]==='T'?'10':c[0])+RSUIT[c[1]]+'</b>';
+let rpBusy=false,rpData=null;
+function openReport(botId){$('#tabs [data-tab="report"]').click();if(!$('#rpFrom').value)rpPreset('today',false);$('#rpBot').value=botId||'';if(botId&&![...$('#rpBot').options].some(o=>o.value===botId))$('#rpBot').insertAdjacentHTML('beforeend','<option value="'+safe(botId)+'">…</option>');$('#rpBot').value=botId||'';loadReport();}
+function rpPreset(p,load=true){$$('#rpPresets [data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));const [f,t]=presetRange(p);$('#rpFrom').value=f;$('#rpTo').value=t;if(load)loadReport();}
+async function loadReport(){if(rpBusy)return;rpBusy=true;try{rpData=await api('bots/report',{from:$('#rpFrom').value,to:$('#rpTo').value,botId:$('#rpBot').value});renderReport(rpData);}catch(err){toast(err.message,true);}finally{rpBusy=false;}}
+function renderReport(r){
+ const sel=$('#rpBot'),keep=sel.value;sel.innerHTML='<option value="">Të gjithë botat</option>'+r.choices.bots.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');sel.value=keep;
+ const T=r.totals,b=r.bot,one=!!r.botId,kpi=(k,v,n='')=>'<div class="kpi"><small>'+k+'</small>'+v+(n?'<span>'+n+'</span>':'')+'</div>';
+ const n=v=>'<td class="num">'+v+'</td>',s=v=>'<td class="num">'+signed(v)+'</td>',when=t=>new Date(t).toLocaleString('en-GB',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+ $('#rpTitle').textContent=one?'Raporti · '+(b?.name||'boti'):'Raporti i botëve';
+ let h=one&&b?'<div class="rpBot"><span class="avatar">'+safe(b.name[0].toUpperCase())+'</span><div><strong>'+safe(b.name)+'</strong><small>'+safe(statusSq(b.status))+' · '+safe(b.style)+' · portofol + stack '+eur(b.equity)+' · që nga krijimi '+(b.total>=0?'+':'')+eur(b.total)+'</small></div><button type="button" class="small" data-rp-all>← Të gjithë botat</button></div>':'';
+ h+='<div class="kpis">'+kpi(one?'Fitoi / humbi':'Profiti i CENB',signed(T.profit),'në tavolina '+(T.net>=0?'+':'')+eur(T.net)+' + rake '+eur(T.rake))
+  +kpi('Kundër lojtarëve të vërtetë',signed(r.vsPlayers),'para që lojtarët i dhanë ose morën')
+  +kpi('Rake i paguar','<b>'+eur(T.rake)+'</b>','mbetet te CENB, nuk është humbje')
+  +kpi('Duar','<b>'+T.hands+'</b>',T.winRate+'% të fituara')
+  +(one?'':kpi('Bot kundër bot','<b>'+eur(r.internal.moved)+'</b>','lëvizën mes botëve · mbeten te CENB'))
+  +kpi('Kredi','<b>+'+eur(r.credit.funded)+' / −'+eur(r.credit.taken)+'</b>','dhënë botëve / marrë mbrapsht'+(r.credit.returned?' · kthyer lojtarëve '+eur(r.credit.returned):''))+'</div>';
+ h+='<h3>Kush i dha para dhe kush i mori '+(one?'këtij boti':'botëve')+'</h3><p class="muted rpNote">Llogaritur dorë për dorë: kur boti fiton, paratë vijnë nga ata që humbën në atë dorë; kur humbet, shkojnë te ata që fituan (pjesa tjetër është rake).</p>'
+  +'<div class="tableWrap">'+table(['Lojtari','Duar bashkë ','I dha botit ','Mori nga boti ','Neto për botin '],r.opponents.map(o=>'<tr><td>'+safe(o.name)+(o.bot?' <span class="pill">bot</span>':'')+'</td>'+n(o.hands)+n(eur(o.won))+n(eur(o.lost))+s(o.net)+'</tr>'),'Asnjë dorë me lojtarë në këtë periudhë.')+'</div>';
+ if(!one)h+='<h3>Sipas botit</h3><div class="tableWrap">'+table(['Boti','Duar ','Në tavolina ','Rake ','Profiti ',''],r.bots.map(x=>'<tr><td>'+safe(x.name)+'</td>'+n(x.hands)+s(x.net)+n(eur(x.rake))+s(x.profit)+'<td><button type="button" class="small" data-rp-bot="'+safe(x.id)+'">📊 Hap</button></td></tr>'),'Asnjë bot nuk ka luajtur në këtë periudhë.')+'</div>';
+ if(one)h+='<h3>Duart</h3><div class="tableWrap">'+table(['Koha','Tavolina','Letrat','Tabela','Kundërshtarët','Rezultati '],r.hands.map(x=>'<tr><td>'+when(x.time)+'</td><td>'+safe(x.table||'')+'</td><td>'+x.cards.map(rc).join('')+'</td><td>'+x.board.map(rc).join('')+'</td><td class="rpOpp">'+x.opponents.map(o=>safe(o.name)+(o.bot?' (bot)':'')+' <b class="'+(o.result>0?'up':o.result<0?'down':'')+'">'+(o.result>0?'+':'')+eur(o.result)+'</b>').join('<br>')+'</td>'+s(x.result)+'</tr>'),'Asnjë dorë në këtë periudhë.')+'</div>'+(r.hands.length>=60?'<p class="muted">Shfaqen 60 duart e fundit të periudhës.</p>':'');
+ h+='<h3>Lëvizjet e kredisë</h3><div class="tableWrap">'+table(['Koha','Lëvizja',...(one?[]:['Boti']),'Detaje','Shuma '],r.moves.map(m=>'<tr><td>'+when(m.time)+'</td><td>'+safe(MOVE[m.type]||m.type)+'</td>'+(one?'':'<td>'+safe(m.bot||'CENB')+'</td>')+'<td class="muted">'+safe(m.detail||'')+'</td>'+s(m.amount)+'</tr>'),'Asnjë lëvizje kredie në këtë periudhë.')+'</div>';
+ h+='<h3>Ditë për ditë</h3><div class="tableWrap">'+table(['Dita','Duar ','Në tavolina ','Rake ','Profiti '],r.days.slice().reverse().filter(d=>d.hands||d.rake).map(d=>'<tr><td>'+d.day+'</td>'+n(d.hands)+s(d.net)+n(eur(d.rake))+s(d.profit)+'</tr>'),'Asnjë dorë në këtë periudhë.')+'</div>';
+ $('#rpBody').innerHTML=h;}
+$('#rpPresets').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(b)rpPreset(b.dataset.p);});
+for(const id of ['#rpFrom','#rpTo'])$(id).addEventListener('change',()=>{$$('#rpPresets [data-p]').forEach(b=>b.classList.remove('on'));loadReport();});
+$('#rpBot').addEventListener('change',loadReport);
+$('#rpBody').addEventListener('click',e=>{const b=e.target.closest('[data-rp-bot]');if(b){$('#rpBot').value=b.dataset.rpBot;loadReport();return;}if(e.target.closest('[data-rp-all]')){$('#rpBot').value='';loadReport();}});
+$('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="report"]')&&!rpBusy){if(!$('#rpFrom').value)rpPreset('today');else loadReport();}});
