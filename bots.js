@@ -40,9 +40,9 @@ export function handOutcome(t,s){
   return tied?'tie':'win';
  }catch{return 'unknown';}
 }
-export function botClashView(v,isBotId,mode='balanced'){
+export function botClashView(v,isBotId,mode='balanced',capBB=0){
  const active=v.opponents.filter(o=>!o.folded);
- return {...v,botClash:active.length>0&&active.every(o=>isBotId(o.id))?mode:'off'};
+ return {...v,botClash:active.length>0&&active.every(o=>isBotId(o.id))?mode:'off',clashCap:capBB>0?Math.round(capBB*v.bb/2):0};
 }
 export const botDecision=(v,style='medium',random=Math.random)=>decide(v,style,random);
 
@@ -81,7 +81,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  // ---- House limits ----
  const g=db.botGuard??={};
  if(g.start!==undefined&&g.dayStart===undefined){g.dayStart=g.start;delete g.start;}
- for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
+ for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,clashCapBB:10,refillMinutes:10,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
  const PERIODS=[['day','dailyLimit','daily'],['week','weeklyLimit','weekly'],['month','monthlyLimit','monthly']];
  const tirana=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
  function keys(now){const day=tirana(now),[y,m,d]=day.split('-').map(Number),wd=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7,monday=new Date(Date.UTC(y,m-1,d-wd)).toISOString().slice(0,10);return {day,week:monday,month:day.slice(0,7)};}
@@ -102,7 +102,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  function periods(now=Date.now()){
   const k=keys(now);let value=null,changed=false;
   for(const [p,,name] of PERIODS)if(g[p]!==k[p]){value??=houseValue();g[p]=k[p];g[p+'Start']=value;changed=true;
-   for(const b of bots())if(b.bot.error===`House ${name} limit reached`){b.bot.error=null;b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);}}
+   for(const b of bots())if(b.bot.error===`House ${name} limit reached`){b.bot.error=null;b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;}}
   if(changed)save();value??=houseValue();
   return {day:value-g.dayStart,week:value-g.weekStart,month:value-g.monthStart};
  }
@@ -116,6 +116,28 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const playCache={at:0,map:null};
  const playTotals=()=>{if(!store?.botPlayTotals)return null;if(!playCache.map||Date.now()-playCache.at>10000){playCache.map=new Map(store.botPlayTotals().map(r=>[r.id,Math.round((r.net||0)*100)]));playCache.at=Date.now();}return playCache.map;};
  const sessionOf=b=>{const r=rakeOf(b.id);b.bot.rakeBase??=r;return equity(b)-b.bot.baseline+(r-b.bot.rakeBase);};
+ // b.bot.clash: what the bot won (+) or lost (−) against other bots, in cents, over all its hands.
+ // The stop-loss counts only what it lost to real players: bot-vs-bot money stays inside CENB.
+ const vsPlayers=b=>{b.bot.clashBase??=b.bot.clash||0;return sessionOf(b)-((b.bot.clash||0)-b.bot.clashBase);};
+ // After every hand: each bot's share with the other bots. A bot's win comes from the losers in
+ // proportion to what each lost; its loss goes to the winners in proportion to what each won.
+ function onHand(h){const ps=(h?.players||[]).map(p=>({id:p.userId,r:Math.round((Number(p.result)||0)*100)}));const L=ps.reduce((n,p)=>n+(p.r<0?-p.r:0),0);if(!L)return;
+  for(const a of ps){const b=db.users.find(u=>u.id===a.id);if(!b?.isBot||!a.r)continue;let x=0;
+   for(const o of ps)if(o!==a&&isBotId(o.id)){if(a.r>0&&o.r<0)x+=a.r*(-o.r)/L;else if(a.r<0&&o.r>0)x-=(-a.r)*o.r/L;}
+   if(x){b.bot.clashBase??=b.bot.clash||0;b.bot.clash=(b.bot.clash||0)+Math.round(x);}}}
+ // ---- 2. Automatic re-credit from the CENB wallet ----
+ // Every refillMinutes, a bot that is not at a table and has run short (it is on, or it stopped
+ // because its wallet was smaller than the buy-in) is filled back up to the credit it was funded
+ // with, from the CENB credit wallet, and starts again. Bots stopped by hand, by a loss limit
+ // against real players or by a house limit are never touched. No credit is created.
+ let lastRefill=Date.now();
+ function refill(now=Date.now()){lastRefill=now;if(db.botReclaim)return {bots:0,amount:0};let count=0,total=0;periods();
+  for(const b of bots()){if(seatOf(b))continue;const short=(b.bot.funded||0)-b.balance;if(short<=0)continue;
+   if(!(b.bot.enabled||b.bot.error==='Wallet smaller than the buy-in'))continue;
+   const n=Math.min(short,W.credit);if(n<=0)break;W.credit-=n;b.balance+=n;b.bot.baseline+=n;
+   audit('BOT_RESTORE',b,n,{auto:true,before:b.balance-n,after:b.balance});
+   if(!b.bot.enabled){b.bot.enabled=true;b.bot.error=null;}count++;total+=n;}
+  if(count)save();return {bots:count,amount:total/100};}
  // The first time the wallets exist, the period starts are taken again so the change of
  // formula is not seen as a profit or a loss.
  if(freshWallet){periods();const v=houseValue();for(const [p] of PERIODS)g[p+'Start']=v;delete db.cenbFlow;save();}
@@ -188,12 +210,12 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
   const rows=[...(store?.ledgerOlder?store.ledgerOlder(types,since):[]),...db.ledger.filter(x=>set.has(x.type)&&x.time>=since)].filter(x=>x.time<until&&(!botId||x.to===botId));
   const sign={BOT_FUND:1,BOT_REFUND:-1,BOT_RETURN:-1,BOT_RESTORE:1,CENB_CREDIT:1,CENB_RETURN:-1,CENB_RAKE:1,CENB_RESTORE:1};
   const moves=rows.sort((a,b)=>b.time-a.time).slice(0,500).map(x=>({time:x.time,type:x.type,bot:x.type.startsWith('BOT_')?name(x.to)||'—':null,amount:(sign[x.type]||1)*(x.amount||0)/100,
-   detail:x.type==='BOT_RETURN'?'hand '+(x.hand??'')+(x.tableId?' · '+(runtime.get(String(x.tableId))?.name||''):''):x.type==='BOT_REFUND'&&x.reclaim?'collected':x.type==='CENB_RESTORE'?(x.bots||0)+' bots':''}));
+   detail:x.type==='BOT_RETURN'?'hand '+(x.hand??'')+(x.tableId?' · '+(runtime.get(String(x.tableId))?.name||''):''):x.type==='BOT_REFUND'&&x.reclaim?'collected':x.type==='CENB_RESTORE'?(x.bots||0)+' bots':x.type==='BOT_RESTORE'&&x.auto?'automatic':''}));
   const sum=t=>rows.filter(x=>x.type===t).reduce((n,x)=>n+(x.amount||0),0)/100;
   const credit={funded:sum('BOT_FUND'),taken:sum('BOT_REFUND'),returned:sum('BOT_RETURN'),restored:rows.filter(x=>x.type==='BOT_RESTORE').reduce((n,x)=>n+(x.amount||0),0)/100};
   const bot=botId?list().find(b=>b.id===botId)||null:null;
   return {...P,bot,opponents,vsPlayers:Math.round(vsPlayers*100)/100,internal:{hands:internal.hands,moved:internal.moved/100},credit,moves};}
- function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
+ function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,clashCapBB:g.clashCapBB,refillMinutes:g.refillMinutes,nextRefill:g.refillMinutes>0?lastRefill+g.refillMinutes*60000:null,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
  // ---- What bots learn about real players: only public actions, over many hands ----
@@ -302,7 +324,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   for(const job of jobs){const {t,person,budget,topup,config,report}=job;let b=person.b;
    if(!b)b=create(u,person.name,budget,config,true);
    else{if(topup){W.credit-=topup;b.balance+=topup;b.bot.funded+=topup;audit('BOT_FUND',b,topup,{from:'cenb'});}configure(b,config);}
-   b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.error=null;
+   b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;b.bot.error=null;
    engine.sit(t,b,t.seats.findIndex(s=>!s),config.buyin,[...runtime.values()]);
    if(c.mode==='seat')engine.sitOut(t,b,true);
    audit('BOT_MANAGE',b,0,{enabled:true,fill:true});report.added++;
@@ -313,7 +335,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  // Moves the wallet of every bot that is not at a table back to the centre.
  // onlyOff: only the bots already stopped; the ones that play are left alone.
   function reclaim(onlyOff=false){const c=center();let returned=0,bots_=0;if(!c)return {returned,bots:0,waiting:0};periods();
-   for(const b of bots()){if(seatOf(b)||!(b.balance>0)||onlyOff&&b.bot.enabled)continue;const n=b.balance;W.credit+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.rakeBase=rakeOf(b.id);b.bot.enabled=false;audit('BOT_REFUND',b,n,{reclaim:true,from:b.id,to:'cenb'});returned+=n;bots_++;}
+   for(const b of bots()){if(seatOf(b)||!(b.balance>0)||onlyOff&&b.bot.enabled)continue;const n=b.balance;W.credit+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;b.bot.enabled=false;audit('BOT_REFUND',b,n,{reclaim:true,from:b.id,to:'cenb'});returned+=n;bots_++;}
    if(onlyOff)return {returned:returned/100,bots:bots_,waiting:0};
    const waiting=bots().filter(b=>seatOf(b)).length;if(!waiting)delete db.botReclaim;return {returned:returned/100,bots:bots_,waiting};}
  const stop=(b,reason,at)=>{b.bot.enabled=false;b.bot.error=reason||null;if(at)try{engine.leave(at.t,b);}catch{}save();};
@@ -335,6 +357,8 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    const next={};for(const [k,label] of [['dailyLimit','The daily limit'],['weeklyLimit','The weekly limit'],['monthlyLimit','The monthly limit'],['maxBB','The highest big blind']])if(body[k]!==undefined&&body[k]!==''){const n=Math.round(Number(body[k])*100);if(!Number.isSafeInteger(n)||n<0)fail(label+' must be 0 or more');next[k]=n;}
    if(body.maxPerTable!==undefined&&body.maxPerTable!==''){const n=Number(body.maxPerTable);if(!Number.isInteger(n)||n<1||n>4)fail('Bots per table: 1–4');next.maxPerTable=n;}
    if(body.returnPercent!==undefined)next.returnPercent=Number(body.returnPercent);
+   if(body.clashCapBB!==undefined&&body.clashCapBB!==''){const n=Number(body.clashCapBB);if(!Number.isInteger(n)||n<0||n>200)fail('Kufiri i përplasjes: 0–200 BB');next.clashCapBB=n;}
+   if(body.refillMinutes!==undefined&&body.refillMinutes!==''){const n=Number(body.refillMinutes);if(![0,5,10,15,30,60].includes(n))fail('Rikreditimi automatik: 0, 5, 10, 15, 30 ose 60 minuta');next.refillMinutes=n;}
    Object.assign(g,next);save();return guardInfo();}
   if(p==='/api/bots/create'){const b=create(u,String(body.name||'').trim(),cents(body.budget,'Budget'),body);save();return {ok:true,id:b.id};}
   if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');need(each*n);
@@ -353,7 +377,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(!free.length)fail(seated?'Every bot is at a table: press "Ndalo të gjithë", wait for the hands to end, then try again':'There are no bots');
    const pool=free.reduce((n,b)=>n+b.balance,0)+wallet,need=free.reduce((n,b)=>n+Math.max(0,b.bot.funded||0),0);
    const ratio=need>0&&pool<need?pool/need:1;let given=0;
-   for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);if(target!==b.balance)audit('BOT_RESTORE',b,target-b.balance,{before:b.balance,after:target});b.balance=target;b.bot.baseline=target;b.bot.rakeBase=rakeOf(b.id);given+=target;}
+   for(const b of free){const target=Math.floor(Math.max(0,b.bot.funded||0)*ratio);if(target!==b.balance)audit('BOT_RESTORE',b,target-b.balance,{before:b.balance,after:target});b.balance=target;b.bot.baseline=target;b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;given+=target;}
    const left=pool-given;db.cenbRake=0;W.credit+=left;
    db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,rakeUsed:wallet,toProfit:left,time:Date.now()});save();
    return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:W.credit/100,walletChange:left/100};}
@@ -374,7 +398,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     configure(b,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??(b.bot.stopLoss||b.balance)/100});}
    else{const name=String(body.name||'').trim()||freshName(),budget=body.budget===undefined||body.budget===''?buyin*2:cents(body.budget,'Budget');if(budget<buyin)fail('The budget must cover the buy-in');
     b=create(u,name,budget,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??budget/100,stopWin:body.stopWin??0},true);}
-   b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);if(mode==='seat')engine.sitOut(t,b,true);
+   b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;if(mode==='seat')engine.sitOut(t,b,true);
    audit('BOT_MANAGE',b,0,{enabled:true,seat:pos+1,table:t.name});save();return {ok:true,bot:b.username,seat:pos+1,table:t.name};}
   // CENB wallets and the centre: credit in, credit back, profit out.
   if(p==='/api/bots/wallet'){const c=center();if(!c)fail('No center account');const a=String(body.action||'');
@@ -392,7 +416,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     info[s.id]={id:b.id,risk:b.bot.risk||'medium',botClash:b.bot.botClash||'balanced',style:STYLES[b.bot.risk]?.label||b.bot.risk,mode:b.bot.mode||'play',enabled:!!b.bot.enabled,balance:b.balance/100,stopLoss:b.bot.stopLoss/100,stopWin:(b.bot.stopWin||0)/100,session:sessionOf(b)/100,hands:b.bot.hands||0,addChips:(b.bot.addChips||0)/100,error:b.bot.error||null};}
    return {...view,bots:info,maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
   if(p==='/api/bots/stopall'){let n=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
-  if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
+  if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
   const b=bots().find(x=>x.id===body.id);if(!b)fail('Bot not found',404);
   if(p==='/api/bots/configure'){if(b.bot.enabled||seatOf(b))fail('Stop the bot and let it leave the table before changing it');configure(b,body);audit('BOT_MANAGE',b);}
   // Live, also while it plays: style, mode and limits. It plays its next decision with them.
@@ -407,7 +431,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   else if(p==='/api/bots/withdraw'){const n=cents(body.amount,'Amount');if(n>b.balance)fail('The bot wallet holds only €'+(b.balance/100).toFixed(2)+'. Chips on the table come back when it leaves the table.');
    b.balance-=n;W.credit+=n;b.bot.funded=Math.max(0,b.bot.funded-n);b.bot.baseline-=n;audit('BOT_REFUND',b,n,{from:b.id,to:'cenb'});}
   else if(p==='/api/bots/status'){if(typeof body.enabled!=='boolean')fail('Invalid status');
-   if(body.enabled){if(/^House /.test(b.bot.error||''))fail('The house limit is reached: raise it or wait for the next period');if(b.bot.tableId!=='auto'&&b.balance<b.bot.buyin&&!seatOf(b))fail('The bot wallet is smaller than its buy-in');b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);}
+   if(body.enabled){if(/^House /.test(b.bot.error||''))fail('The house limit is reached: raise it or wait for the next period');if(b.bot.tableId!=='auto'&&b.balance<b.bot.buyin&&!seatOf(b))fail('The bot wallet is smaller than its buy-in');b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;}
    b.bot.enabled=body.enabled;b.bot.error=null;if(!body.enabled){const at=seatOf(b);if(at)engine.leave(at.t,b);}audit('BOT_MANAGE',b,0,{enabled:body.enabled});}
   else if(p==='/api/bots/topup'){const n=body.amount===undefined&&body.toTable?0:cents(body.amount,'Amount'),at=seatOf(b);
    if(n){need(n);W.credit-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;audit('BOT_FUND',b,n,{from:'cenb'});}
@@ -452,6 +476,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  function tick(now=Date.now()){
   settleReturns();
   if(db.botReclaim){const r=reclaim();if(r.bots)save();}
+  if(g.refillMinutes>0&&now-lastRefill>=g.refillMinutes*60000)refill(now);
   const r=periods(now);
   for(const [p,limit,name] of PERIODS)if(g[limit]>0&&r[p]<=-g[limit])for(const b of bots())if(b.bot.enabled)stop(b,`House ${name} limit reached`,seatOf(b));
   for(const t of runtime.values())if(t.seats.some(Boolean))observe(t);
@@ -463,7 +488,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     const between=at&&(!LIVE.includes(at.t.phase)||!at.s.inHand),session=sessionOf(b);
     if(at&&between){
      if(b.bot.stopWin>0&&session>=b.bot.stopWin){stop(b,'Win limit reached',at);continue;}
-     if(-session>=b.bot.stopLoss){stop(b,'Loss limit reached',at);continue;}
+     if(-vsPlayers(b)>=b.bot.stopLoss){stop(b,'Loss limit reached',at);continue;}
      if(at.t.seats.filter(Boolean).length===1){
       if(!aloneDeadlines.has(at.s))aloneDeadlines.set(at.s,now+3000+random()*2000);
       if(now>=aloneDeadlines.get(at.s)){engine.leave(at.t,b);leftAlone.add(b);save();}
@@ -472,7 +497,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
      aloneDeadlines.delete(at.s);
      if(shouldLeave(at.t,b,at.s)){engine.leave(at.t,b);save();continue;}}
     if(!at){
-     if(-session>=b.bot.stopLoss){stop(b,'Loss limit reached');continue;}
+     if(-vsPlayers(b)>=b.bot.stopLoss){stop(b,'Loss limit reached');continue;}
      let t;if(b.bot.tableId==='auto')t=pickTable(b);else{t=runtime.get(b.bot.tableId);if(!t){stop(b,'Table removed');continue;}if(!canJoin(t,b)){if(b.balance<buyinFor(b,t))stop(b,'Wallet smaller than the buy-in');continue;}}
      if(!t)continue;
      const free=t.seats.map((s,i)=>s?-1:i).filter(i=>i>=0);
@@ -483,12 +508,12 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     const {t,s}=at;
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
      const key=t.hand+':'+t.phase+':'+t.turnStartedAt;let plan=plans.get(s);
-     if(plan?.key!==key){const v=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced');plan={key,v,d:null,at:0};plans.set(s,plan);
+     if(plan?.key!==key){const v=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced',g.clashCapBB);plan={key,v,d:null,at:0};plans.set(s,plan);
       if(decider){const p=plan;decider(v,b.bot.risk).then(d=>{p.d=d;p.at=Math.max(Date.now(),t.turnStartedAt+think(d,v));}).catch(()=>{p.d=v.toCall?{type:'fold'}:{type:'check'};p.at=Date.now();});}
       else{plan.d=botDecision(v,b.bot.risk,random);plan.at=t.turnStartedAt+think(plan.d,v);}}
      // A decision that never came back: check when free, otherwise fold.
      if(!plan.d&&now-t.turnStartedAt>9000){plan.d=plan.v.toCall?{type:'fold'}:{type:'check'};plan.at=now;}
-     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced'),d=botDecision(current,b.bot.risk,random);
+     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced',g.clashCapBB),d=botDecision(current,b.bot.risk,random);
       // Only humans may receive a deliberate return; avoid bot-to-bot transfers.
       const humanOnly=current.opponents.filter(o=>!o.folded).every(o=>!isBotId(o.id));
       const budget=returnBudget(b.bot,equity(b),g.returnPercent);
@@ -503,5 +528,5 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    }catch(e){stop(b,e.message,seatOf(b));}
   }
  }
- return {route,tick,list,profileOf};
+ return {route,tick,onHand,refill,list,profileOf};
 }

@@ -262,3 +262,6 @@ article.bot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:ce
 .rcChoice b{font-size:15px}.rcChoice span{font-weight:700;color:#92efbf}.rcChoice small{color:var(--muted);font-size:12px;line-height:1.4}
 .rcChoice:hover:not(:disabled){border-color:#3c6a58}.rcChoice.danger span{color:#ffb4a8}.rcChoice.danger:hover:not(:disabled){border-color:#7a3a33}
 .rcChoice:disabled{opacity:.5;cursor:not-allowed}
+/* Limits: bots against bots */
+.limSub{margin:18px 0 4px}.limWide{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start;margin-bottom:12px}
+.limWide label small{display:block;font-weight:400;color:var(--muted);font-size:12px;line-height:1.4;margin-top:2px}

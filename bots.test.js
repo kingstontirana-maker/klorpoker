@@ -498,3 +498,22 @@ test('collect credit: only the stopped bots, or all of them',()=>{
  const all=manager.route('/api/bots/reclaim',{},center);assert.equal(all.bots,2);assert.ok(db.users.filter(u=>u.isBot).every(u=>u.balance===0&&!u.bot.enabled));
  assert.equal(total(),before,'no credit is made or lost');
 });
+
+test('stop-loss counts only real players; automatic re-credit from the CENB wallet',()=>{
+ const {center,db,manager,total}=world();const before=total();
+ manager.route('/api/bots/bulk',{count:2,budget:40,tableId:'auto',buyinBB:100,stopLoss:20,risk:'mix'},center);
+ const [a,b]=db.users.filter(u=>u.isBot);a.bot.enabled=true;b.bot.enabled=true;
+ // a loses €15 to bot b: the money stays in CENB, so a is not stopped by its €20 stop-loss
+ a.balance-=1500;b.balance+=1500;manager.onHand({players:[{userId:a.id,result:-15},{userId:b.id,result:15}]});
+ assert.deepEqual([a.bot.clash,b.bot.clash],[-1500,1500]);
+ manager.tick();assert.equal(a.bot.enabled,true,'losing to a bot does not count');
+ // a loses €20 to a real player: stopped
+ a.balance-=1000;manager.onHand({players:[{userId:a.id,result:-10},{userId:'h1',result:10}]});
+ a.balance-=1000;center.balance+=2000;manager.tick();assert.equal(a.bot.error,'Loss limit reached');
+ // b ran short (it is on): the automatic re-credit fills it from the CENB wallet; a stays stopped
+ b.balance=500;const wallet=db.cenbWallet.credit;const r=manager.refill();
+ assert.equal(r.bots,1);assert.equal(b.balance,4000,'back to its €40 funding');assert.equal(db.cenbWallet.credit,wallet-3500);assert.equal(a.balance,500,'a stopped by real players is not re-credited');
+ assert.ok(db.ledger.some(x=>x.type==='BOT_RESTORE'&&x.auto&&x.to===b.id));
+ manager.route('/api/bots/settings',{clashCapBB:6,refillMinutes:15},center);assert.deepEqual([manager.route('/api/bots/guard',{},center).clashCapBB,manager.route('/api/bots/guard',{},center).refillMinutes],[6,15]);
+ assert.throws(()=>manager.route('/api/bots/settings',{refillMinutes:7},center),/Rikreditimi/);
+});

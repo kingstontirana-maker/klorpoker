@@ -189,9 +189,11 @@ export function decide(v,style='medium',random=Math.random){
  if(['balanced','aggressive'].includes(v.botClash)){
   const aggressive=v.botClash==='aggressive';
   const chance=aggressive?.7:.4;
+  // clashCap: the most this bot may have in the pot in this hand (half the pot cap); 0 = no cap.
+  const room=v.clashCap>0?v.clashCap-(v.committed-v.roundBet):Infinity;
   if(v.canRaise&&random()<chance){
-   const target=raiseTo(v,v.currentBet+Math.max(v.bb,(v.pot+v.toCall)*(aggressive?.85:.45)));
-   if(target)return {type:'raise',amount:target/100,why:'bot clash',equity:null};
+   const target=raiseTo(v,Math.min(v.currentBet+Math.max(v.bb,(v.pot+v.toCall)*(aggressive?.85:.45)),room));
+   if(target&&target<=room)return {type:'raise',amount:target/100,why:'bot clash',equity:null};
   }
   // Continue contested pots without consulting the future runout.
   return {type:v.toCall?'call':'check',why:'bot clash',equity:null};
