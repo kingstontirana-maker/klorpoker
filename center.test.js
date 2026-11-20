@@ -40,7 +40,7 @@ test('the report: rake, what the network earned, what the centre keeps, money fl
  assert.equal(r.now.players,30);assert.equal(r.now.onTables,4);assert.equal(r.now.cenb.bots,10,'bot wallets and their chips');
  assert.equal(r.now.total,50+30+30+4+10+10+0.3,'credit in circulation: everything outside the centre');assert.equal(r.now.ok,true);
  assert.equal(c.created,65,'created: 40 to the network + 25 for deposits');assert.equal(c.returned,5);assert.equal(c.net,59.4,'created − returned − what the centre kept');
- const agent=r.network.find(x=>x.username==='agt');assert.equal(agent.rake,1);assert.equal(agent.earned,0.2);assert.equal(agent.players,1);
+ const agent=r.network.find(x=>x.username==='agt');assert.equal(agent.rake,1);assert.equal(agent.earned,0.2);assert.equal(agent.players,2,'all the players under it');assert.equal(agent.active,0,'no hand history in this test');
  assert.equal(r.network.find(x=>x.username==='adm').rake,1,'the admin counts the players of its agents');
  assert.deepEqual(r.players.map(p=>[p.username,p.rake,p.agent]),[['pl',1,'agt']]);
  assert.equal(r.daily.length,1);assert.equal(r.daily[0].rake,1);
@@ -64,4 +64,16 @@ test('a member sees only its own network, without e-mails, addresses or devices'
  assert.deepEqual(center.directory({rootId:'g'}).rows.map(r=>r.username).sort(),['old','pl']);
  const a=center.account('p','a');assert.deepEqual(a.path.map(x=>x.username),['adm','agt'],'the chain starts at the member');assert.deepEqual(a.user.ips,[]);assert.equal(a.user.email,null);
  assert.equal(center.account('a','g'),null,'nothing above or beside it');assert.deepEqual(center.account('p').user.ips,['1.2.3.4']);
+});
+
+test('the report lists every member of the network, also with no rake, with its players\' hands and result',()=>{
+ const users=[{id:'center',username:'center',role:'CENTER',balance:0},{id:'m',username:'mgr',role:'MANAGER',parentId:'center',balance:0,share:30},
+  {id:'z',username:'zio',role:'AGENT',parentId:'m',balance:0,share:20},{id:'p',username:'pz',role:'USER',parentId:'z',balance:0},{id:'q',username:'qz',role:'USER',parentId:'z',balance:0}];
+ const db={users,ledger:[],tables:[]};
+ const store={playerPeriod:()=>[{id:'p',hands:12,net:-3.5}]};
+ const center=createCenter({db,store,runtime:new Map()});const r=center.report({preset:'today'});
+ const zio=r.network.find(x=>x.username==='zio');
+ assert.ok(zio,'a new agent is listed even with no rake');
+ assert.deepEqual([zio.players,zio.active,zio.hands,zio.result,zio.rake],[2,1,12,-3.5,0]);
+ assert.deepEqual([r.network.find(x=>x.username==='mgr').hands,r.players.find(x=>x.username==='pz').hands],[12,12]);
 });

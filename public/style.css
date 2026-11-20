@@ -599,3 +599,6 @@ html{touch-action:manipulation}
 @media(max-width:560px){.utKids{margin-left:8px;padding-left:8px}}
 .uTools{grid-template-columns:minmax(180px,2fr) repeat(5,minmax(110px,1fr)) auto auto}.uCounts{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
 @media(max-width:1200px){.uTools{grid-template-columns:1fr 1fr 1fr}}@media(max-width:560px){.uTools{grid-template-columns:1fr 1fr}.uCounts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Summary: network and players full width */
+.sStack{display:grid;gap:16px}

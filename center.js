@@ -108,6 +108,16 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
    const seen=new Set(),perDay=new Map();for(const r of store?.playerHours?store.playerHours(range.since,range.until):[]){seen.add(r.id);if(isCur){const d=tiranaDay(r.h*3600000);(perDay.get(d)||perDay.set(d,new Set()).get(d)).add(r.id);}}
    b.players=seen.size;if(isCur)for(const [d,s] of perDay)if(daily.get(d))daily.get(d).players=s.size;}
   for(const u of db.users){const c=created(u);if(u.isBot||u.role!=='USER'||!c)continue;if(c>=P.since&&c<P.until){cur.newPlayers++;const d=daily.get(tiranaDay(c));if(d)d.newPlayers++;}else if(c>=P.prev.since&&c<P.prev.until)prev.newPlayers++;}
+  // The network: every administrator, manager and agent, with all the players under it, how many of
+  // them played in the period, their hands and result, the rake they paid and what the member earned.
+  // A member whose players played without rake (or who has no players yet) is listed too.
+  const played=new Map((store?.playerPeriod?store.playerPeriod(P.since,P.until):[]).map(r=>[r.id,{hands:r.hands,net:Math.round((r.net||0)*100)}]));
+  const net=new Map();const member=u=>net.get(u.id)||net.set(u.id,{id:u.id,username:u.username,role:u.role,rake:0,earned:0,players:0,active:0,hands:0,result:0}).get(u.id);
+  for(const u of db.users)if(!u.isBot&&STAFF.includes(u.role))member(u);
+  for(const a of agents.values()){const u=ids.get(a.id);if(!u||u.isBot)continue;const m=member(u);m.rake=a.rake;m.earned=a.earned;}
+  for(const u of db.users){if(u.isBot||u.role!=='USER')continue;const pl=played.get(u.id);
+   for(let p=ids.get(u.parentId),i=0;p&&STAFF.includes(p.role)&&i<10;p=ids.get(p.parentId),i++){const m=member(p);m.players++;if(pl){m.active++;m.hands+=pl.hands;m.result+=pl.net;}}
+   if(pl){const e=players.get(u.id)||players.set(u.id,{id:u.id,username:u.username,agent:ids.get(u.parentId)?.username||'',rake:0}).get(u.id);e.hands=pl.hands;e.result=pl.net;}}
   // Where the money is right now.
   const role=r=>db.users.filter(u=>u.role===r&&!u.isBot).reduce((n,u)=>n+u.balance,0);
   let chips=0,botChips=0,pots=0;for(const t of runtime.values()){for(const s of t.seats)if(s){if(s.isBot)botChips+=s.stack;else chips+=s.stack;}if(LIVE.includes(t.phase))pots+=t.pot;}
@@ -124,8 +134,8 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   return {from:P.from,to:P.to,days:P.days,previous:{from:P.prev.from,to:P.prev.to},current:out(cur),before:out(prev),
    daily:[...daily.values()].map(d=>({day:d.day,...out(d)})),now:{...nowMoney,ok:!db.moneyMismatch},
    pending:{withdrawals:pending.length,amount:eur(pending.reduce((n,w)=>n+(w.cents||0),0))},
-   network:[...agents.values()].map(a=>({id:a.id,username:a.username,role:a.role,rake:eur(a.rake),earned:eur(a.earned),players:a.players.size})).sort((a,b)=>b.rake-a.rake||b.earned-a.earned).slice(0,50),
-   players:[...players.values()].map(p=>({...p,rake:eur(p.rake)})).sort((a,b)=>b.rake-a.rake).slice(0,50)};
+   network:[...net.values()].map(m=>({...m,rake:eur(m.rake),earned:eur(m.earned),result:eur(m.result)})).sort((a,b)=>b.rake-a.rake||b.hands-a.hands||b.players-a.players||a.username.localeCompare(b.username)).slice(0,300),
+   players:[...players.values()].map(p=>({...p,rake:eur(p.rake),hands:p.hands||0,result:eur(p.result||0)})).sort((a,b)=>b.rake-a.rake||b.hands-a.hands).slice(0,200)};
  }
  return {directory,account,report};
 }
