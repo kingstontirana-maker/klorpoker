@@ -168,7 +168,7 @@ if(p==='/api/network/user'){roleCheck(u,'ADMIN','MANAGER','AGENT');const a=cente
 if(p==='/api/center/users'){roleCheck(u,'CENTER');return centerView.directory({days:[7,30,90].includes(Number(body.days))?Number(body.days):30});}
 if(p==='/api/center/user'){roleCheck(u,'CENTER');const a=centerView.account(body.id);if(!a)fail('Account not found',404);return a;}
 if(p==='/api/center/report'){roleCheck(u,'CENTER');return centerView.report(body);}
-if(p==='/api/users'){roleCheck(u,'CENTER','ADMIN','MANAGER','AGENT');return db.users.filter(x=>(x.parentId===u.id||(u.role==='CENTER'&&x.email))&&!x.isBot).map(x=>({id:x.id,username:x.username,role:x.role,direct:!!x.email,...(x.email&&u.role==='AGENT'?{cashout:cashoutFor(x)}:{}),balance:clean(x.balance),...(STAFF.includes(x.role)?{share:pct(x.share)}:{}),blocked:!!x.blocked,below:STAFF.includes(x.role)?descendants(db.users,x.id).filter(d=>!d.isBot).length:0,mutedUntil:x.mutedUntil>Date.now()?x.mutedUntil:null,lastLoginAt:x.lastLoginAt||null,online:[...tokens.values()].some(s=>s.userId===x.id)}));}
+if(p==='/api/users'){roleCheck(u,'CENTER','ADMIN','MANAGER','AGENT');return db.users.filter(x=>(x.parentId===u.id||(u.role==='CENTER'&&x.email))&&!x.isBot).map(x=>({id:x.id,username:x.username,role:x.role,direct:!!x.email,...(x.email&&u.role==='AGENT'?{cashout:cashoutFor(x)}:{}),balance:clean(x.balance),...(STAFF.includes(x.role)?{share:pct(x.share)}:{}),blocked:!!x.blocked,below:STAFF.includes(x.role)?descendants(db.users,x.id).filter(d=>!d.isBot).length:0,mutedUntil:x.mutedUntil>Date.now()?x.mutedUntil:null,lastLoginAt:x.lastLoginAt||null,online:onlineIds().has(x.id)}));}
 // Your own password; other sessions of the account are signed out.
 if(p==='/api/password'){if(!samePassword(u,String(body.current||'')))fail('The current password is wrong',400);if(!strongEnough(body.next))fail(PASSWORD_RULE);u.salt=secret();u.passHash=hash(body.next,u.salt);endUserSessions(u.id,'Your password was changed. Please sign in again.',token);save();return {ok:true};}
 // Staff manage their direct accounts: new password, block and unblock.
@@ -292,7 +292,10 @@ setInterval(()=>{if(replaced)return;try{botManager.tick();}catch(err){console.er
 // Crypto deposits: the blockchain is checked every 30 seconds while a deposit is open.
 const payments=createPayments({db,save,fail,playSince:(id,since)=>{try{const t=store.playerStats(id,since);return {hands:t.hands,net:Math.round((t.net||0)*100)/100};}catch{return null;}}});
 // The centre's view of everything: all accounts, one account in full, the report.
-let onlineAt=0,onlineSet=new Set();const onlineIds=()=>{if(Date.now()-onlineAt>1000){onlineSet=new Set([...tokens.values()].map(s=>s.userId));onlineAt=Date.now();}return onlineSet;};
+// Online = the app is open now: an open page asks the server every few seconds, so a session seen in
+// the last ONLINE_MS (or a live table stream) is online. A session that is only still valid is not.
+const ONLINE_MS=60000;
+let onlineAt=0,onlineSet=new Set();const onlineIds=()=>{const now=Date.now();if(now-onlineAt>1000){onlineSet=new Set([...[...tokens.values()].filter(s=>now-s.lastSeen<ONLINE_MS).map(s=>s.userId),...[...tableSubs.values()].map(s=>s.userId)]);onlineAt=now;}return onlineSet;};
 const centerView=createCenter({db,store,runtime,online:id=>onlineIds().has(id),held:()=>payments.held(),
  cenbValue:()=>({wallet:(Number(db.cenbWallet?.credit)||0)+(Number(db.cenbWallet?.profit)||0),rake:Number(db.cenbRake)||0,bots:db.users.filter(u=>u.isBot).reduce((n,u)=>n+u.balance,0)})});
 // Money only moves between accounts, it is never made or lost: wallets, chips on the tables
@@ -309,7 +312,7 @@ setInterval(()=>{if(replaced||saveFailed)return;payments.scan().catch(err=>conso
 function inspectView(){
  const ipOf=userId=>{for(const s of tokens.values())if(s.userId===userId)return s.ip;return db.users.find(u=>u.id===userId)?.lastLoginIp||null;};
  const tables=[...runtime.values()].map(t=>{const view=engine.inspect(t),byIp={};
-  for(const s of view.seats)if(s){s.ip=ipOf(s.userId);s.online=[...tokens.values()].some(x=>x.userId===s.userId);if(s.ip)(byIp[s.ip]??=[]).push(s.username);}
+  for(const s of view.seats)if(s){s.ip=ipOf(s.userId);s.online=onlineIds().has(s.userId);if(s.ip)(byIp[s.ip]??=[]).push(s.username);}
   view.alerts=Object.entries(byIp).filter(([,names])=>names.length>1).map(([ip,names])=>({type:'SAME_IP',ip,names}));return view;});
  return {serverNow:Date.now(),rakePercent:db.rakePercent,tables};
 }
