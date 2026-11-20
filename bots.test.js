@@ -487,3 +487,14 @@ test('CENB at the table: watch shows no hidden cards; credit in and out, style a
  assert.equal(total(),all,'no money appears or disappears');
  t.phase='waiting';for(const x of t.seats)if(x)x.inHand=false;t.pot=0;manager.tick();assert.equal(seat.stack,stack+500,'added between hands');assert.equal(b.bot.addChips,undefined);
 });
+
+test('collect credit: only the stopped bots, or all of them',()=>{
+ const {center,db,manager,total}=world();const before=total();
+ manager.route('/api/bots/bulk',{count:3,budget:20,tableId:'auto',buyinBB:100,stopLoss:20,risk:'mix'},center);
+ const [a,b,c]=db.users.filter(u=>u.isBot);a.bot.enabled=false;b.bot.enabled=true;c.bot.enabled=true;const credit=db.cenbWallet.credit;
+ const r=manager.route('/api/bots/reclaim',{only:'off'},center);
+ assert.deepEqual([r.bots,r.stopped,a.balance,b.balance,c.balance],[1,0,0,2000,2000],'only the stopped bot gives its credit back');
+ assert.equal(db.cenbWallet.credit,credit+2000);assert.equal(b.bot.enabled,true,'the others keep playing');assert.ok(!db.botReclaim);
+ const all=manager.route('/api/bots/reclaim',{},center);assert.equal(all.bots,2);assert.ok(db.users.filter(u=>u.isBot).every(u=>u.balance===0&&!u.bot.enabled));
+ assert.equal(total(),before,'no credit is made or lost');
+});

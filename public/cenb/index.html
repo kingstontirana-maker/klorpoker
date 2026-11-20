@@ -80,6 +80,10 @@
    <div class="liveBody"><div class="liveTableWrap"><div class="liveFelt" id="liveFelt"></div></div>
     <aside class="liveSide"><div class="liveCtrl" id="liveCtrl"><p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p></div>
      <h3>Ngjarjet</h3><ol class="liveEvents" id="liveEvents"></ol></aside></div></dialog>
+  <dialog id="reclaimDialog" class="seatDialog"><form method="dialog"><h2>Mblidh kredinë e botave</h2><p class="muted">Kredia kthehet te kuleta e kredisë së CENB. Llogaritë e botave mbeten, me €0.</p>
+   <div class="rcChoices"><button type="button" class="rcChoice" data-rc="off"><b>Vetëm botat e fikur</b><span id="rcOff"></span><small>Botat që luajnë nuk preken.</small></button>
+   <button type="button" class="rcChoice danger" data-rc="all"><b>Të gjithë botat</b><span id="rcAll"></span><small>Ndalen të gjithë. Ata që janë në një dorë ngrihen kur mbaron dora dhe kredia e tyre kthehet vetë.</small></button></div>
+   <div class="seatActions"><button type="button" id="rcClose">Anulo</button></div></form></dialog>
   <dialog id="botDialog" class="seatDialog"><form method="dialog"><h2 id="botDlgName">Boti</h2><p class="muted" id="botDlgInfo"></p>
    <div class="seatActions"><button type="button" id="botDlgClose">Mbyll</button><button type="button" class="danger" id="botDlgStop">■ Ndalo botin</button></div></form></dialog>
   <dialog id="seatDialog" class="seatDialog"><form method="dialog" id="seatForm">

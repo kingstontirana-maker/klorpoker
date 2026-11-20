@@ -311,8 +311,10 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   save();return {ok:true,added:jobs.length,funded:funding/100,tables:reports};
  }
  // Moves the wallet of every bot that is not at a table back to the centre.
-  function reclaim(){const c=center();let returned=0,bots_=0;if(!c)return {returned,bots:0,waiting:0};periods();
-   for(const b of bots()){if(seatOf(b)||!(b.balance>0))continue;const n=b.balance;W.credit+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.rakeBase=rakeOf(b.id);b.bot.enabled=false;audit('BOT_REFUND',b,n,{reclaim:true,from:b.id,to:'cenb'});returned+=n;bots_++;}
+ // onlyOff: only the bots already stopped; the ones that play are left alone.
+  function reclaim(onlyOff=false){const c=center();let returned=0,bots_=0;if(!c)return {returned,bots:0,waiting:0};periods();
+   for(const b of bots()){if(seatOf(b)||!(b.balance>0)||onlyOff&&b.bot.enabled)continue;const n=b.balance;W.credit+=n;b.balance=0;b.bot.funded=Math.max(0,(b.bot.funded||0)-n);b.bot.baseline=0;b.bot.rakeBase=rakeOf(b.id);b.bot.enabled=false;audit('BOT_REFUND',b,n,{reclaim:true,from:b.id,to:'cenb'});returned+=n;bots_++;}
+   if(onlyOff)return {returned:returned/100,bots:bots_,waiting:0};
    const waiting=bots().filter(b=>seatOf(b)).length;if(!waiting)delete db.botReclaim;return {returned:returned/100,bots:bots_,waiting};}
  const stop=(b,reason,at)=>{b.bot.enabled=false;b.bot.error=reason||null;if(at)try{engine.leave(at.t,b);}catch{}save();};
  function route(p,body,u){if(!p.startsWith('/api/bots'))return undefined;if(u?.role!=='CENTER')fail('Only the center can manage bots',403);
@@ -340,6 +342,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(bots().length+n>MAX_BOTS)fail('Maximum '+MAX_BOTS+' bots');const made=[];for(let i=0;i<n;i++)made.push(create(u,freshName(),each,{...body,risk:body.risk==='mix'?['low','medium','high'][i%3]:body.risk}).id);save();return {ok:true,ids:made};}
   // Return every bot's credit to the centre: all bots stop; the ones at a table leave when
   // their hand ends and are emptied then (tick below). The bot accounts stay, with €0.
+  if(p==='/api/bots/reclaim'&&body.only==='off'){const r=reclaim(true);save();return {ok:true,stopped:0,...r};}
   if(p==='/api/bots/reclaim'){let stopped=0;for(const b of bots())if(b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});stopped++;}db.botReclaim=true;const r=reclaim();save();return {ok:true,stopped,...r};}
   // Rake the bots paid is kept by CENB; CENB sends it (all or part) to the centre by hand.
   // Re-credit the bots: the money inside CENB circulates. Every bot that is not at a table goes

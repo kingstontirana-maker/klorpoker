@@ -110,7 +110,18 @@ $('#botList').onclick=async e=>{const btn=e.target.closest('[data-act]');if(!btn
   await refresh();
  }catch(err){toast(err.message,true);}};
 $('#botList').onsubmit=async e=>{e.preventDefault();const id=e.target.closest('[data-id]').dataset.id;try{await api('bots/configure',{id,...formBody(e.target)});editing=null;toast('U ruajt');await refresh();}catch(err){toast(err.message,true);}};
-$('#reclaimAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat dhe kredia e tyre të kthehet te kuleta e kredisë së CENB?\n\nBotat që janë në një dorë ngrihen sapo të mbarojë dora, dhe kredia e tyre kthehet vetë pas kësaj. Llogaritë e botave mbeten, me €0.'))return;try{const r=await api('bots/reclaim');toast('U kthyen €'+r.returned.toLocaleString('en-US',{minimumFractionDigits:2})+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}};
+// Collect credit: only from the stopped bots, or stop all of them and collect everything.
+const money=n=>'€'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+$('#reclaimAll').onclick=()=>{const b=data?.bots||[],off=b.filter(x=>!x.enabled&&!x.seatedAt&&x.balance>0),all=b.filter(x=>x.equity>0);
+ $('#rcOff').textContent=off.length?off.length+' bota · '+money(off.reduce((n,x)=>n+x.balance,0)):'Asnjë bot i fikur me kredi';
+ $('[data-rc="off"]').disabled=!off.length;
+ $('#rcAll').textContent=all.length+' bota · '+money(all.reduce((n,x)=>n+x.equity,0));
+ $('#reclaimDialog').showModal();};
+$('#rcClose').onclick=()=>$('#reclaimDialog').close();
+$('#reclaimDialog').addEventListener('click',async e=>{const btn=e.target.closest('[data-rc]');if(!btn||btn.disabled)return;const only=btn.dataset.rc;
+ if(only==='all'&&!confirm('Të ndalen TË GJITHË botat dhe e gjithë kredia e tyre të kthehet te CENB?'))return;
+ btn.disabled=true;try{const r=await api('bots/reclaim',only==='off'?{only:'off'}:{});$('#reclaimDialog').close();
+  toast('U kthyen '+money(r.returned)+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}finally{btn.disabled=false;}});
 $('#restoreBots').onclick=async()=>{if(!confirm('Të rikreditohen botat?\n\n• Çdo bot që nuk është në tavolinë kthehet te kredia me të cilën u financua.\n• Botat që fituan u japin atyre që humbën, dhe rake-u i botave u kthehet atyre.\n• Ajo që mbetet plus shkon te kuleta e CENB.\n\nBotat në tavolinë nuk preken: për t\'i përfshirë, shtyp më parë "Ndalo të gjithë".'))return;
  try{const r=await api('bots/restore');toast(r.bots+' bota u rikredituan'+(r.full?'':' (pjesërisht: kredia nuk mjaftonte)')+' · kuleta e CENB +'+eur(r.walletChange)+' = '+eur(r.wallet)+(r.seated?' · '+r.seated+' në tavolinë nuk u prekën':''));await refresh();}catch(err){toast(err.message,true);}};
 $('#stopAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;try{const r=await api('bots/stopall');toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}};

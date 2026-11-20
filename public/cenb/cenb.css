@@ -255,3 +255,10 @@ article.bot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:ce
 .kpi>span{display:block;margin-top:4px;font-size:11.5px;color:var(--muted)}
 .rpNote{margin:-4px 0 10px;font-size:12px}
 @media(max-width:640px){.botReport{margin-right:10px;width:34px;height:34px}}
+
+/* Collect credit: the two choices */
+.rcChoices{display:grid;gap:10px;margin-top:12px}
+.rcChoice{display:grid;gap:4px;text-align:left;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:#0f1b19;color:inherit;cursor:pointer;font:inherit}
+.rcChoice b{font-size:15px}.rcChoice span{font-weight:700;color:#92efbf}.rcChoice small{color:var(--muted);font-size:12px;line-height:1.4}
+.rcChoice:hover:not(:disabled){border-color:#3c6a58}.rcChoice.danger span{color:#ffb4a8}.rcChoice.danger:hover:not(:disabled){border-color:#7a3a33}
+.rcChoice:disabled{opacity:.5;cursor:not-allowed}
