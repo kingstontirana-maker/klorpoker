@@ -77,3 +77,13 @@ test('the report lists every member of the network, also with no rake, with its 
  assert.deepEqual([zio.players,zio.active,zio.hands,zio.result,zio.rake],[2,1,12,-3.5,0]);
  assert.deepEqual([r.network.find(x=>x.username==='mgr').hands,r.players.find(x=>x.username==='pz').hands],[12,12]);
 });
+
+test('users: an agent\'s row shows what its players did (hands, result, rake), not its own play',()=>{
+ const users=[{id:'center',username:'center',role:'CENTER',balance:0},{id:'m',username:'mgr',role:'MANAGER',parentId:'center',balance:0},
+  {id:'z',username:'zio1',role:'AGENT',parentId:'m',balance:0},{id:'p',username:'pz',role:'USER',parentId:'z',balance:0},{id:'q',username:'qz',role:'USER',parentId:'z',balance:0}];
+ const db={users,ledger:[{type:'RAKE',time:Date.now(),amount:150,allocations:[{userId:'p',amount:100},{userId:'q',amount:50}],shares:[{userId:'z',role:'AGENT',amount:90}]}],tables:[]};
+ const store={playerTotals:()=>[{id:'p',hands:10,net:-4},{id:'q',hands:5,net:2.5}]};
+ const d=createCenter({db,store,runtime:new Map()}).directory();const z=d.rows.find(r=>r.username==='zio1');
+ assert.deepEqual(z.team,{players:2,hands:15,net:-1.5,rake:1.5});assert.equal(z.earned,0.9);
+ assert.deepEqual(d.rows.find(r=>r.username==='mgr').team,{players:2,hands:15,net:-1.5,rake:1.5});assert.equal(d.rows.find(r=>r.username==='pz').team,null);
+});

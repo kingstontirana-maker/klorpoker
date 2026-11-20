@@ -95,7 +95,9 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
  function fillUnder(){const sel=$('#uUnder'),keep=sel.value,members=dirCache.rows.filter(r=>r.role!=='USER').sort((a,b)=>['ADMIN','MANAGER','AGENT'].indexOf(a.role)-['ADMIN','MANAGER','AGENT'].indexOf(b.role)||a.username.localeCompare(b.username));
   sel.innerHTML='<option value="">'+(staff()?'Whole network':'Whole platform')+'</option>'+members.map(s=>'<option value="'+safe(s.id)+'">Under '+safe(roleNames[s.role])+' '+safe(s.username)+' ('+s.below+')</option>').join('');sel.value=keep;}
  function filtered(){const q=$('#uSearch').value.trim().toLowerCase(),role=$('#uRole').value,st=$('#uStatus').value,under=dirCache.rows.find(r=>r.id===$('#uUnder').value);
-  const sorts={balance:(a,b)=>b.balance+b.chips-a.balance-a.chips,rake:(a,b)=>b.rake-a.rake,hands:(a,b)=>b.hands-a.hands,net:(a,b)=>b.net-a.net,login:(a,b)=>(b.lastLoginAt||0)-(a.lastLoginAt||0),name:(a,b)=>a.username.localeCompare(b.username)};
+  // Staff are sorted by what their players did.
+  const v=(r,k)=>r.team?r.team[k]:r[k];
+  const sorts={balance:(a,b)=>b.balance+b.chips-a.balance-a.chips,rake:(a,b)=>v(b,'rake')-v(a,'rake'),hands:(a,b)=>v(b,'hands')-v(a,'hands'),net:(a,b)=>v(b,'net')-v(a,'net'),login:(a,b)=>(b.lastLoginAt||0)-(a.lastLoginAt||0),name:(a,b)=>a.username.localeCompare(b.username)};
   return dirCache.rows.filter(r=>(!q||r.username.toLowerCase().includes(q)||(r.email||'').toLowerCase().includes(q))&&(!role||r.role===role)
    &&(!st||(st==='online'&&r.online)||(st==='playing'&&r.tables.length)||(st==='blocked'&&r.blocked)||(st==='direct'&&r.direct)||(st==='never'&&!r.lastLoginAt)||(st==='idle'&&r.role==='USER'&&!r.hands))
    &&(!under||r.parent?.id===under.id||r.agent===under.username||r.manager===under.username||r.admin===under.username)).sort(sorts[$('#uSort').value]||sorts.balance);}
@@ -113,6 +115,8 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
   const rootId=staff()?dirCache.root?.id:rows.find(r=>r.parent?.role==='CENTER')?.parent.id;
   const top=kids.get(rootId)||[];
   $('#uTreeBox').innerHTML='<div class="utRoot">'+(staff()?'You · '+safe(dirCache.root?.username||'')+' · '+safe(roleNames[dirCache.root?.role]||''):'Centre')+'</div>'+(top.map(r=>node(r,0)).join('')||'<p class="muted">No accounts below.</p>');}
+ // Administrators, managers and agents do not play: their columns show what their players did in the period.
+ function teamCells(r){const t=r.team;return '<td class="num" title="Hands of its players">'+(t.hands?t.hands+'<small class="accountMeta">'+t.players+' player'+(t.players===1?'':'s')+'</small>':'—')+'</td><td class="num" title="What its players won or lost">'+(t.hands?signed(t.net):'—')+'</td><td class="num">'+(t.rake||r.earned?(t.rake?'<span title="Rake its players paid">'+fmt(t.rake)+'</span>':'')+(r.earned?'<small class="accountMeta" title="Its share of the rake">'+fmt(r.earned)+' earned</small>':''):'—')+'</td>';}
  function renderUsers(){if(treeMode){$('#uTreeBox').hidden=false;document.querySelector('.uTable').closest('.tableScroll').hidden=true;$('#uMore').hidden=true;}else{$('#uTreeBox').hidden=true;document.querySelector('.uTable').closest('.tableScroll').hidden=false;}
   const d=dirCache,c=d.counts,rows=filtered();
   $('#uCounts').innerHTML=[['All accounts',c.all,''],['Players',c.USER,'USER'],['Agents',c.AGENT,'AGENT'],...(staff()&&role()!=='ADMIN'?[]:[['Managers',c.MANAGER,'MANAGER']]),...(staff()?[]:[['Administrators',c.ADMIN,'ADMIN']]),['Online now',c.online,'online'],['At a table',c.playing,'playing'],['Blocked',c.blocked,'blocked']]
@@ -122,7 +126,7 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
   $('#uRows').innerHTML=rows.slice(0,uLimit).map(r=>'<tr data-user="'+safe(r.id)+'" tabindex="0"><td><div class="accountCell"><span class="accountAvatar">'+safe(r.username[0].toUpperCase())+'</span><div><strong>'+safe(r.username)+'</strong>'+(r.email?'<small class="accountMeta">'+safe(r.email)+'</small>':'')+'</div></div></td>'
    +'<td>'+roleBadge(r.role,r.share)+(r.blocked?' <b class="statusBlocked">Blocked</b>':'')+'</td>'
    +'<td class="uNet">'+[r.agent&&'<span>A · '+safe(r.agent)+'</span>',r.manager&&'<span>M · '+safe(r.manager)+'</span>',r.admin&&'<span>AD · '+safe(r.admin)+'</span>'].filter(Boolean).join('')+(r.parent?.role==='CENTER'?'<span>Centre</span>':'')+(r.below?'<small>'+r.below+' below</small>':'')+'</td>'
-   +'<td class="num">'+fmt(r.balance)+'</td><td class="num">'+(r.chips?fmt(r.chips)+'<small class="accountMeta">'+safe(r.tables.join(', '))+'</small>':'—')+'</td><td class="num">'+(r.hands||'—')+'</td><td class="num">'+(r.hands?signed(r.net):'—')+'</td><td class="num">'+(r.role==='USER'?fmt(r.rake):r.earned?'<span title="Earned from the rake">'+fmt(r.earned)+' earned</span>':'—')+'</td>'
+   +'<td class="num">'+fmt(r.balance)+'</td><td class="num">'+(r.chips?fmt(r.chips)+'<small class="accountMeta">'+safe(r.tables.join(', '))+'</small>':'—')+'</td>'+(r.team?teamCells(r):'<td class="num">'+(r.hands||'—')+'</td><td class="num">'+(r.hands?signed(r.net):'—')+'</td><td class="num">'+fmt(r.rake)+'</td>')
    +'<td>'+(r.online?'<b class="statusOnline">● Online</b>':'<span class="muted">'+ago(r.lastLoginAt)+'</span>')+'</td></tr>').join('')||'<tr><td colspan="9" class="emptyState"><strong>No account matches.</strong></td></tr>';
   $('#uMore').hidden=treeMode||rows.length<=uLimit;$('#uMore').textContent='Show more ('+(rows.length-uLimit)+')';if(treeMode)renderTree();}
  function bindUsers(){

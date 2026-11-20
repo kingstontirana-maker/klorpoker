@@ -48,10 +48,13 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   const ids=byId(),seats=seatsOf(),since=Date.now()-days*864e5,{paid,earned}=rakeSince(since);
   const totals=new Map((store?.playerTotals?store.playerTotals(since):[]).map(t=>[t.id,t]));
   const below=new Map();for(const u of db.users){if(u.isBot)continue;for(let p=ids.get(u.parentId),i=0;p&&i<50;p=ids.get(p.parentId),i++)below.set(p.id,(below.get(p.id)||0)+1);}
+  // For an administrator, manager or agent: what the players under it did in the period (hands, result, rake paid).
+  const team=new Map();for(const u of db.users){if(u.isBot||u.role!=='USER')continue;const t=totals.get(u.id),r=paid.get(u.id)||0;if(!t?.hands&&!r)continue;
+   for(let p=ids.get(u.parentId),i=0;p&&STAFF.includes(p.role)&&i<50;p=ids.get(p.parentId),i++){const e=team.get(p.id)||team.set(p.id,{players:0,hands:0,net:0,rake:0}).get(p.id);e.players++;e.hands+=t?.hands||0;e.net+=Math.round((t?.net||0)*100);e.rake+=r;}}
   const rows=db.users.filter(u=>!u.isBot&&u.role!=='CENTER'&&(!rootId||under(ids,u.id,rootId))).map(u=>{const s=seats.get(u.id),t=totals.get(u.id),up=upline(ids,u);
    return {id:u.id,username:u.username,role:u.role,email:rootId?null:u.email||null,direct:!!u.email,balance:eur(u.balance),chips:eur(s?.chips||0),tables:s?.tables||[],
     ...up,share:STAFF.includes(u.role)?pct(u.share):null,blocked:!!u.blocked,muted:u.mutedUntil>Date.now(),online:online(u.id),lastLoginAt:u.lastLoginAt||null,created:created(u),
-    below:below.get(u.id)||0,hands:t?.hands||0,net:Math.round((t?.net||0)*100)/100,rake:eur(paid.get(u.id)||0),earned:eur(earned.get(u.id)||0),lastPlayed:t?.last||null};});
+    below:below.get(u.id)||0,team:STAFF.includes(u.role)?(x=>({players:x?.players||0,hands:x?.hands||0,net:eur(x?.net||0),rake:eur(x?.rake||0)}))(team.get(u.id)):null,hands:t?.hands||0,net:Math.round((t?.net||0)*100)/100,rake:eur(paid.get(u.id)||0),earned:eur(earned.get(u.id)||0),lastPlayed:t?.last||null};});
   const count=r=>rows.filter(r).length;
   return {days,rows,counts:{all:rows.length,USER:count(r=>r.role==='USER'),AGENT:count(r=>r.role==='AGENT'),MANAGER:count(r=>r.role==='MANAGER'),ADMIN:count(r=>r.role==='ADMIN'),online:count(r=>r.online),playing:count(r=>r.tables.length>0),blocked:count(r=>r.blocked)}};
  }
