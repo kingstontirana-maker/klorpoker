@@ -517,3 +517,21 @@ test('stop-loss counts only real players; automatic re-credit from the CENB wall
  manager.route('/api/bots/settings',{clashCapBB:6,refillMinutes:15},center);assert.deepEqual([manager.route('/api/bots/guard',{},center).clashCapBB,manager.route('/api/bots/guard',{},center).refillMinutes],[6,15]);
  assert.throws(()=>manager.route('/api/bots/settings',{refillMinutes:7},center),/Rikreditimi/);
 });
+
+test('a bot seated on a table tops up its chips instead of leaving, and may come back to its table',()=>{
+ const {center,db,manager,t,total}=world();const before=total();
+ for(let i=0;i<5;i++)manager.route('/api/bots/seat',{tableId:'1',position:i,name:'Pin'+i,budget:40,buyin:20},center);
+ assert.equal(t.seats.filter(Boolean).length,5,'five bots, more than the per-table limit of 2');
+ const b=db.users.find(u=>u.username==='Pin0'),s=t.seats.find(x=>x?.userId===b.id);
+ // it lost almost all its chips to another bot
+ const o=t.seats.find(x=>x&&x!==s);o.stack+=s.stack-50;s.stack=50;
+ manager.tick();
+ assert.ok(t.seats.some(x=>x?.userId===b.id),'still at the table');assert.equal(s.stack,2000,'back to its €20 buy-in from its wallet');assert.equal(b.balance,50);
+ // the wallet is short: the CENB wallet fills it, up to what the bot was funded with
+ o.stack+=s.stack-50;s.stack=50;const wallet=db.cenbWallet.credit;manager.tick();
+ assert.equal(s.stack,2000);assert.equal(db.cenbWallet.credit,wallet-1900);assert.ok(db.ledger.some(x=>x.type==='BOT_RESTORE'&&x.auto&&x.to===b.id));
+ assert.equal(total(),before,'no credit is made or lost');
+ // with automatic re-credit off, a busted bot with an empty wallet leaves as before
+ manager.route('/api/bots/settings',{refillMinutes:0},center);b.balance=0;o.stack+=s.stack;s.stack=0;manager.tick();
+ assert.ok(!t.seats.some(x=>x?.userId===b.id),'it left the table');
+});

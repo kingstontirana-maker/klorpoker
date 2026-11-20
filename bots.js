@@ -244,7 +244,8 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const perTable=t=>fillPolicy(t)?Math.max(0,t.seats.length-fillPolicy(t).emptySeats-humansAt(t)):Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
- const canJoin=(t,b)=>(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ // A bot CENB seated on this table (pinned) comes back to it whenever a seat is free; the others follow the seating policy.
+ const canJoin=(t,b)=>b.bot.pinned===t.id?(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&freeAt(t)>=1&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t):(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
@@ -468,6 +469,16 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
  }
  // Chips asked for at the table: from the bot's wallet to its stack, only between hands (a player
  // may add chips only then) and up to the table's maximum; what does not fit stays in the wallet.
+ // Short of chips (under 30% of its buy-in, or busted): the bot adds chips from its wallet back to
+ // its buy-in instead of leaving the table. With automatic re-credit on, a wallet that is short is
+ // first filled from the CENB wallet, never above the credit the bot was funded with.
+ function topUp(b,at){const {t,s}=at;if(b.bot.mode==='seat'||t.waitlist?.length||t.waitOffer)return 0;
+  const target=Math.min(buyinFor(b,t),engine.buyinLimits(t).max);if(!(s.stack<t.bb||s.stack<target*.3))return 0;
+  const want=target-s.stack;if(want<=0)return 0;
+  if(b.balance<want&&g.refillMinutes>0&&!db.botReclaim){const pull=Math.min(want-b.balance,Math.max(0,(b.bot.funded||0)-equity(b)),W.credit);
+   if(pull>0){periods();W.credit-=pull;b.balance+=pull;b.bot.baseline+=pull;audit('BOT_RESTORE',b,pull,{auto:true,atTable:t.id,before:b.balance-pull,after:b.balance});}}
+  const n=Math.min(want,b.balance);if(n<=0||s.stack+n<t.bb)return 0;
+  try{engine.rebuy(t,b,n/100);save();return n;}catch{return 0;}}
  function chipsToTable(b,at){const want=b.bot.addChips;delete b.bot.addChips;
   const n=Math.min(want,b.balance,engine.buyinLimits(at.t).max-at.s.stack);
   if(n>0)try{engine.rebuy(at.t,b,n/100);return n;}catch{}save();return 0;}
@@ -495,6 +506,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
       continue;
      }
      aloneDeadlines.delete(at.s);
+     topUp(b,at);
      if(shouldLeave(at.t,b,at.s)){engine.leave(at.t,b);save();continue;}}
     if(!at){
      if(-vsPlayers(b)>=b.bot.stopLoss){stop(b,'Loss limit reached');continue;}
