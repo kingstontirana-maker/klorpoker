@@ -602,3 +602,13 @@ html{touch-action:manipulation}
 
 /* Summary: network and players full width */
 .sStack{display:grid;gap:16px}
+
+/* Centre report: the network tree */
+.rpSearch{min-width:220px;max-width:320px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:#0b1413;color:inherit}
+.rpTable td{vertical-align:middle}.rpName{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.rpToggle{width:22px;height:22px;border-radius:6px;border:1px solid var(--line);background:#0f1b19;color:#92efbf;cursor:pointer;padding:0;line-height:1}
+.rpDot{width:22px;display:inline-block}.rpName .linkBtn{color:#fff;font-weight:600;text-decoration:none}.rpName .linkBtn:hover{text-decoration:underline}
+.rpSmall{font-size:11px}.rpPlayer td{color:#c9d6d2;font-size:13px}.rpPlayer .linkBtn{font-weight:500}
+.rpStaff.rpADMIN td{background:#121d1b}.rpHit .linkBtn{color:#ffd07a}
+.rpMore{padding:14px 16px}.rpMore summary{cursor:pointer;color:var(--muted)}.rpMore summary b{color:#e6f2ee}.rpMore[open] summary{margin-bottom:10px}
+.rpMore .sTable{margin-top:8px}

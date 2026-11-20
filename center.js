@@ -137,8 +137,8 @@ export function createCenter({db,store,runtime,online=()=>false,cenbValue=()=>({
   return {from:P.from,to:P.to,days:P.days,previous:{from:P.prev.from,to:P.prev.to},current:out(cur),before:out(prev),
    daily:[...daily.values()].map(d=>({day:d.day,...out(d)})),now:{...nowMoney,ok:!db.moneyMismatch},
    pending:{withdrawals:pending.length,amount:eur(pending.reduce((n,w)=>n+(w.cents||0),0))},
-   network:[...net.values()].map(m=>({...m,rake:eur(m.rake),earned:eur(m.earned),result:eur(m.result)})).sort((a,b)=>b.rake-a.rake||b.hands-a.hands||b.players-a.players||a.username.localeCompare(b.username)).slice(0,300),
-   players:[...players.values()].map(p=>({...p,rake:eur(p.rake),hands:p.hands||0,result:eur(p.result||0)})).sort((a,b)=>b.rake-a.rake||b.hands-a.hands).slice(0,200)};
+   network:[...net.values()].map(m=>({...m,parentId:ids.get(m.id)?.parentId||null,share:pct(ids.get(m.id)?.share),rake:eur(m.rake),earned:eur(m.earned),result:eur(m.result)})).sort((a,b)=>b.rake-a.rake||b.hands-a.hands||b.players-a.players||a.username.localeCompare(b.username)).slice(0,300),
+   players:[...players.values()].map(p=>({...p,parentId:ids.get(p.id)?.parentId||null,rake:eur(p.rake),hands:p.hands||0,result:eur(p.result||0)})).sort((a,b)=>b.rake-a.rake||b.hands-a.hands).slice(0,3000)};
  }
  return {directory,account,report};
 }

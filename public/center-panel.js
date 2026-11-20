@@ -19,7 +19,7 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
  const GROUPS=[
   {id:'home',label:'Dashboard',icon:'overview',pages:[['overview','Dashboard']]},
   {id:'people',label:'Users',icon:'users',pages:[['users','All users'],['accounts','Create & credit']]},
-  {id:'money',label:'Reports',icon:'revenue',pages:[['summary','Summary'],['revenue','By network'],['reports','Players'],['history','Credit movements']]},
+  {id:'money',label:'Reports',icon:'revenue',pages:[['summary','Report'],['history','Credit movements']]},
   {id:'play',label:'Tables',icon:'table',pages:[['tables','Tables'],['inspect','Live'],['hands','Hand history']]},
   {id:'pay',label:'Payments',icon:'crypto',pages:[['crypto','Crypto payments']]},
   {id:'safe',label:'Security',icon:'shield',pages:[['security','Fair play'],['moderation','Chat reports'],['activity','Activity log']]},
@@ -188,44 +188,52 @@ export function createCenterPanel({api,fmt,safe,toast,openPanel,roleNames,openHa
   $('#sRange').onsubmit=e=>{e.preventDefault();repBody={from:$('#sFrom').value,to:$('#sTo').value};loadReport();};
   $('#sCsv').onclick=()=>{if(!rep)return;csv('report-'+rep.from+'-'+rep.to,['Day','Rake from players','To the network','Centre kept','Bot rake','Hands','Hands with players','Players','New players','Deposits','Withdrawals','Credit sent to network','Credit returned'],
    rep.daily.map(d=>[d.day,d.rake,d.shares,d.center,d.bots,d.hands,d.humanHands,d.players,d.newPlayers,d.deposits,d.withdrawals,d.toNetwork,d.fromNetwork]));};
-  $('#sBody').addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o)openUser(o.dataset.open);});}
+  $('#sBody').addEventListener('click',e=>{const t=e.target.closest('[data-toggle]');if(t){const id=t.dataset.toggle;repOpen.has(id)?repOpen.delete(id):repOpen.add(id);if(rep)renderReport(rep);return;}const o=e.target.closest('[data-open]');if(o)openUser(o.dataset.open);});}
  async function loadReport(){
   document.querySelectorAll('#sPresets [data-p]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.p===repBody.preset)));
   $('#sStatus').textContent='Loading…';
-  try{rep=await api('center/report',repBody);$('#sFrom').value=rep.from;$('#sTo').value=rep.to;$('#sStatus').textContent='Updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});renderReport(rep);}catch(err){$('#sStatus').textContent=err.message;}}
+  try{rep=await api('center/report',repBody);if(!repOpen.size)for(const x of rep.network)if(x.role!=='AGENT')repOpen.add(x.id);$('#sFrom').value=rep.from;$('#sTo').value=rep.to;$('#sStatus').textContent='Updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});renderReport(rep);}catch(err){$('#sStatus').textContent=err.message;}}
+ // One clear report: what came in (rake), who got what (the network tree), what the centre kept.
+ let repOpen=new Set(),repQuery='';
  function renderReport(r){const c=r.current,b=r.before,n=r.now;
-  const label=r.from===r.to?day(r.from):day(r.from)+' – '+day(r.to),prevLabel=r.previous.from===r.previous.to?day(r.previous.from):day(r.previous.from)+' – '+day(r.previous.to);
-  const line=(name,cur,prev,{neg=false,strong=false,note=''}={})=>'<tr class="'+(strong?'strong':'')+'"><td>'+name+(note?'<small>'+note+'</small>':'')+'</td><td class="num">'+(neg&&cur?'− ':'')+fmt(cur)+'</td><td class="num muted">'+(neg&&prev?'− ':'')+fmt(prev)+'</td><td class="num">'+delta(cur,prev)+'</td></tr>';
-  const count=(name,cur,prev,note='')=>'<tr><td>'+name+(note?'<small>'+note+'</small>':'')+'</td><td class="num">'+cur+'</td><td class="num muted">'+prev+'</td><td class="num">'+delta(cur,prev)+'</td></tr>';
-  const head='<p class="sPeriod">Period <b>'+label+'</b> · compared with <b>'+prevLabel+'</b></p><table class="dataTable sTable"><thead><tr><th></th><th class="num">Period</th><th class="num">Before</th><th class="num">Change</th></tr></thead>';
-  const maxDay=Math.max(...r.daily.map(d=>d.rake),0);
-  const reconciled=n.ok;
+  const label=r.from===r.to?day(r.from):day(r.from)+' – '+day(r.to);
+  // The tree: administrators → managers → agents → players, from the centre down.
+  const kids=new Map(),add=(pid,x)=>(kids.get(pid||'')||kids.set(pid||'',[]).get(pid||'')).push(x);
+  const staffIds=new Set(r.network.map(x=>x.id));
+  for(const x of r.network)add(staffIds.has(x.parentId)?x.parentId:'',{...x,kind:'staff'});
+  for(const p of r.players)add(staffIds.has(p.parentId)?p.parentId:'',{...p,kind:'player'});
+  for(const l of kids.values())l.sort((x,y)=>(x.kind===y.kind?0:x.kind==='staff'?-1:1)||y.rake-x.rake||(y.hands||0)-(x.hands||0)||x.username.localeCompare(y.username));
+  const q=repQuery.trim().toLowerCase(),match=x=>x.username.toLowerCase().includes(q),has=x=>match(x)||(kids.get(x.id)||[]).some(has);
+  const row=(x,depth)=>{const k=x.kind==='staff'?kids.get(x.id)||[]:[];if(q&&!has(x))return '';const open=q||repOpen.has(x.id);
+   const name='<span class="rpName" style="padding-left:'+(depth*18)+'px">'+(k.length?'<button type="button" class="rpToggle" data-toggle="'+safe(x.id)+'" aria-expanded="'+open+'">'+(open?'▾':'▸')+'</button>':'<i class="rpDot"></i>')
+    +'<button type="button" class="linkBtn" data-open="'+safe(x.id)+'">'+safe(x.username)+'</button>'+(x.kind==='staff'?roleBadge(x.role):'<span class="muted rpSmall">player</span>')+'</span>';
+   const line='<tr class="'+(x.kind==='staff'?'rpStaff rp'+x.role:'rpPlayer')+(q&&match(x)?' rpHit':'')+'"><td>'+name+'</td>'
+    +'<td class="num">'+(x.kind==='staff'?(x.share??0)+'%':'')+'</td>'
+    +'<td class="num">'+(x.kind==='staff'?(x.active||0)+' / '+x.players:'')+'</td>'
+    +'<td class="num">'+(x.hands||'—')+'</td><td class="num">'+(x.hands?signed(x.result||0):'—')+'</td>'
+    +'<td class="num"><b>'+fmt(x.rake)+'</b></td><td class="num">'+(x.kind==='staff'?(x.earned?'<b class="up">'+fmt(x.earned)+'</b>':fmt(0)):'')+'</td></tr>';
+   return line+(open?k.map(y=>row(y,depth+1)).join(''):'');};
+  const top=kids.get('')||[];
   $('#sBody').innerHTML=
-   '<div class="sHero">'+kpi('Centre kept',fmt(c.center),delta(c.center,b.center)+'<small>rake '+fmt(c.rake)+' − network '+fmt(c.shares)+'</small>','hero')+kpi('Rake from players',fmt(c.rake),delta(c.rake,b.rake)+'<small>'+c.rakeHands+' hands with rake · '+fmt(c.avgRake)+' a hand</small>')
-    +kpi('Active players',c.players,delta(c.players,b.players)+'<small>'+c.newPlayers+' new in the period</small>')+kpi('Hands played',c.humanHands,delta(c.humanHands,b.humanHands)+'<small>with players · '+c.hands+' with bots too</small>')+'</div>'
-   +'<div class="sGrid"><article class="surface"><div class="sectionHead"><div><h2>1 · Revenue</h2><p class="muted">The rake real players paid, how it was shared, and what the centre kept.</p></div></div>'+head+'<tbody>'
-    +line('Rake paid by players',c.rake,b.rake,{strong:true})+line('Administrators\' share',c.byRole.ADMIN,b.byRole.ADMIN,{neg:true})+line('Managers\' share',c.byRole.MANAGER,b.byRole.MANAGER,{neg:true})+line('Agents\' share',c.byRole.AGENT,b.byRole.AGENT,{neg:true})
-    +line('= Centre kept',c.center,b.center,{strong:true})+'</tbody></table><p class="muted sNote">Rake the CENB bots paid: '+fmt(c.bots)+'. It is the house paying itself: it stays in CENB, so it is neither revenue nor a loss. Bots against real players: '+signed(c.cenbResult)+'.</p></article>'
-   +'<article class="surface"><div class="sectionHead"><div><h2>2 · Credit created and returned</h2><p class="muted">The centre creates credit: when it gives it, it comes into circulation; when it comes back, it leaves circulation.</p></div></div>'+head+'<tbody>'
-    +line('Credit created for the network',c.toNetwork,b.toNetwork,{note:'centre → administrators, agents, players'})+line('Credit created for crypto deposits',c.deposits,b.deposits,{note:c.depositCount+' payments'})+line('Credit created for CENB',c.toCenb,b.toCenb)
-    +line('= Credit created',c.created,b.created,{strong:true})
-    +line('Returned by the network',c.fromNetwork,b.fromNetwork,{neg:true})+line('Paid out as crypto withdrawals',c.withdrawals,b.withdrawals,{neg:true,note:c.withdrawalCount+' payments'})+line('Returned by CENB',c.fromCenb,b.fromCenb,{neg:true})
-    +line('= Credit returned',c.returned,b.returned,{strong:true})
-    +line('Change in circulation',c.net,b.net,{strong:true,note:'created − returned − what the centre kept from the rake'})
-    +line('Cash-outs to agents',c.cashouts,b.cashouts,{note:'players who gave credit back to their agent; it stays in circulation'})+'</tbody></table></article></div>'
-   +'<div class="sGrid"><article class="surface"><div class="sectionHead"><div><h2>3 · Play</h2></div></div>'+head+'<tbody>'
-    +count('Hands with real players',c.humanHands,b.humanHands)+count('All hands',c.hands,b.hands,'with bots too')+count('Players who played',c.players,b.players)+count('New players',c.newPlayers,b.newPlayers)+line('Average rake a hand',c.avgRake,b.avgRake)+'</tbody></table></article>'
-   +'<article class="surface"><div class="sectionHead"><div><h2>4 · Credit in circulation now</h2><p class="muted">All the credit the centre created that is out there right now, and where it is.</p></div><span class="badge '+(reconciled?'okBadge':'warnBadge')+'">'+(reconciled?'✓ MONEY CHECK OK':'CHECK')+'</span></div><table class="dataTable sTable"><tbody>'
-    +[['Players\' wallets',n.players],['On the tables',n.onTables+n.pots],['Agents',n.agents],['Managers',n.managers],['Administrators',n.admins],['CENB (wallet, rake, bots)',n.cenb.wallet+n.cenb.rake+n.cenb.bots],['Withdrawals waiting',n.held]].map(([l,v])=>'<tr><td>'+l+'</td><td class="num">'+fmt(v)+'</td></tr>').join('')
-    +'<tr class="strong"><td>Credit in circulation</td><td class="num">'+fmt(n.total)+'</td></tr></tbody></table><p class="muted sNote">'+(reconciled?'The server\'s money check confirms every movement: no credit appeared or disappeared outside the centre\'s own actions.':'The money check found a difference. Open Dashboard → Server.')+' The centre itself holds nothing: it creates credit when it gives it.</p></article></div>'
-   +'<article class="surface"><div class="sectionHead"><div><h2>5 · Day by day</h2><p class="muted">Days in Tirana time.</p></div></div><div class="tableScroll"><table class="dataTable sDaily"><thead><tr><th>Day</th><th class="num">Rake</th><th></th><th class="num">Network</th><th class="num">Centre kept</th><th class="num">Hands</th><th class="num">Players</th><th class="num">New</th><th class="num">Deposits</th><th class="num">Withdrawals</th></tr></thead><tbody>'
-    +r.daily.slice().reverse().map(d=>'<tr><td>'+day(d.day)+'</td><td class="num">'+fmt(d.rake)+'</td><td class="barCell"><i style="width:'+(maxDay?Math.round(d.rake/maxDay*100):0)+'%"></i></td><td class="num">'+fmt(d.shares)+'</td><td class="num"><b>'+fmt(d.center)+'</b></td><td class="num">'+d.humanHands+'</td><td class="num">'+d.players+'</td><td class="num">'+d.newPlayers+'</td><td class="num">'+fmt(d.deposits)+'</td><td class="num">'+fmt(d.withdrawals)+'</td></tr>').join('')
-    +'</tbody><tfoot><tr><td>Total</td><td class="num">'+fmt(c.rake)+'</td><td></td><td class="num">'+fmt(c.shares)+'</td><td class="num"><b>'+fmt(c.center)+'</b></td><td class="num">'+c.humanHands+'</td><td class="num">'+c.players+'</td><td class="num">'+c.newPlayers+'</td><td class="num">'+fmt(c.deposits)+'</td><td class="num">'+fmt(c.withdrawals)+'</td></tr></tfoot></table></div></article>'
-   +'<div class="sStack"><article class="surface"><div class="sectionHead"><div><h2>6 · Network</h2><p class="muted">Every administrator, manager and agent: their players (played in the period / all), the players\' hands and result, the rake they paid and what the member earned.</p></div></div><div class="tableScroll"><table class="dataTable"><thead><tr><th>Who</th><th class="num">Players</th><th class="num">Hands</th><th class="num">Players\' result</th><th class="num">Rake</th><th class="num">Earned</th></tr></thead><tbody>'
-    +(r.network.map(x=>'<tr class="clickRow" data-open="'+safe(x.id)+'"><td><b>'+safe(x.username)+'</b> '+roleBadge(x.role)+'</td><td class="num">'+(x.active??x.players)+' / '+x.players+'</td><td class="num">'+(x.hands||0)+'</td><td class="num">'+(x.result>0?'+':'')+fmt(x.result||0)+'</td><td class="num">'+fmt(x.rake)+'</td><td class="num">'+fmt(x.earned)+'</td></tr>').join('')||'<tr><td colspan="6" class="muted">No administrators, managers or agents yet.</td></tr>')+'</tbody></table></div></article>'
-   +'<article class="surface"><div class="sectionHead"><div><h2>7 · Players</h2><p class="muted">Everyone who played in the period, by rake paid.</p></div></div><div class="tableScroll"><table class="dataTable"><thead><tr><th>Player</th><th>Agent</th><th class="num">Hands</th><th class="num">Result</th><th class="num">Rake</th></tr></thead><tbody>'
-    +(r.players.map(x=>'<tr class="clickRow" data-open="'+safe(x.id)+'"><td><b>'+safe(x.username)+'</b></td><td class="muted">'+safe(x.agent||'—')+'</td><td class="num">'+(x.hands||0)+'</td><td class="num">'+(x.result>0?'+':'')+fmt(x.result||0)+'</td><td class="num">'+fmt(x.rake)+'</td></tr>').join('')||'<tr><td colspan="5" class="muted">No one played in this period.</td></tr>')+'</tbody></table></div></article></div>';}
-
+   '<p class="sPeriod">Period <b>'+label+'</b></p>'
+   +'<div class="sHero">'+kpi('Rake from players',fmt(c.rake),delta(c.rake,b.rake)+'<small>'+c.rakeHands+' hands with rake</small>','hero')
+    +kpi('Paid to the network',fmt(c.shares),'<small>admins '+fmt(c.byRole.ADMIN)+' · managers '+fmt(c.byRole.MANAGER)+' · agents '+fmt(c.byRole.AGENT)+'</small>')
+    +kpi('Centre kept',fmt(c.center),delta(c.center,b.center)+'<small>rake − network</small>')
+    +kpi('Players · hands',c.players+' · '+c.humanHands,'<small>'+c.newPlayers+' new players</small>')+'</div>'
+   +'<article class="surface"><div class="sectionHead"><div><h2>Who brought the rake, and who earned what</h2><p class="muted">Click ▸ to open a member and see who is under it, down to the players. <b>Rake</b> = what its players paid. <b>Earned</b> = its own part of that rake.</p></div>'
+    +'<input type="search" id="rpSearch" class="rpSearch" placeholder="Find an agent or player…" value="'+safe(repQuery)+'"></div>'
+    +'<div class="tableScroll"><table class="dataTable rpTable"><thead><tr><th>Who</th><th class="num">Share</th><th class="num">Players played / all</th><th class="num">Hands</th><th class="num">Players won / lost</th><th class="num">Rake</th><th class="num">Earned</th></tr></thead><tbody>'
+    +(top.map(x=>row(x,0)).join('')||'<tr><td colspan="7" class="muted">No accounts yet.</td></tr>')
+    +'</tbody><tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td class="num"><b>'+fmt(c.rake)+'</b></td><td class="num">'+fmt(c.shares)+'</td></tr></tfoot></table></div>'
+    +'<p class="muted sNote">Centre kept '+fmt(c.center)+' = rake '+fmt(c.rake)+' − paid to the network '+fmt(c.shares)+'. The CENB bots paid '+fmt(c.bots)+' rake; it stays in CENB and is not counted here.</p></article>'
+   +'<article class="surface"><div class="sectionHead"><div><h2>Day by day</h2></div></div><div class="tableScroll"><table class="dataTable sDaily"><thead><tr><th>Day</th><th class="num">Rake</th><th class="num">Network</th><th class="num">Centre kept</th><th class="num">Hands</th><th class="num">Players</th></tr></thead><tbody>'
+    +r.daily.slice().reverse().filter(d=>d.rake||d.humanHands).map(d=>'<tr><td>'+day(d.day)+'</td><td class="num">'+fmt(d.rake)+'</td><td class="num">'+fmt(d.shares)+'</td><td class="num"><b>'+fmt(d.center)+'</b></td><td class="num">'+d.humanHands+'</td><td class="num">'+d.players+'</td></tr>').join('')
+    +'</tbody></table>'+(r.daily.some(d=>d.rake||d.humanHands)?'':'<p class="muted">No play in this period.</p>')+'</div></article>'
+   +'<details class="surface rpMore"><summary><b>Credit</b> · created '+fmt(c.created)+' · returned '+fmt(c.returned)+' · in circulation now '+fmt(n.total)+'</summary><table class="dataTable sTable"><tbody>'
+    +[['Credit given to the network',c.toNetwork],['Crypto deposits',c.deposits],['Credit given to CENB',c.toCenb],['Returned by the network',-c.fromNetwork],['Crypto withdrawals',-c.withdrawals],['Returned by CENB',-c.fromCenb]].map(([l,v])=>'<tr><td>'+l+'</td><td class="num">'+fmt(v)+'</td></tr>').join('')
+    +'</tbody></table><table class="dataTable sTable"><tbody>'+[['Players\' wallets',n.players],['On the tables',n.onTables+n.pots],['Agents',n.agents],['Managers',n.managers],['Administrators',n.admins],['CENB',n.cenb.wallet+n.cenb.rake+n.cenb.bots],['Withdrawals waiting',n.held]].map(([l,v])=>'<tr><td>'+l+'</td><td class="num">'+fmt(v)+'</td></tr>').join('')
+    +'<tr class="strong"><td>In circulation now</td><td class="num">'+fmt(n.total)+'</td></tr></tbody></table></details>';
+  const sIn=$('#rpSearch');sIn.oninput=()=>{repQuery=sIn.value;const pos=sIn.selectionStart;renderReport(r);const x=$('#rpSearch');x.focus();x.setSelectionRange(pos,pos);};}
  function csv(name,head,rows){const esc=v=>{const s=String(v??'');return /[",\n;]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
   const blob=new Blob(['﻿'+[head,...rows].map(r=>r.map(esc).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 
