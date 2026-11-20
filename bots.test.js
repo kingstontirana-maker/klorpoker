@@ -535,3 +535,12 @@ test('a bot seated on a table tops up its chips instead of leaving, and may come
  manager.route('/api/bots/settings',{refillMinutes:0},center);b.balance=0;o.stack+=s.stack;s.stack=0;manager.tick();
  assert.ok(!t.seats.some(x=>x?.userId===b.id),'it left the table');
 });
+
+test('a seat kept by hand ends when the bot leaves; it does not come back past the per-table limit',()=>{
+ const {center,db,manager,t,engine}=world();
+ for(let i=0;i<4;i++)manager.route('/api/bots/seat',{tableId:'1',position:i,name:'Keep'+i,budget:40,buyin:20},center);
+ const b=db.users.find(u=>u.username==='Keep0');engine.leave(t,b);manager.tick();
+ assert.equal(b.bot.pinned,undefined,'no longer kept');
+ for(let k=0;k<5;k++)manager.tick();
+ assert.ok(!t.seats.some(x=>x?.userId===b.id),'three bots already sit there: it does not come back');
+});

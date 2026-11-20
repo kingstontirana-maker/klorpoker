@@ -80,6 +80,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
 
  // ---- House limits ----
  const g=db.botGuard??={};
+ if(!g.pinReset){for(const u of db.users)if(u.isBot)delete u.bot?.pinned;g.pinReset=1;}
  if(g.start!==undefined&&g.dayStart===undefined){g.dayStart=g.start;delete g.start;}
  for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,clashCapBB:10,refillMinutes:10,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
  const PERIODS=[['day','dailyLimit','daily'],['week','weeklyLimit','weekly'],['month','monthlyLimit','monthly']];
@@ -244,8 +245,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const perTable=t=>fillPolicy(t)?Math.max(0,t.seats.length-fillPolicy(t).emptySeats-humansAt(t)):Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
- // A bot CENB seated on this table (pinned) comes back to it whenever a seat is free; the others follow the seating policy.
- const canJoin=(t,b)=>b.bot.pinned===t.id?(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&freeAt(t)>=1&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t):(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ const canJoin=(t,b)=>(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
@@ -494,6 +494,8 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   for(const b of bots()){
    let at=seatOf(b);if(at)at.s.lastSeen=now;
    if(b.bot.addChips&&at&&(!LIVE.includes(at.t.phase)||!at.s.inHand))chipsToTable(b,at);
+   // A seat kept by hand is given up once the bot is no longer at that table.
+   if(!at&&b.bot.pinned){delete b.bot.pinned;save();}
    if(!b.bot.enabled)continue;
    try{
     const between=at&&(!LIVE.includes(at.t.phase)||!at.s.inHand),session=sessionOf(b);
