@@ -196,12 +196,12 @@ export function openStore(file){
   // For each bot and each opponent who shared its hands: what the bot won from them and lost to them.
   // In a hand, the bot's win comes from the players who lost, in proportion to what each lost;
   // a bot's loss goes to the winners in proportion to what each won (the rest of it is the rake).
-  botOpponents(since,until,botId=''){return sql.prepare(`WITH hs AS (SELECT hand_id,SUM(CASE WHEN result<0 THEN -result ELSE 0 END) AS L FROM hand_players WHERE started_at>=? AND started_at<? GROUP BY hand_id)
+  botOpponents(since,until,botId='',tableId=''){return sql.prepare(`WITH hs AS (SELECT hand_id,SUM(CASE WHEN result<0 THEN -result ELSE 0 END) AS L FROM hand_players WHERE started_at>=? AND started_at<? GROUP BY hand_id)
    SELECT a.user_id AS bot,o.user_id AS id,MAX(o.username) AS name,MAX(o.bot) AS isBot,COUNT(*) AS hands,
     SUM(CASE WHEN hs.L>0 AND a.result>0 AND o.result<0 THEN a.result*(-o.result)/hs.L ELSE 0 END) AS won,
     SUM(CASE WHEN hs.L>0 AND a.result<0 AND o.result>0 THEN (-a.result)*o.result/hs.L ELSE 0 END) AS lost
    FROM hand_players a JOIN hand_players o ON o.hand_id=a.hand_id AND o.user_id<>a.user_id JOIN hs ON hs.hand_id=a.hand_id
-   WHERE a.bot=1 AND a.started_at>=? AND a.started_at<? AND (?='' OR a.user_id=?) GROUP BY a.user_id,o.user_id`).all(since,until,since,until,botId,botId).map(r=>({...r}));},
+   WHERE a.bot=1 AND a.started_at>=? AND a.started_at<? AND (?='' OR a.user_id=?) AND (?='' OR a.hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?)) GROUP BY a.user_id,o.user_id`).all(since,until,since,until,botId,botId,tableId,tableId).map(r=>({...r}));},
   botRake(since,until){return sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND time>=? AND time<? AND instr(data,'\"bot\":true')>0").all(since,until).map(r=>{const x=JSON.parse(r.data);return {time:x.time,tableId:x.tableId,allocations:(x.allocations||[]).filter(a=>a.bot)};});},
   close(){sql.close();},
  };

@@ -123,5 +123,8 @@ test('who each bot won from and lost to, hand by hand',()=>{
  assert.deepEqual([by('u').hands,by('u').won,by('u').lost],[2,2,3],'Ana gave it 2 and took 3');
  assert.deepEqual([by('v').won,by('v').lost],[1,0]);assert.deepEqual([by('c2').won,by('c2').isBot],[2,1]);
  assert.equal(s.botOpponents(0,1500,'b').length,2,'only the period');
+ s.addHand({id:4,tableId:'2',table:'Two',startedAt:4000,players:[P('b','Bot1',5,true),P('w','Cara',-5)],winners:['Bot1']});
+ assert.deepEqual(s.botOpponents(0,10000,'','2').map(r=>[r.id,r.won]),[['w',5]],'only the chosen table');
+ assert.equal(s.botOpponents(0,10000,'','1').some(r=>r.id==='w'),false);
  s.close();
 });

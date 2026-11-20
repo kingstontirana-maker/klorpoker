@@ -149,7 +149,28 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
   const days=[];for(let d=from;d<=to&&days.length<400;d=new Date(Date.parse(d+'T12:00:00Z')+86400000).toISOString().slice(0,10))days.push(out(byDay.get(d)||{day:d,hands:0,net:0,rake:0}));
   return {from,to,today,tableId,botId,totals:{...out(T),bots:byBot.size,tables:byTable.size,winRate:T.hands?Math.round(T.won/T.hands*1000)/10:0},
    days,bots:[...byBot.values()].map(out).sort((a,b)=>b.profit-a.profit),tables:[...byTable.values()].map(out).sort((a,b)=>b.profit-a.profit),
-   wallets:wallets(),choices:{bots:bots().map(b=>({id:b.id,name:b.username})).sort((a,b)=>a.name.localeCompare(b.name)),tables:[...runtime.values()].map(t=>({id:t.id,name:t.name}))}};}
+   wallets:wallets(),choices:{bots:bots().map(b=>({id:b.id,name:b.username})).sort((a,b)=>a.name.localeCompare(b.name)),tables:[...runtime.values()].map(t=>({id:t.id,name:t.name})),...hierarchyChoices()},
+   ...fromPlayers(since,until,botId,tableId,body)};}
+ // ---- Where the profit came from: each real player against the bots, and their agent and manager ----
+ // CENB took from a player = what the bots won from them; gave = what the bots lost to them (the
+ // rake is separate: the bots' rake comes back to CENB). Bots against bots are left out.
+ const usersById=()=>new Map(db.users.map(u=>[u.id,u]));
+ const upOf=(ids,u,role)=>{for(let x=ids.get(u?.parentId),i=0;x&&i<50;x=ids.get(x.parentId),i++)if(x.role===role)return x;return null;};
+ function hierarchyChoices(){const ids=usersById(),pick=role=>db.users.filter(u=>u.role===role&&!u.isBot).map(u=>({id:u.id,name:u.username,managerId:upOf(ids,u,'MANAGER')?.id||null})).sort((a,b)=>a.name.localeCompare(b.name));
+  return {managers:pick('MANAGER'),agents:pick('AGENT')};}
+ function fromPlayers(since,until,botId,tableId,body){
+  const ids=usersById(),managerId=body.managerId?String(body.managerId):'',agentId=body.agentId?String(body.agentId):'';
+  const by=new Map();
+  for(const r of store?.botOpponents?store.botOpponents(since,until,botId||'',tableId||''):[]){if(r.isBot)continue;
+   const o=by.get(r.id)||by.set(r.id,{id:r.id,name:ids.get(r.id)?.username||r.name,hands:0,took:0,gave:0}).get(r.id);o.hands+=r.hands;o.took+=Math.round(r.won*100);o.gave+=Math.round(r.lost*100);}
+  const all=[...by.values()].map(o=>{const u=ids.get(o.id),a=upOf(ids,u,'AGENT'),m=upOf(ids,u,'MANAGER');
+   return {...o,agent:a?{id:a.id,name:a.username}:null,manager:m?{id:m.id,name:m.username}:null};});
+  const players=all.filter(p=>(!managerId||p.manager?.id===managerId)&&(!agentId||p.agent?.id===agentId));
+  const group=key=>{const g=new Map();for(const p of players){const k=p[key]?.id||'',o=g.get(k)||g.set(k,{id:k||null,name:p[key]?.name||null,players:0,hands:0,took:0,gave:0}).get(k);o.players++;o.hands+=p.hands;o.took+=p.took;o.gave+=p.gave;}return [...g.values()];};
+  const out=o=>({...o,took:o.took/100,gave:o.gave/100,net:(o.took-o.gave)/100});
+  const sort=l=>l.map(out).sort((a,b)=>b.net-a.net||b.hands-a.hands);
+  const T=players.reduce((t,p)=>({players:t.players+1,hands:t.hands+p.hands,took:t.took+p.took,gave:t.gave+p.gave}),{players:0,hands:0,took:0,gave:0});
+  return {managerId,agentId,players:sort(players),byAgent:sort(group('agent')),byManager:sort(group('manager')),fromPlayers:out(T)};}
  // ---- One bot (or all of them) in full: result, who gave it money and who took it, every movement ----
  const MOVES=['BOT_FUND','BOT_REFUND','BOT_RETURN','BOT_RESTORE'],CENB_MOVES=['CENB_CREDIT','CENB_RETURN','CENB_RAKE','CENB_RESTORE'];
  function botReport(body={}){

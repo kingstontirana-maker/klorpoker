@@ -259,10 +259,12 @@ function presetRange(p){const today=tiranaDay(Date.now());if(p==='today')return 
  if(p==='7')return [addDay(today,-6),today];if(p==='30')return [addDay(today,-29),today];if(p==='month')return [today.slice(0,8)+'01',today];
  if(p==='lastmonth'){const first=today.slice(0,8)+'01',last=addDay(first,-1);return [last.slice(0,8)+'01',last];}return [today,today];}
 let pfBusy=false;
-async function loadProfit(){if(pfBusy)return;pfBusy=true;try{const r=await api('bots/profit',{from:$('#pfFrom').value,to:$('#pfTo').value,botId:$('#pfBot').value,tableId:$('#pfTable').value});renderProfit(r);}catch(err){toast(err.message,true);}finally{pfBusy=false;}}
+async function loadProfit(){if(pfBusy)return;pfBusy=true;try{const r=await api('bots/profit',{from:$('#pfFrom').value,to:$('#pfTo').value,botId:$('#pfBot').value,tableId:$('#pfTable').value,managerId:$('#pfManager').value,agentId:$('#pfAgent').value});renderProfit(r);}catch(err){toast(err.message,true);}finally{pfBusy=false;}}
 function renderProfit(r){
  const fill=(sel,list,all)=>{const keep=sel.value;sel.innerHTML='<option value="">'+all+'</option>'+list.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');sel.value=list.some(x=>x.id===keep)?keep:'';};
- fill($('#pfBot'),r.choices.bots,'Të gjithë botat');fill($('#pfTable'),r.choices.tables,'Të gjitha tavolinat');
+ fill($('#pfBot'),r.choices.bots,'Të gjithë botat');fill($('#pfTable'),r.choices.tables,'Të gjitha tavolinat');fill($('#pfManager'),r.choices.managers||[],'Të gjithë menaxherët');
+ // With a manager chosen, only that manager's agents are offered.
+ fill($('#pfAgent'),(r.choices.agents||[]).filter(a=>!r.managerId||a.managerId===r.managerId),'Të gjithë agjentët');
  const T=r.totals;$('#pfTotals').innerHTML=[['Profiti',signed(T.profit)],['Në tavolina (pas rake)',signed(T.net)],['Rake i botave',  '<b>'+eur(T.rake)+'</b>'],['Duar','<b>'+T.hands+'</b>'],['Duar të fituara','<b>'+T.winRate+'%</b>'],['Bota · tavolina','<b>'+T.bots+' · '+T.tables+'</b>']]
   .map(([k,v])=>'<div class="kpi"><small>'+k+'</small>'+v+'</div>').join('');
  const max=Math.max(1,...r.days.map(d=>Math.abs(d.profit)));
@@ -270,11 +272,20 @@ function renderProfit(r){
  const row=(cells)=>'<tr>'+cells.join('')+'</tr>';const n=v=>'<td class="num">'+v+'</td>',s=v=>'<td class="num">'+signed(v)+'</td>';
  $('#pfDays').innerHTML=table(['Dita','Duar ','Në tavolina ','Rake ','Profiti '],r.days.slice().reverse().map(d=>row(['<td>'+d.day+'</td>',n(d.hands),s(d.net),n(eur(d.rake)),s(d.profit)])),'Asnjë dorë në këtë periudhë.');
  $('#pfBots').innerHTML=table(['Boti','Duar ','Të fituara ','Në tavolina ','Rake ','Profiti '],r.bots.map(b=>row(['<td>'+safe(b.name)+'</td>',n(b.hands),n(b.won||0),s(b.net),n(eur(b.rake)),s(b.profit)])),'Asnjë bot nuk ka luajtur në këtë periudhë.');
- $('#pfTables').innerHTML=table(['Tavolina','Duar e botave ','Në tavolina ','Rake ','Profiti '],r.tables.map(t=>row(['<td>'+safe(t.name)+'</td>',n(t.hands),s(t.net),n(eur(t.rake)),s(t.profit)])),'Asnjë tavolinë në këtë periudhë.');}
+ $('#pfTables').innerHTML=table(['Tavolina','Duar e botave ','Në tavolina ','Rake ','Profiti '],r.tables.map(t=>row(['<td>'+safe(t.name)+'</td>',n(t.hands),s(t.net),n(eur(t.rake)),s(t.profit)])),'Asnjë tavolinë në këtë periudhë.');
+ const F=r.fromPlayers||{players:0,hands:0,took:0,gave:0,net:0},who=x=>x?safe(x.name):'<span class="muted">—</span>';
+ $('#pfFromTotals').innerHTML=[['Nga lojtarët (neto)',signed(F.net)],['Mori nga lojtarët','<b>'+eur(F.took)+'</b>'],['Dha te lojtarët','<b>'+eur(F.gave)+'</b>'],['Lojtarë · duar','<b>'+F.players+' · '+F.hands+'</b>']]
+  .map(([k,v])=>'<div class="kpi"><small>'+k+'</small>'+v+'</div>').join('');
+ const grp=(list,none,empty)=>table(['Emri','Lojtarë ','Duar ','Mori ','Dha ','Neto '],list.map(g=>row(['<td>'+(g.id?safe(g.name):'<span class="muted">'+none+'</span>')+'</td>',n(g.players),n(g.hands),n(eur(g.took)),n(eur(g.gave)),s(g.net)])),empty);
+ $('#pfManagers').innerHTML=grp(r.byManager||[],'Pa menaxher','Asnjë lojtar në këtë periudhë.');
+ $('#pfAgents').innerHTML=grp(r.byAgent||[],'Pa agjent','Asnjë lojtar në këtë periudhë.');
+ $('#pfPlayers').innerHTML=table(['Lojtari','Agjenti','Menaxheri','Duar ','Mori ','Dha ','Neto '],(r.players||[]).map(p=>row(['<td>'+safe(p.name)+'</td>','<td>'+who(p.agent)+'</td>','<td>'+who(p.manager)+'</td>',n(p.hands),n(eur(p.took)),n(eur(p.gave)),s(p.net)])),'Asnjë lojtar në këtë periudhë.');}
 function setPreset(p){$$('#pfPresets [data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));const [f,t]=presetRange(p);$('#pfFrom').value=f;$('#pfTo').value=t;loadProfit();}
 $('#pfPresets').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(b)setPreset(b.dataset.p);});
 for(const id of ['#pfFrom','#pfTo'])$(id).addEventListener('change',()=>{$$('#pfPresets [data-p]').forEach(b=>b.classList.remove('on'));loadProfit();});
-for(const id of ['#pfBot','#pfTable'])$(id).addEventListener('change',loadProfit);
+for(const id of ['#pfBot','#pfTable','#pfAgent'])$(id).addEventListener('change',loadProfit);
+// A new manager clears the agent, which may belong to another manager.
+$('#pfManager').addEventListener('change',()=>{$('#pfAgent').value='';loadProfit();});
 const openProfit=()=>{$('#tabs [data-tab="profit"]').click();};
 document.addEventListener('click',e=>{if(e.target.closest('.profitCard')&&!e.target.closest('button'))openProfit();});
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest?.('.profitCard')){e.preventDefault();openProfit();}});

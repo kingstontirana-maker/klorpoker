@@ -29,12 +29,17 @@
    <div id="rpBody"><div class="empty">Duke ngarkuar…</div></div></div></section>
   <section data-pane="profit" class="hidden"><div class="card">
    <div class="pfHead"><h2>Profiti i CENB</h2><div class="pfPresets" id="pfPresets"><button type="button" data-p="today" class="on">Sot</button><button type="button" data-p="yesterday">Dje</button><button type="button" data-p="7">7 ditë</button><button type="button" data-p="30">30 ditë</button><button type="button" data-p="month">Ky muaj</button><button type="button" data-p="lastmonth">Muaji i kaluar</button></div></div>
-   <div class="pfFilters"><label>Nga<input type="date" id="pfFrom"></label><label>Deri<input type="date" id="pfTo"></label><label>Boti<select id="pfBot"><option value="">Të gjithë botat</option></select></label><label>Tavolina<select id="pfTable"><option value="">Të gjitha tavolinat</option></select></label></div>
+   <div class="pfFilters"><label>Nga<input type="date" id="pfFrom"></label><label>Deri<input type="date" id="pfTo"></label><label>Boti<select id="pfBot"><option value="">Të gjithë botat</option></select></label><label>Tavolina<select id="pfTable"><option value="">Të gjitha tavolinat</option></select></label><label>Menaxheri<select id="pfManager"><option value="">Të gjithë menaxherët</option></select></label><label>Agjenti<select id="pfAgent"><option value="">Të gjithë agjentët</option></select></label></div>
    <p class="muted pfNote">Profiti = ajo që botat fituan në tavolina (pas rake) + rake-u që paguan botat (kthehet te CENB). Botat që luajnë mes tyre nuk ndryshojnë profitin.</p>
    <div class="kpis pfTotals" id="pfTotals"></div>
    <h3>Ditë për ditë</h3><div class="pfChart" id="pfChart"></div><div class="tableWrap" id="pfDays"></div>
    <h3>Sipas botit</h3><div class="tableWrap" id="pfBots"></div>
-   <h3>Sipas tavolinës</h3><div class="tableWrap" id="pfTables"></div></div></section>
+   <h3>Sipas tavolinës</h3><div class="tableWrap" id="pfTables"></div>
+   <h3>Nga cilët lojtarë</h3><p class="muted pfNote">Mori = sa fituan botat nga lojtari · Dha = sa humbën botat te lojtari. Rake-u nuk është këtu, ai numërohet veç te profiti. Filtrat Menaxheri / Agjenti zbatohen këtu.</p>
+   <div class="kpis pfTotals" id="pfFromTotals"></div>
+   <h3>Sipas menaxherit</h3><div class="tableWrap" id="pfManagers"></div>
+   <h3>Sipas agjentit</h3><div class="tableWrap" id="pfAgents"></div>
+   <h3>Sipas lojtarit</h3><div class="tableWrap" id="pfPlayers"></div></div></section>
   <section data-pane="bots"><div class="botFilters"><input type="search" id="bfSearch" placeholder="Kërko botin…" autocomplete="off"><select id="bfStatus"><option value="">Të gjithë</option><option value="playing">Luajnë tani</option><option value="on">Ndezur</option><option value="waiting">Presin / kërkojnë tavolinë</option><option value="off">Të ndalur</option><option value="err">Limit / gabim</option></select><select id="bfStyle"><option value="">Çdo stil</option></select><select id="bfTable"><option value="">Çdo tavolinë</option></select><select id="bfSort"><option value="name">Rendit: emri</option><option value="total">Fitimi total</option><option value="session">Kjo seancë</option><option value="hands">Duar</option><option value="equity">Portofol + stack</option></select><span class="muted" id="bfCount"></span></div><p class="botListHelp">Kliko një bot për statistikat, veprimet dhe konfigurimin.</p><div class="bots" id="botList" role="list" aria-label="Lista e botëve"></div></section>
   <section data-pane="fill" class="hidden"><div class="split">
    <form class="card" id="fillForm"><h2>Mbush tavolinat me një klikim</h2><p>Eksperiment me kredi virtuale. Botat ulen direkt me emrat e listës dhe konfigurim sipas tavolinës. Vendimet gjatë lojës mbeten sipas konfigurimit ekzistues.</p>
