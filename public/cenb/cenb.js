@@ -124,7 +124,15 @@ $('#reclaimDialog').addEventListener('click',async e=>{const btn=e.target.closes
   toast('U kthyen '+money(r.returned)+' nga '+r.bots+' bota'+(r.waiting?' · '+r.waiting+' po mbarojnë dorën, kthehen vetë':''));await refresh();}catch(err){toast(err.message,true);}finally{btn.disabled=false;}});
 $('#restoreBots').onclick=async()=>{if(!confirm('Të rikreditohen botat?\n\n• Çdo bot që nuk është në tavolinë kthehet te kredia me të cilën u financua.\n• Botat që fituan u japin atyre që humbën, dhe rake-u i botave u kthehet atyre.\n• Ajo që mbetet plus shkon te kuleta e CENB.\n\nBotat në tavolinë nuk preken: për t\'i përfshirë, shtyp më parë "Ndalo të gjithë".'))return;
  try{const r=await api('bots/restore');toast(r.bots+' bota u rikredituan'+(r.full?'':' (pjesërisht: kredia nuk mjaftonte)')+' · kuleta e CENB +'+eur(r.walletChange)+' = '+eur(r.wallet)+(r.seated?' · '+r.seated+' në tavolinë nuk u prekën':''));await refresh();}catch(err){toast(err.message,true);}};
-$('#stopAll').onclick=async()=>{if(!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;try{const r=await api('bots/stopall');toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}};
+// Stop: only the bots that are on but not playing (waiting or looking for a table), or all of them.
+$('#stopAll').onclick=()=>{const b=data?.bots||[],idle=b.filter(x=>x.enabled&&!x.seatedAt),all=b.filter(x=>x.enabled||x.seatedAt);
+ $('#stIdle').textContent=idle.length?idle.length+' bota':'Asnjë bot i ndezur jashtë tavolinave';$('[data-st="idle"]').disabled=!idle.length;
+ $('#stAll').textContent=all.length?all.length+' bota · '+b.filter(x=>x.seatedAt).length+' në tavolina':'Asnjë bot i ndezur';$('[data-st="all"]').disabled=!all.length;
+ $('#stopDialog').showModal();};
+$('#stClose').onclick=()=>$('#stopDialog').close();
+$('#stopDialog').addEventListener('click',async e=>{const btn=e.target.closest('[data-st]');if(!btn||btn.disabled)return;const only=btn.dataset.st;
+ if(only==='all'&&!confirm('Të ndalen TË GJITHË botat tani? Ata që janë në një dorë ngrihen sapo të mbarojë.'))return;
+ btn.disabled=true;try{const r=await api('bots/stopall',only==='idle'?{only:'idle'}:{});$('#stopDialog').close();toast(r.stopped+' bota u ndalën');await refresh();}catch(err){toast(err.message,true);}finally{btn.disabled=false;}});
 $('#startAll').onclick=async()=>{try{const r=await api('bots/startall');toast(r.started+' bota u nisën');await refresh();}catch(err){toast(err.message,true);}};
 
 // ---- Other tabs ----

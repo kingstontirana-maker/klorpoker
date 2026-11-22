@@ -80,6 +80,10 @@
    <div class="liveBody"><div class="liveTableWrap"><div class="liveFelt" id="liveFelt"></div></div>
     <aside class="liveSide"><div class="liveCtrl" id="liveCtrl"><p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p></div>
      <h3>Ngjarjet</h3><ol class="liveEvents" id="liveEvents"></ol></aside></div></dialog>
+  <dialog id="stopDialog" class="seatDialog"><form method="dialog"><h2>Ndalo botat</h2><p class="muted">Botat e ndalur nuk ulen më në tavolina derisa t'i nisësh sërish.</p>
+   <div class="rcChoices"><button type="button" class="rcChoice" data-st="idle"><b>Vetëm botat që nuk janë në lojë</b><span id="stIdle"></span><small>Botat e ndezur që presin ose kërkojnë tavolinë. Ata që luajnë në tavolina nuk preken.</small></button>
+   <button type="button" class="rcChoice danger" data-st="all"><b>Të gjithë botat</b><span id="stAll"></span><small>Ndalen të gjithë. Ata që janë në një dorë ngrihen kur mbaron dora.</small></button></div>
+   <div class="seatActions"><button type="button" id="stClose">Anulo</button></div></form></dialog>
   <dialog id="reclaimDialog" class="seatDialog"><form method="dialog"><h2>Mblidh kredinë e botave</h2><p class="muted">Kredia kthehet te kuleta e kredisë së CENB. Llogaritë e botave mbeten, me €0.</p>
    <div class="rcChoices"><button type="button" class="rcChoice" data-rc="off"><b>Vetëm botat e fikur</b><span id="rcOff"></span><small>Botat që luajnë nuk preken.</small></button>
    <button type="button" class="rcChoice danger" data-rc="all"><b>Të gjithë botat</b><span id="rcAll"></span><small>Ndalen të gjithë. Ata që janë në një dorë ngrihen kur mbaron dora dhe kredia e tyre kthehet vetë.</small></button></div>

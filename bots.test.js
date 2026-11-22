@@ -544,3 +544,13 @@ test('a seat kept by hand ends when the bot leaves; it does not come back past t
  for(let k=0;k<5;k++)manager.tick();
  assert.ok(!t.seats.some(x=>x?.userId===b.id),'three bots already sit there: it does not come back');
 });
+
+test('stop only the bots that are not playing, or all of them',()=>{
+ const {center,db,t,manager,engine}=world();
+ manager.route('/api/bots/bulk',{count:3,budget:100,tableId:'1',buyin:40,stopLoss:100},center);
+ const [a,b,c]=db.users.filter(u=>u.isBot);for(const x of [a,b,c])x.bot.enabled=true;
+ engine.sit(t,a,0,40,[t]);engine.sit(t,b,1,40,[t]);
+ assert.equal(manager.route('/api/bots/stopall',{only:'idle'},center).stopped,1);
+ assert.deepEqual([a.bot.enabled,b.bot.enabled,c.bot.enabled],[true,true,false],'the seated bots keep playing');
+ assert.equal(manager.route('/api/bots/stopall',{},center).stopped,2);assert.ok(!a.bot.enabled&&!b.bot.enabled);
+});
