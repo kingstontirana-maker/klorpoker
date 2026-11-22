@@ -179,7 +179,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
   if(t.record){const r=t.record,name=id=>byId(id)?.username||id;Object.assign(r,{endedAt:Date.now(),board:[...t.board],showdown,pot:clean(t.pot),rake:clean(result.totalRake),
    pots:result.pots.map(p=>({amount:clean(p.amount),winners:p.winners.map(name),refunded:!!p.refunded})),payments:Object.fromEntries(Object.entries(result.payments).map(([id,n])=>[name(id),clean(n)])),
    winners:winnerIds.map(name),shown:t.lastResult.hands.map(h=>({username:h.username,cards:h.cards,rank:h.rank})),winningHands:Object.fromEntries(Object.entries(winningHands).map(([id,w])=>[name(id),{rank:w.rank,cards:w.cards}]))});
-   for(const p of r.players){const s=byId(p.userId);p.end=clean(s?s.stack:0);p.result=Math.round((p.end-p.stack)*100)/100;p.folded=!!s?.folded;}t.record=null;try{onHand(r);}catch{}}
+   for(const p of r.players){const s=byId(p.userId);p.end=clean(s?s.stack:0);p.result=Math.round((p.end-p.stack)*100)/100;p.folded=!!s?.folded;const rk=result.rakeContributions?.[p.userId];if(rk)p.rake=clean(rk);}t.record=null;try{onHand(r);}catch{}}
   for(const s of t.seats)if(s)s.roundBet=0;
   t.phase='finished';setTurn(t,-1);
   for(let i=0;i<t.seats.length;i++)if(t.seats[i]?.leaveAfterHand)cashOutSeat(t,i,'LEFT');

@@ -43,6 +43,8 @@ export function openStore(file){
  // WAL with FULL sync: a finished commit survives a crash or a power cut.
  sql.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;PRAGMA busy_timeout=5000;');
  sql.exec(SCHEMA);
+ // The rake each player paid in a hand (older databases get the column, filled below once).
+ if(!sql.prepare('PRAGMA table_info(hand_players)').all().some(c=>c.name==='rake'))sql.exec('ALTER TABLE hand_players ADD COLUMN rake REAL NOT NULL DEFAULT 0');
  const q={
   putUser:sql.prepare('INSERT INTO users(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data'),
   delUser:sql.prepare('DELETE FROM users WHERE id=?'),
@@ -76,11 +78,20 @@ export function openStore(file){
   for(const key of saved.settings.keys())if(!next.settings.has(key))q.delSetting.run(key);
   return next;
  };
- const addHandPlayer=sql.prepare('INSERT OR IGNORE INTO hand_players(hand_id,user_id,username,started_at,result,won,vpip,bot) VALUES(?,?,?,?,?,?,?,?)');
- const insertPlayers=h=>{for(const p of h.players||[])if(p.userId)addHandPlayer.run(h.id,p.userId,p.username??null,h.startedAt??null,Number(p.result)||0,(h.winners||[]).includes(p.username)?1:0,(h.actions||[]).some(a=>a.street==='preflop'&&a.username===p.username&&VOLUNTARY.has(a.type))?1:0,p.bot?1:0);};
+ const addHandPlayer=sql.prepare('INSERT OR IGNORE INTO hand_players(hand_id,user_id,username,started_at,result,won,vpip,bot,rake) VALUES(?,?,?,?,?,?,?,?,?)');
+ const insertPlayers=h=>{for(const p of h.players||[])if(p.userId)addHandPlayer.run(h.id,p.userId,p.username??null,h.startedAt??null,Number(p.result)||0,(h.winners||[]).includes(p.username)?1:0,(h.actions||[]).some(a=>a.street==='preflop'&&a.username===p.username&&VOLUNTARY.has(a.type))?1:0,p.bot?1:0,Number(p.rake)||0);};
  const insertHand=h=>{q.addHand.run(h.id,h.tableId==null?null:String(h.tableId),h.startedAt??null,handPlayers(h),JSON.stringify(h));insertPlayers(h);};
  // Databases made before player statistics existed: fill them once from the stored hands.
  if(!q.getMeta.get('handPlayers'))transaction(()=>{for(const r of sql.prepare('SELECT data FROM hands').all())insertPlayers(JSON.parse(r.data));q.setMeta.run('handPlayers','1');});
+ // Hands stored before the rake was kept per player: it is taken once from the rake entries of the
+ // ledger (same table and hand number, the first entry after the hand started).
+ if(!q.getMeta.get('handRake'))transaction(()=>{
+  const led=new Map();for(const r of sql.prepare("SELECT data FROM ledger WHERE type='RAKE'").all()){const x=JSON.parse(r.data);if(x.hand==null||!x.allocations)continue;const k=String(x.tableId)+'|'+x.hand;(led.get(k)||led.set(k,[]).get(k)).push(x);}
+  const up=sql.prepare('UPDATE hand_players SET rake=? WHERE hand_id=? AND user_id=?');
+  for(const r of sql.prepare("SELECT id,table_id AS tableId,started_at AS at,json_extract(data,'$.hand') AS hand FROM hands WHERE json_extract(data,'$.rake')>0").all()){
+   let best=null;for(const x of led.get(String(r.tableId)+'|'+r.hand)||[])if(x.time>=(r.at||0)&&x.time-(r.at||0)<6*3600000&&(!best||x.time<best.time))best=x;
+   if(best)for(const a of best.allocations)if(a.amount>0)up.run(a.amount/100,r.id,a.userId);}
+  q.setMeta.run('handRake','1');});
  let oldestSeq=1;
  const store={
   claim(){claimed=true;q.setMeta.run('owner',instance);},
@@ -198,12 +209,18 @@ export function openStore(file){
   // For each bot and each opponent who shared its hands: what the bot won from them and lost to them.
   // In a hand, the bot's win comes from the players who lost, in proportion to what each lost;
   // a bot's loss goes to the winners in proportion to what each won (the rest of it is the rake).
-  botOpponents(since,until,botId='',tableId=''){return sql.prepare(`WITH hs AS (SELECT hand_id,SUM(CASE WHEN result<0 THEN -result ELSE 0 END) AS L FROM hand_players WHERE started_at>=? AND started_at<? GROUP BY hand_id)
+  // In every hand with a bot: what each bot won from (or lost to) each other player. Results are taken
+  // before the rake (result + rake paid), shared in proportion, so the bots' own rake, which comes back
+  // to CENB, is part of what they took, and the bots' total against the players equals the CENB profit.
+  botOpponents(since,until,botId='',tableId=''){return sql.prepare(`WITH hs AS (SELECT hand_id,SUM(CASE WHEN result+rake<0 THEN -(result+rake) ELSE 0 END) AS L FROM hand_players WHERE started_at>=? AND started_at<? GROUP BY hand_id)
    SELECT a.user_id AS bot,o.user_id AS id,MAX(o.username) AS name,MAX(o.bot) AS isBot,COUNT(*) AS hands,
-    SUM(CASE WHEN hs.L>0 AND a.result>0 AND o.result<0 THEN a.result*(-o.result)/hs.L ELSE 0 END) AS won,
-    SUM(CASE WHEN hs.L>0 AND a.result<0 AND o.result>0 THEN (-a.result)*o.result/hs.L ELSE 0 END) AS lost
+    SUM(CASE WHEN hs.L>0 AND a.result+a.rake>0 AND o.result+o.rake<0 THEN (a.result+a.rake)*(-(o.result+o.rake))/hs.L ELSE 0 END) AS won,
+    SUM(CASE WHEN hs.L>0 AND a.result+a.rake<0 AND o.result+o.rake>0 THEN (-(a.result+a.rake))*(o.result+o.rake)/hs.L ELSE 0 END) AS lost
    FROM hand_players a JOIN hand_players o ON o.hand_id=a.hand_id AND o.user_id<>a.user_id JOIN hs ON hs.hand_id=a.hand_id
    WHERE a.bot=1 AND a.started_at>=? AND a.started_at<? AND (?='' OR a.user_id=?) AND (?='' OR a.hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?)) GROUP BY a.user_id,o.user_id`).all(since,until,since,until,botId,botId,tableId,tableId).map(r=>({...r}));},
+  // Hands with the bots (each hand once), and each real player's hands against them.
+  botHands(since,until,botId='',tableId=''){return sql.prepare(`SELECT COUNT(DISTINCT hand_id) AS n FROM hand_players WHERE bot=1 AND started_at>=? AND started_at<? AND (?='' OR user_id=?) AND (?='' OR hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?))`).get(since,until,botId,botId,tableId,tableId).n;},
+  botOpponentHands(since,until,botId='',tableId=''){return sql.prepare(`SELECT o.user_id AS id,COUNT(*) AS hands FROM hand_players o WHERE o.bot=0 AND o.started_at>=? AND o.started_at<? AND EXISTS(SELECT 1 FROM hand_players a WHERE a.hand_id=o.hand_id AND a.bot=1 AND (?='' OR a.user_id=?)) AND (?='' OR o.hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?)) GROUP BY o.user_id`).all(since,until,botId,botId,tableId,tableId).map(r=>({...r}));},
   botRake(since,until){return sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND time>=? AND time<? AND instr(data,'\"bot\":true')>0").all(since,until).map(r=>{const x=JSON.parse(r.data);return {time:x.time,tableId:x.tableId,allocations:(x.allocations||[]).filter(a=>a.bot)};});},
   close(){sql.close();},
  };

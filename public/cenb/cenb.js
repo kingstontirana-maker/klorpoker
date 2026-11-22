@@ -276,13 +276,13 @@ function renderProfit(r){
  fill($('#pfBot'),r.choices.bots,'Të gjithë botat');fill($('#pfTable'),r.choices.tables,'Të gjitha tavolinat');fill($('#pfManager'),r.choices.managers||[],'Të gjithë menaxherët');
  // With a manager chosen, only that manager's agents are offered.
  fill($('#pfAgent'),(r.choices.agents||[]).filter(a=>!r.managerId||a.managerId===r.managerId),'Të gjithë agjentët');
- const T=r.totals;$('#pfTotals').innerHTML=[['Profiti',signed(T.profit)],['Në tavolina (pas rake)',signed(T.net)],['Rake i botave',  '<b>'+eur(T.rake)+'</b>'],['Duar','<b>'+T.hands+'</b>'],['Duar të fituara','<b>'+T.winRate+'%</b>'],['Bota · tavolina','<b>'+T.bots+' · '+T.tables+'</b>']]
+ const T=r.totals;$('#pfTotals').innerHTML=[['Profiti = sa fituan botat',signed(T.profit)],['Në tavolina (pas rake)',signed(T.net)],['+ Rake i botave (kthehet te CENB)',  '<b>'+eur(T.rake)+'</b>'],['Duar me bota','<b>'+T.hands+'</b>'],['Duar të fituara','<b>'+T.winRate+'%</b>'],['Bota · tavolina','<b>'+T.bots+' · '+T.tables+'</b>']]
   .map(([k,v])=>'<div class="kpi"><small>'+k+'</small>'+v+'</div>').join('');
  const max=Math.max(1,...r.days.map(d=>Math.abs(d.profit)));
  $('#pfChart').innerHTML=r.days.length>1?r.days.map(d=>'<div class="pfBar" title="'+d.day+' · '+eur(d.profit)+'"><i class="'+(d.profit<0?'down':'up')+'" style="height:'+Math.max(2,Math.round(Math.abs(d.profit)/max*100))+'%"></i><small>'+d.day.slice(8)+'</small></div>').join(''):'';
  const row=(cells)=>'<tr>'+cells.join('')+'</tr>';const n=v=>'<td class="num">'+v+'</td>',s=v=>'<td class="num">'+signed(v)+'</td>';
  $('#pfDays').innerHTML=table(['Dita','Duar ','Në tavolina ','Rake ','Profiti '],r.days.slice().reverse().map(d=>row(['<td>'+d.day+'</td>',n(d.hands),s(d.net),n(eur(d.rake)),s(d.profit)])),'Asnjë dorë në këtë periudhë.');
- $('#pfBots').innerHTML=table(['Boti','Duar ','Të fituara ','Në tavolina ','Rake ','Profiti '],r.bots.map(b=>row(['<td>'+safe(b.name)+'</td>',n(b.hands),n(b.won||0),s(b.net),n(eur(b.rake)),s(b.profit)])),'Asnjë bot nuk ka luajtur në këtë periudhë.');
+ $('#pfBots').innerHTML=table(['Boti','Duar ','Të fituara ','Në tavolina ','Rake ','Profiti ','Nga lojtarët '],r.bots.map(b=>row(['<td>'+safe(b.name)+'</td>',n(b.hands),n(b.won||0),s(b.net),n(eur(b.rake)),s(b.profit),s(b.players||0)])),'Asnjë bot nuk ka luajtur në këtë periudhë.');
  $('#pfTables').innerHTML=table(['Tavolina','Duar e botave ','Në tavolina ','Rake ','Profiti '],r.tables.map(t=>row(['<td>'+safe(t.name)+'</td>',n(t.hands),s(t.net),n(eur(t.rake)),s(t.profit)])),'Asnjë tavolinë në këtë periudhë.');
  const F=r.fromPlayers||{players:0,hands:0,took:0,gave:0,net:0},who=x=>x?safe(x.name):'<span class="muted">—</span>';
  $('#pfFromTotals').innerHTML=[['Nga lojtarët (neto)',signed(F.net)],['Mori nga lojtarët','<b>'+eur(F.took)+'</b>'],['Dha te lojtarët','<b>'+eur(F.gave)+'</b>'],['Lojtarë · duar','<b>'+F.players+' · '+F.hands+'</b>']]

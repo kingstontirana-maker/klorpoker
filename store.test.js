@@ -128,3 +128,28 @@ test('who each bot won from and lost to, hand by hand',()=>{
  assert.equal(s.botOpponents(0,10000,'','1').some(r=>r.id==='w'),false);
  s.close();
 });
+
+test('bots against players are counted before the rake: their total equals the CENB profit; older hands get the rake once',()=>{
+ const dir=tmp(),file=path.join(dir,'rake.db');let s=openStore(file);s.commit(sample());
+ const P=(id,name,result,rake,bot)=>({userId:id,username:name,result,...(rake?{rake}:{}),...(bot?{bot:true}:{})});
+ // Pot 20, rake 1 (bot 0.5, Ana 0.5): the bot wins 9.5 after rake, Ana loses 10.5 → the bot took 10 from her before the rake.
+ s.addHand({id:1,tableId:'1',hand:1,startedAt:1000,rake:1,players:[P('b','Bot1',9.5,0.5,true),P('u','Ana',-10.5,0.5)],winners:['Bot1']});
+ // Two bots and Ana: Bot2 loses 5 to Bot1, Ana loses 4 to Bot1 (no rake).
+ s.addHand({id:2,tableId:'1',hand:2,startedAt:2000,players:[P('b','Bot1',9,0,true),P('c2','Bot2',-5,0,true),P('u','Ana',-4)],winners:['Bot1']});
+ const rows=s.botOpponents(0,10000),ana=rows.filter(r=>r.id==='u');
+ assert.equal(Math.round(ana.reduce((n,r)=>n+r.won-r.lost,0)*100),1400,'10 + 4 from Ana = what the bots made (9.5+0.5 rake, then 9-5)');
+ assert.deepEqual(s.botOpponentHands(0,10000).map(r=>[r.id,r.hands]),[['u',2]],'each hand once, not once per bot');
+ assert.equal(s.botHands(0,10000),2);assert.equal(s.botHands(0,10000,'c2'),1);
+ s.close();
+ // An older database: the column is missing and the rake is in the ledger only.
+ const old=path.join(dir,'old.db'),raw=new DatabaseSync(old);
+ raw.exec("CREATE TABLE hand_players(hand_id INTEGER NOT NULL,user_id TEXT NOT NULL,username TEXT,started_at INTEGER,result REAL NOT NULL,won INTEGER NOT NULL,vpip INTEGER NOT NULL,bot INTEGER NOT NULL,PRIMARY KEY(hand_id,user_id));CREATE TABLE hands(id INTEGER PRIMARY KEY,table_id TEXT,started_at INTEGER,players TEXT NOT NULL,data TEXT NOT NULL);CREATE TABLE ledger(seq INTEGER PRIMARY KEY AUTOINCREMENT,data TEXT NOT NULL,type TEXT GENERATED ALWAYS AS (json_extract(data,'$.type')) VIRTUAL,time INTEGER GENERATED ALWAYS AS (json_extract(data,'$.time')) VIRTUAL);");
+ raw.prepare('INSERT INTO hands VALUES(?,?,?,?,?)').run(7,'1',1000,'',JSON.stringify({id:7,tableId:'1',hand:3,startedAt:1000,rake:1}));
+ for(const [u,r,b] of [['b',9.5,1],['u',-10.5,0]])raw.prepare('INSERT INTO hand_players VALUES(7,?,?,1000,?,0,0,?)').run(u,u,r,b);
+ raw.prepare('INSERT INTO ledger(data) VALUES(?)').run(JSON.stringify({type:'RAKE',tableId:'1',hand:3,time:900,amount:100,allocations:[{userId:'b',amount:90,bot:true}]}),);
+ raw.prepare('INSERT INTO ledger(data) VALUES(?)').run(JSON.stringify({type:'RAKE',tableId:'1',hand:3,time:1500,amount:100,allocations:[{userId:'b',amount:50,bot:true},{userId:'u',amount:50}]}));
+ raw.close();s=openStore(old);
+ assert.equal(Math.round(s.botOpponents(0,10000)[0].won*100),1000,'the rake of the entry after the hand started');
+ s.close();s=openStore(old);assert.equal(Math.round(s.botOpponents(0,10000)[0].won*100),1000,'filled once');s.close();
+ fs.rmSync(dir,{recursive:true,force:true});
+});
