@@ -139,6 +139,7 @@ test('bots against players are counted before the rake: their total equals the C
  const rows=s.botOpponents(0,10000),ana=rows.filter(r=>r.id==='u');
  assert.equal(Math.round(ana.reduce((n,r)=>n+r.won-r.lost,0)*100),1400,'10 + 4 from Ana = what the bots made (9.5+0.5 rake, then 9-5)');
  assert.deepEqual(s.botOpponentHands(0,10000).map(r=>[r.id,r.hands]),[['u',2]],'each hand once, not once per bot');
+ assert.deepEqual(s.botOpponentHands(0,10000).map(r=>[Math.round(r.result*100),Math.round(r.rake*100)]),[[-1450,50]],'her exact result and rake');
  assert.equal(s.botHands(0,10000),2);assert.equal(s.botHands(0,10000,'c2'),1);
  s.close();
  // An older database: the column is missing and the rake is in the ledger only.

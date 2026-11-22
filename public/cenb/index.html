@@ -28,14 +28,14 @@
    <div class="pfFilters"><label>Nga<input type="date" id="rpFrom"></label><label>Deri<input type="date" id="rpTo"></label><label>Boti<select id="rpBot"><option value="">Të gjithë botat</option></select></label></div>
    <div id="rpBody"><div class="empty">Duke ngarkuar…</div></div></div></section>
   <section data-pane="profit" class="hidden"><div class="card">
-   <div class="pfHead"><h2>Profiti i CENB</h2><div class="pfPresets" id="pfPresets"><button type="button" data-p="today" class="on">Sot</button><button type="button" data-p="yesterday">Dje</button><button type="button" data-p="7">7 ditë</button><button type="button" data-p="30">30 ditë</button><button type="button" data-p="month">Ky muaj</button><button type="button" data-p="lastmonth">Muaji i kaluar</button></div></div>
+   <div class="pfHead"><h2>Profiti i CENB</h2><div class="pfPresets" id="pfPresets"><button type="button" data-p="24">24 orët e fundit</button><button type="button" data-p="today" class="on">Sot</button><button type="button" data-p="yesterday">Dje</button><button type="button" data-p="7">7 ditë</button><button type="button" data-p="30">30 ditë</button><button type="button" data-p="month">Ky muaj</button><button type="button" data-p="lastmonth">Muaji i kaluar</button></div></div>
    <div class="pfFilters"><label>Nga<input type="date" id="pfFrom"></label><label>Deri<input type="date" id="pfTo"></label><label>Boti<select id="pfBot"><option value="">Të gjithë botat</option></select></label><label>Tavolina<select id="pfTable"><option value="">Të gjitha tavolinat</option></select></label><label>Menaxheri<select id="pfManager"><option value="">Të gjithë menaxherët</option></select></label><label>Agjenti<select id="pfAgent"><option value="">Të gjithë agjentët</option></select></label></div>
    <p class="muted pfNote">Profiti = ajo që botat fituan në tavolina (pas rake) + rake-u që paguan botat (kthehet te CENB). Botat që luajnë mes tyre nuk ndryshojnë profitin.</p>
    <div class="kpis pfTotals" id="pfTotals"></div>
    <h3>Ditë për ditë</h3><div class="pfChart" id="pfChart"></div><div class="tableWrap" id="pfDays"></div>
    <h3>Sipas botit</h3><div class="tableWrap" id="pfBots"></div>
    <h3>Sipas tavolinës</h3><div class="tableWrap" id="pfTables"></div>
-   <h3>Nga cilët lojtarë</h3><p class="muted pfNote">Mori = sa fituan botat nga lojtari · Dha = sa humbën botat te lojtari, të dyja para rake-ut (rake-u i botave kthehet te CENB). Pa filtra, Neto është e barabartë me Profitin lart. Filtrat Menaxheri / Agjenti zbatohen këtu.</p>
+   <h3>Nga cilët lojtarë</h3><p class="muted pfNote">Lojtari fitoi / humbi = rezultati i saktë i lojtarit në duart me bota, deri në cent. Prej tij, rake-u që pagoi lojtari shkon te rrjeti dhe qendra; pjesa tjetër shkoi te botat (Botat morën) ose te lojtarët e tjerë në të njëjtën dorë. Pa filtra, Botat morën = Profiti lart. Filtrat Menaxheri / Agjenti zbatohen këtu.</p>
    <div class="kpis pfTotals" id="pfFromTotals"></div>
    <h3>Sipas menaxherit</h3><div class="tableWrap" id="pfManagers"></div>
    <h3>Sipas agjentit</h3><div class="tableWrap" id="pfAgents"></div>

@@ -205,7 +205,7 @@ export function openStore(file){
   // CENB profit report: bot results per bot, table and hour; the rake bots paid.
   // Every bot's result over all the hands it ever finished (euros), for the bot list.
   botPlayTotals(){return sql.prepare('SELECT user_id AS id,COUNT(*) AS hands,SUM(result) AS net FROM hand_players WHERE bot=1 GROUP BY user_id').all();},
-  botResults(since,until){return sql.prepare('SELECT hp.user_id AS id,hp.username AS name,h.table_id AS tableId,CAST(hp.started_at/3600000 AS INTEGER) AS hour,COUNT(*) AS hands,SUM(hp.result) AS net,SUM(hp.won) AS won FROM hand_players hp JOIN hands h ON h.id=hp.hand_id WHERE hp.bot=1 AND hp.started_at>=? AND hp.started_at<? GROUP BY hp.user_id,h.table_id,hour').all(since,until);},
+  botResults(since,until){return sql.prepare('SELECT hp.user_id AS id,hp.username AS name,h.table_id AS tableId,CAST(hp.started_at/3600000 AS INTEGER) AS hour,COUNT(*) AS hands,SUM(hp.result) AS net,SUM(hp.rake) AS rake,SUM(hp.won) AS won FROM hand_players hp JOIN hands h ON h.id=hp.hand_id WHERE hp.bot=1 AND hp.started_at>=? AND hp.started_at<? GROUP BY hp.user_id,h.table_id,hour').all(since,until);},
   // For each bot and each opponent who shared its hands: what the bot won from them and lost to them.
   // In a hand, the bot's win comes from the players who lost, in proportion to what each lost;
   // a bot's loss goes to the winners in proportion to what each won (the rest of it is the rake).
@@ -220,7 +220,7 @@ export function openStore(file){
    WHERE a.bot=1 AND a.started_at>=? AND a.started_at<? AND (?='' OR a.user_id=?) AND (?='' OR a.hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?)) GROUP BY a.user_id,o.user_id`).all(since,until,since,until,botId,botId,tableId,tableId).map(r=>({...r}));},
   // Hands with the bots (each hand once), and each real player's hands against them.
   botHands(since,until,botId='',tableId=''){return sql.prepare(`SELECT COUNT(DISTINCT hand_id) AS n FROM hand_players WHERE bot=1 AND started_at>=? AND started_at<? AND (?='' OR user_id=?) AND (?='' OR hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?))`).get(since,until,botId,botId,tableId,tableId).n;},
-  botOpponentHands(since,until,botId='',tableId=''){return sql.prepare(`SELECT o.user_id AS id,COUNT(*) AS hands FROM hand_players o WHERE o.bot=0 AND o.started_at>=? AND o.started_at<? AND EXISTS(SELECT 1 FROM hand_players a WHERE a.hand_id=o.hand_id AND a.bot=1 AND (?='' OR a.user_id=?)) AND (?='' OR o.hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?)) GROUP BY o.user_id`).all(since,until,botId,botId,tableId,tableId).map(r=>({...r}));},
+  botOpponentHands(since,until,botId='',tableId=''){return sql.prepare(`SELECT o.user_id AS id,MAX(o.username) AS name,COUNT(*) AS hands,SUM(o.result) AS result,SUM(o.rake) AS rake FROM hand_players o WHERE o.bot=0 AND o.started_at>=? AND o.started_at<? AND EXISTS(SELECT 1 FROM hand_players a WHERE a.hand_id=o.hand_id AND a.bot=1 AND (?='' OR a.user_id=?)) AND (?='' OR o.hand_id IN (SELECT id FROM hands WHERE CAST(table_id AS TEXT)=?)) GROUP BY o.user_id`).all(since,until,botId,botId,tableId,tableId).map(r=>({...r}));},
   botRake(since,until){return sql.prepare("SELECT data FROM ledger WHERE type='RAKE' AND time>=? AND time<? AND instr(data,'\"bot\":true')>0").all(since,until).map(r=>{const x=JSON.parse(r.data);return {time:x.time,tableId:x.tableId,allocations:(x.allocations||[]).filter(a=>a.bot)};});},
   close(){sql.close();},
  };
