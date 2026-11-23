@@ -71,7 +71,7 @@ function renderKpis(){
 }
 
 // ---- Bots ----
-const statusSq=s=>s.replace('Playing at','Luan te').replace('Looking for a table','Kërkon tavolinë').replace('Waiting for players','Pret lojtarë').replace('Stopped','I ndalur').replace('Loss limit reached','Arriti limitin e humbjes').replace('Win limit reached','Arriti limitin e fitimit').replace('Wallet smaller than the buy-in','Portofoli më i vogël se buy-in').replace(/House (daily|weekly|monthly) limit reached/,(m,p)=>'Limiti '+({daily:'ditor',weekly:'javor',monthly:'mujor'}[p])+' i shtëpisë');
+const statusSq=s=>s.replace('Playing at','Luan te').replace('Looking for a table','Kërkon tavolinë').replace('Resting until','Pushim deri').replace('Waiting for players','Pret lojtarë').replace('Stopped','I ndalur').replace('Loss limit reached','Arriti limitin e humbjes').replace('Win limit reached','Arriti limitin e fitimit').replace('Wallet smaller than the buy-in','Portofoli më i vogël se buy-in').replace(/House (daily|weekly|monthly) limit reached/,(m,p)=>'Limiti '+({daily:'ditor',weekly:'javor',monthly:'mujor'}[p])+' i shtëpisë');
 function renderBots(force=false){
  const list=$('#botList');if(!force&&editing&&list.querySelector('[data-edit]'))return;
  const focused=document.activeElement?.closest('#botList [data-act]'),focusId=focused?.closest('[data-id]')?.dataset.id,focusAct=focused?.dataset.act;
@@ -148,7 +148,7 @@ function renderOthers(){
  $('#passForm').classList.toggle('hidden',!!data.signIn?.fromServer);
  renderReturns();
  renderFill();
- const f=$('#limitsForm');if(!f.contains(document.activeElement))for(const k of ['dailyLimit','weeklyLimit','monthlyLimit','maxBB','maxPerTable','clashCapBB','refillMinutes'])f[k].value=data.guard[k];
+ const f=$('#limitsForm');if(!f.contains(document.activeElement))for(const k of ['dailyLimit','weeklyLimit','monthlyLimit','maxBB','maxPerTable','clashCapBB','refillMinutes','handsMin','handsMax','restMin','restMax'])f[k].value=data.guard[k];
 }
 $('#limitsForm').onsubmit=async e=>{e.preventDefault();try{await api('bots/settings',Object.fromEntries(new FormData(e.target)));toast('Limitet u ruajtën');await refresh();}catch(err){toast(err.message,true);}};
 

@@ -118,6 +118,12 @@
    <h3 class="limSub">Botat kundër botave</h3><p class="muted">Paratë që lëvizin mes botave mbeten te CENB. Stop-loss-i i botit numëron vetëm humbjet ndaj lojtarëve realë.</p><div class="grid limWide">
    <label>Kufiri i potit (BB) · 0 pa kufi<input name="clashCapBB" type="number" min="0" max="200" step="1"><small>Kur në dorë mbeten vetëm bota, nuk e rritin potin mbi këtë (secili fut maksimumi gjysmën).</small></label>
    <label>Rikreditim automatik<select name="refillMinutes"><option value="0">Fikur</option><option value="5">Çdo 5 minuta</option><option value="10">Çdo 10 minuta</option><option value="15">Çdo 15 minuta</option><option value="30">Çdo 30 minuta</option><option value="60">Çdo 1 orë</option></select><small>Botat pa kredi që nuk janë në tavolinë mbushen deri në financimin e tyre dhe nisin sërish. Botat e ndalur me dorë ose nga limiti ndaj lojtarëve realë nuk preken.</small></label>
+   </div>
+   <h3 class="limSub">Duar për ulje</h3><p class="muted">Si një njeri: çdo bot luan një numër duarsh të rastësishëm brenda intervalit, ngrihet ndërmjet duarve dhe pushon. Vendin e tij e zë pas 20–90 sekondash një bot tjetër i lirë i kësaj tavoline, ose një bot i ri nga lista e emrave. 0 te maksimumi = pa limit.</p><div class="grid limWide">
+   <label>Duar minimum<input name="handsMin" type="number" min="0" max="2000" step="1"></label>
+   <label>Duar maksimum<input name="handsMax" type="number" min="0" max="2000" step="1"></label>
+   <label>Pushimi minimum (minuta)<input name="restMin" type="number" min="1" max="1440" step="1"></label>
+   <label>Pushimi maksimum (minuta)<input name="restMax" type="number" min="1" max="1440" step="1"></label>
    </div><div class="grid"><button class="gold">Ruaj limitet</button></div></form>
   <form class="card" id="passForm"><h2>Fjalëkalimi i CENB</h2><p id="passNote">Pas ndryshimit, sesionet e tjera mbyllen.</p><div class="grid">
    <label>Fjalëkalimi aktual<input name="current" type="password" autocomplete="current-password" required></label>

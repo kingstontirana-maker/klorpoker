@@ -82,7 +82,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const g=db.botGuard??={};
  if(!g.pinReset){for(const u of db.users)if(u.isBot)delete u.bot?.pinned;g.pinReset=1;}
  if(g.start!==undefined&&g.dayStart===undefined){g.dayStart=g.start;delete g.start;}
- for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,clashCapBB:10,refillMinutes:10,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
+ for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,clashCapBB:10,refillMinutes:10,handsMin:150,handsMax:170,restMin:20,restMax:60,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
  const PERIODS=[['day','dailyLimit','daily'],['week','weeklyLimit','weekly'],['month','monthlyLimit','monthly']];
  const tirana=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
  function keys(now){const day=tirana(now),[y,m,d]=day.split('-').map(Number),wd=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7,monday=new Date(Date.UTC(y,m-1,d-wd)).toISOString().slice(0,10);return {day,week:monday,month:day.slice(0,7)};}
@@ -224,7 +224,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
   const credit={funded:sum('BOT_FUND'),taken:sum('BOT_REFUND'),returned:sum('BOT_RETURN'),restored:rows.filter(x=>x.type==='BOT_RESTORE').reduce((n,x)=>n+(x.amount||0),0)/100};
   const bot=botId?list().find(b=>b.id===botId)||null:null;
   return {...P,bot,opponents,vsPlayers:Math.round(vsPlayers*100)/100,internal:{hands:internal.hands,moved:internal.moved/100},credit,moves};}
- function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,clashCapBB:g.clashCapBB,refillMinutes:g.refillMinutes,nextRefill:g.refillMinutes>0?lastRefill+g.refillMinutes*60000:null,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
+ function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,clashCapBB:g.clashCapBB,refillMinutes:g.refillMinutes,handsMin:g.handsMin,handsMax:g.handsMax,restMin:g.restMin,restMax:g.restMax,nextRefill:g.refillMinutes>0?lastRefill+g.refillMinutes*60000:null,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
  // ---- What bots learn about real players: only public actions, over many hands ----
@@ -235,7 +235,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  function observe(t){
   const r=t.record;if(!r||!LIVE.includes(t.phase))return;let o=seenHands.get(t.id);
   if(!o||o.hand!==t.hand){o={hand:t.hand,idx:0,vpip:new Set(),pfr:new Set()};seenHands.set(t.id,o);
-   for(const s of t.seats)if(s?.inHand){if(isHuman(s))stat(s.userId)[0]++;else{const b=db.users.find(u=>u.id===s.userId);if(b?.bot)b.bot.hands=(b.bot.hands||0)+1;}}}
+   for(const s of t.seats)if(s?.inHand){if(isHuman(s))stat(s.userId)[0]++;else{const b=db.users.find(u=>u.id===s.userId);if(b?.bot){b.bot.hands=(b.bot.hands||0)+1;b.bot.sitHands=(b.bot.sitHands||0)+1;}}}}
   for(;o.idx<r.actions.length;o.idx++){const a=r.actions[o.idx],s=t.seats[a.seat-1];if(!s||!isHuman(s)||/^AUTO/.test(a.type))continue;const p=stat(s.userId);
    if(a.street==='preflop'){if(['CALL','BET','RAISE'].includes(a.type)&&!o.vpip.has(s.userId)){o.vpip.add(s.userId);p[1]++;}if(['BET','RAISE'].includes(a.type)&&!o.pfr.has(s.userId)){o.pfr.add(s.userId);p[2]++;}}
    else{if(['BET','RAISE'].includes(a.type))p[3]++;if(a.type==='CALL')p[4]++;if(['FOLD','CALL','RAISE'].includes(a.type))p[5]++;if(a.type==='FOLD')p[6]++;}}
@@ -253,7 +253,8 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const perTable=t=>fillPolicy(t)?Math.max(0,t.seats.length-fillPolicy(t).emptySeats-humansAt(t)):Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
- const canJoin=(t,b)=>(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ let clock=Date.now();
+ const canJoin=(t,b)=>!(b.bot.restUntil>clock)&&!(b.bot.joinAfter>clock)&&(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
@@ -269,7 +270,8 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   return {id:u.id,name:u.username,risk:u.bot.risk,botClash:u.bot.botClash||'balanced',style:STYLES[u.bot.risk]?.label||u.bot.risk,mode:u.bot.mode||'play',waitForPlayers:!!u.bot.waitForPlayers,enabled:u.bot.enabled,tableId:u.bot.tableId,tableName:auto?'Auto':fixed?.name||'—',
    buyin:(u.bot.buyin||0)/100,buyinBB:u.bot.buyinBB||null,maxBB:(u.bot.maxBB||0)/100,stopLoss:u.bot.stopLoss/100,stopWin:(u.bot.stopWin||0)/100,balance:u.balance/100,equity:eq/100,
    session:sessionOf(u)/100,total:(played?(played.get(u.id)||0):eq-u.bot.funded)/100+r.rake/100,net:(played?(played.get(u.id)||0):eq-u.bot.funded)/100,returned:(u.bot.returned||0)/100,returnAvailable:returnBudget(u.bot,eq,g.returnPercent)/100,rakePaid:r.rake/100,house:((played?(played.get(u.id)||0):eq-u.bot.funded)+r.rake)/100,hands:u.bot.hands||0,
-   status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null,seatedId:at?.t.id||null};});}
+   sitHands:at?u.bot.sitHands||0:0,handTarget:at?u.bot.handTarget||null:null,restUntil:u.bot.restUntil>Date.now()?u.bot.restUntil:null,
+   status:u.bot.error||(at?'Playing at '+at.t.name:u.bot.restUntil>Date.now()?'Resting until '+new Date(u.bot.restUntil).toLocaleTimeString('en-GB',{timeZone:'Europe/Tirane',hour:'2-digit',minute:'2-digit'}):u.bot.enabled?(auto?'Looking for a table':'Waiting for players'):'Stopped'),seatedAt:at?.t.name||null,seatedId:at?.t.id||null};});}
  function configure(b,body){
   if(body.tableId!==undefined&&String(body.tableId)!==b.bot.pinned)delete b.bot.pinned;
   const risk=body.risk??b.bot.risk??'medium';if(!STYLES[risk])fail('Invalid style');
@@ -368,6 +370,9 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(body.returnPercent!==undefined)next.returnPercent=Number(body.returnPercent);
    if(body.clashCapBB!==undefined&&body.clashCapBB!==''){const n=Number(body.clashCapBB);if(!Number.isInteger(n)||n<0||n>200)fail('Kufiri i përplasjes: 0–200 BB');next.clashCapBB=n;}
    if(body.refillMinutes!==undefined&&body.refillMinutes!==''){const n=Number(body.refillMinutes);if(![0,5,10,15,30,60].includes(n))fail('Rikreditimi automatik: 0, 5, 10, 15, 30 ose 60 minuta');next.refillMinutes=n;}
+   for(const [k,lo,hi,label] of [['handsMin',0,2000,'Duart minimum'],['handsMax',0,2000,'Duart maksimum'],['restMin',1,1440,'Pushimi minimum'],['restMax',1,1440,'Pushimi maksimum']])if(body[k]!==undefined&&body[k]!==''){const n=Number(body[k]);if(!Number.isInteger(n)||n<lo||n>hi)fail(label+': '+lo+'–'+hi);next[k]=n;}
+   const hMin=next.handsMin??g.handsMin,hMax=next.handsMax??g.handsMax,rMin=next.restMin??g.restMin,rMax=next.restMax??g.restMax;
+   if(hMax>0&&hMin>hMax)fail('Duart minimum nuk mund të jenë mbi maksimumin');if(rMin>rMax)fail('Pushimi minimum nuk mund të jetë mbi maksimumin');
    Object.assign(g,next);save();return guardInfo();}
   if(p==='/api/bots/create'){const b=create(u,String(body.name||'').trim(),cents(body.budget,'Budget'),body);save();return {ok:true,id:b.id};}
   if(p==='/api/bots/bulk'){const n=Number(body.count);if(!Number.isInteger(n)||n<1||n>20)fail('Make 1–20 bots at a time');const each=cents(body.budget,'Budget');need(each*n);
@@ -488,12 +493,33 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(pull>0){periods();W.credit-=pull;b.balance+=pull;b.bot.baseline+=pull;audit('BOT_RESTORE',b,pull,{auto:true,atTable:t.id,before:b.balance-pull,after:b.balance});}}
   const n=Math.min(want,b.balance);if(n<=0||s.stack+n<t.bb)return 0;
   try{engine.rebuy(t,b,n/100);save();return n;}catch{return 0;}}
+ // ---- Hands per sitting, like a person: after 150–170 hands (each bot draws its own number) the bot
+ // gets up between hands and rests for a while; another bot takes the seat after a short pause.
+ const drawHands=()=>{const lo=Math.min(g.handsMin,g.handsMax),hi=Math.max(g.handsMin,g.handsMax);return lo+Math.floor(random()*(hi-lo+1));};
+ const pause=(lo,hi)=>Math.round((lo+random()*(hi-lo))*1000);
+ function rotate(b,at,now){const {t}=at,hands=b.bot.sitHands||0;
+  // Nobody free to take the seat: it plays a few more hands rather than leave the seat empty.
+  if(!substitute(t,b,now)){b.bot.handTarget=hands+10+Math.floor(random()*21);return false;}
+  engine.leave(t,b);delete b.bot.pinned;b.bot.sitHands=0;b.bot.handTarget=null;
+  b.bot.restUntil=now+pause(g.restMin*60,g.restMax*60);
+  audit('BOT_MANAGE',b,0,{rest:true,hands,table:t.name,until:b.bot.restUntil});
+  save();return true;}
+ // Who takes the seat: a bot of this table (or an automatic one) that is free and rested; otherwise a
+ // new bot from the name list, set up like the one that left and funded from the CENB wallet.
+ function substitute(t,old,now){
+  const ready=bots().filter(x=>x!==old&&x.bot.enabled&&!seatOf(x)&&!(x.bot.restUntil>now)&&!x.bot.error&&(x.bot.tableId===t.id||x.bot.tableId==='auto'));
+  if(ready.length){for(const x of ready)x.bot.joinAfter=now+pause(20,90);return ready[0];}
+  if(old.bot.tableId!==t.id||db.botReclaim)return null;
+  const name=(db.botNames||[]).find(n=>!db.users.some(x=>x.username.toLowerCase()===n.toLowerCase()));const c=center();
+  const budget=Math.max(old.bot.buyin||0,old.bot.funded||0);if(!name||!c||!budget||budget>W.credit||bots().length>=MAX_BOTS)return null;
+  try{const x=create(c,name,budget,{tableId:t.id,buyin:old.bot.buyin/100,stopLoss:old.bot.stopLoss/100,stopWin:(old.bot.stopWin||0)/100,waitForPlayers:old.bot.waitForPlayers,mode:old.bot.mode,risk:['low','medium','high'][Math.floor(random()*3)],botClash:old.bot.botClash||'balanced'},true);
+   x.bot.enabled=true;x.bot.baseline=equity(x);x.bot.rakeBase=rakeOf(x.id);x.bot.clashBase=0;x.bot.joinAfter=now+pause(20,90);audit('BOT_MANAGE',x,0,{enabled:true,substitute:old.username,table:t.name});return x;}catch{return null;}}
  function chipsToTable(b,at){const want=b.bot.addChips;delete b.bot.addChips;
   const n=Math.min(want,b.balance,engine.buyinLimits(at.t).max-at.s.stack);
   if(n>0)try{engine.rebuy(at.t,b,n/100);return n;}catch{}save();return 0;}
  const think=(d,v)=>{const big=d.type==='raise'&&d.amount*100>=v.stack+v.roundBet-1||d.type==='call'&&v.toCall>=v.stack*.5;
   return big?3000+random()*4000:d.type==='raise'?1500+random()*3000:d.type==='call'?1200+random()*2300:700+random()*1300;};
- function tick(now=Date.now()){
+ function tick(now=Date.now()){clock=now;
   settleReturns();
   if(db.botReclaim){const r=reclaim();if(r.bots)save();}
   if(g.refillMinutes>0&&now-lastRefill>=g.refillMinutes*60000)refill(now);
@@ -505,6 +531,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(b.bot.addChips&&at&&(!LIVE.includes(at.t.phase)||!at.s.inHand))chipsToTable(b,at);
    // A seat kept by hand is given up once the bot is no longer at that table.
    if(!at&&b.bot.pinned){delete b.bot.pinned;save();}
+   if(!at&&b.bot.sitHands){b.bot.sitHands=0;b.bot.handTarget=null;}
    if(!b.bot.enabled)continue;
    try{
     const between=at&&(!LIVE.includes(at.t.phase)||!at.s.inHand),session=sessionOf(b);
@@ -518,6 +545,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
      }
      aloneDeadlines.delete(at.s);
      topUp(b,at);
+     if(g.handsMax>0&&b.bot.mode!=='seat'){b.bot.handTarget??=drawHands();if((b.bot.sitHands||0)>=b.bot.handTarget&&rotate(b,at,now))continue;}
      if(shouldLeave(at.t,b,at.s)){engine.leave(at.t,b);save();continue;}}
     if(!at){
      if(-vsPlayers(b)>=b.bot.stopLoss){stop(b,'Loss limit reached');continue;}

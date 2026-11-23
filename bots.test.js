@@ -554,3 +554,23 @@ test('stop only the bots that are not playing, or all of them',()=>{
  assert.deepEqual([a.bot.enabled,b.bot.enabled,c.bot.enabled],[true,true,false],'the seated bots keep playing');
  assert.equal(manager.route('/api/bots/stopall',{},center).stopped,2);assert.ok(!a.bot.enabled&&!b.bot.enabled);
 });
+
+test('after its hands for this sitting a bot gets up, rests, and another bot takes the seat after a pause',()=>{
+ const {center,db,t,manager}=world({size:6});
+ manager.route('/api/bots/names',{names:'Rota1\nRota2\nRota3\nRota4'},center);
+ manager.route('/api/bots/fill',{tableId:'1',emptySeats:3,mode:'play'},center);
+ const seated=()=>t.seats.filter(Boolean).map(s=>s.username).sort();assert.deepEqual(seated(),['Rota1','Rota2','Rota3']);
+ const a=db.users.find(u=>u.username==='Rota1');a.bot.handTarget=150;a.bot.sitHands=150;
+ let now=Date.now()+1000;manager.tick(now);
+ assert.deepEqual(seated(),['Rota2','Rota3'],'it got up between hands');
+ assert.ok(a.bot.restUntil>=now+20*60000&&a.bot.restUntil<=now+60*60000,'it rests 20–60 minutes');
+ const sub=db.users.find(u=>u.username==='Rota4');assert.ok(sub?.bot.enabled,'a new bot from the list takes the seat');
+ manager.tick(now+5000);assert.deepEqual(seated(),['Rota2','Rota3'],'not at once');
+ manager.tick(now+91000);assert.deepEqual(seated(),['Rota2','Rota3','Rota4'],'after the pause');
+ manager.tick(now+120000);assert.ok(!seated().includes('Rota1'),'the resting bot does not come back');
+ // nobody free: it keeps playing a few more hands instead of leaving the seat empty
+ const b=db.users.find(u=>u.username==='Rota2');manager.route('/api/bots/names',{names:'Rota1\nRota2\nRota3'},center);
+ b.bot.handTarget=160;b.bot.sitHands=160;manager.tick(now+130000);assert.ok(seated().includes('Rota2'));assert.ok(b.bot.handTarget>=170&&b.bot.handTarget<=190);
+ const gi=manager.route('/api/bots/guard',{},center);assert.deepEqual([gi.handsMin,gi.handsMax,gi.restMin,gi.restMax],[150,170,20,60]);
+ assert.throws(()=>manager.route('/api/bots/settings',{handsMin:200,handsMax:150},center),/minimum/);
+});
