@@ -311,7 +311,10 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   const tables=c.tableId==='all'?[...runtime.values()]:[runtime.get(String(c.tableId))];
   if(!tables.length||tables.some(t=>!t))fail('Zgjidh një tavolinë të vlefshme');
   const result=periods();for(const [p,limit] of PERIODS)if(g[limit]>0&&result[p]<=-g[limit])fail('Limiti i shtëpisë është arritur');
-  const pool=(db.botNames||[]).map(name=>({name,b:db.users.find(x=>x.username.toLowerCase()===name.toLowerCase())})).filter(x=>!x.b||x.b.isBot&&!x.b.bot.enabled&&!seatOf(x.b));
+  // The list's stopped bots first, then names not used yet, then the list's idle bots
+  // and last the resting ones (the one resting longest first). Few names still fill what they can.
+  const listed=listPool(Date.now()).map(b=>({name:b.username,b})),fresh=(db.botNames||[]).filter(n=>!db.users.some(x=>x.username.toLowerCase()===n.toLowerCase())).map(name=>({name,b:null}));
+  const pool=[...listed.filter(x=>!x.b.bot.enabled),...fresh,...listed.filter(x=>x.b.bot.enabled)];
   const jobs=[],reports=[];let funding=0,newBots=0;
   for(const t of tables){
    const emptySeats=Math.min(c.emptySeats,t.seats.length),needed=Math.max(0,freeAt(t)-emptySeats);
@@ -320,13 +323,14 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(skipped)continue;
    const limits=engine.buyinLimits(t),min=Math.max(limits.min,Math.ceil(limits.max*c.buyinMinPercent/100)),max=Math.min(limits.max,Math.floor(limits.max*c.buyinMaxPercent/100));
    for(let i=0;i<needed;i++){
-    const person=pool.shift();if(!person)fail('Shto emra në listë: nuk ka mjaft emra të lirë për mbushjen');
+    const person=pool.shift();if(!person){report.short=needed-i;break;}
     const buyin=min+Math.floor(random()*(max-min+1)),budget=Math.max(buyin,Math.round(buyin*c.budgetPercent/100));
     const config={tableId:t.id,buyin:buyin/100,stopLoss:Math.max(1,Math.round(buyin*c.stopLossPercent/100))/100,stopWin:Math.round(buyin*c.stopWinPercent/100)/100,waitForPlayers:true,mode:c.mode,risk:c.risk==='mix'?['low','medium','high'][jobs.length%3]:c.risk};
     const topup=Math.max(0,budget-(person.b?.balance||0));funding+=topup;if(!person.b)newBots++;
     jobs.push({t,person,budget,topup,config,report});
    }
   }
+  if(!jobs.length&&reports.some(r=>r.short))fail('Shto emra në listë: nuk ka asnjë emër të lirë për mbushjen');
   if(bots().length+newBots>MAX_BOTS)fail('Mbushja do të tejkalojë kufirin prej '+MAX_BOTS+' botësh');
   if(!Number.isSafeInteger(funding))fail('Invalid funding');need(funding);
   db.botFill??={tables:{}};db.botFill.tables??={};
@@ -335,7 +339,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   for(const job of jobs){const {t,person,budget,topup,config,report}=job;let b=person.b;
    if(!b)b=create(u,person.name,budget,config,true);
    else{if(topup){W.credit-=topup;b.balance+=topup;b.bot.funded+=topup;audit('BOT_FUND',b,topup,{from:'cenb'});}configure(b,config);}
-   b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;b.bot.error=null;
+   b.bot.enabled=true;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;b.bot.error=null;delete b.bot.restUntil;delete b.bot.joinAfter;b.bot.sitHands=0;b.bot.handTarget=null;
    engine.sit(t,b,t.seats.findIndex(s=>!s),config.buyin,[...runtime.values()]);
    if(c.mode==='seat')engine.sitOut(t,b,true);
    audit('BOT_MANAGE',b,0,{enabled:true,fill:true});report.added++;
@@ -506,12 +510,22 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   save();return true;}
  // Who takes the seat: a bot of this table (or an automatic one) that is free and rested; otherwise a
  // new bot from the name list, set up like the one that left and funded from the CENB wallet.
+ // The list's bots that can be used now: not at a table, not stopped by a house limit; the stopped
+ // ones first, then the idle ones, then the resting ones (the one resting longest first).
+ function listPool(now){const names=new Set((db.botNames||[]).map(n=>n.toLowerCase()));
+  const rank=b=>!b.bot.enabled?0:!(b.bot.restUntil>now)?1:2;
+  return bots().filter(b=>names.has(b.username.toLowerCase())&&!seatOf(b)&&!/^House /.test(b.bot.error||'')).sort((a,b)=>rank(a)-rank(b)||(a.bot.restUntil||0)-(b.bot.restUntil||0));}
  function substitute(t,old,now){
-  const ready=bots().filter(x=>x!==old&&x.bot.enabled&&!seatOf(x)&&!(x.bot.restUntil>now)&&!x.bot.error&&(x.bot.tableId===t.id||x.bot.tableId==='auto'));
-  if(ready.length){for(const x of ready)x.bot.joinAfter=now+pause(20,90);return ready[0];}
+  // A bot already on its way to a seat (joinAfter) is not counted twice: one substitute per seat.
+  const ready=bots().filter(x=>x!==old&&x.bot.enabled&&!seatOf(x)&&!(x.bot.restUntil>now)&&!(x.bot.joinAfter>now)&&!x.bot.error&&(x.bot.tableId===t.id||x.bot.tableId==='auto'));
+  if(ready.length){ready[0].bot.joinAfter=now+pause(20,90);return ready[0];}
   if(old.bot.tableId!==t.id||db.botReclaim)return null;
   const name=(db.botNames||[]).find(n=>!db.users.some(x=>x.username.toLowerCase()===n.toLowerCase()));const c=center();
-  const budget=Math.max(old.bot.buyin||0,old.bot.funded||0);if(!name||!c||!budget||budget>W.credit||bots().length>=MAX_BOTS)return null;
+  const budget=Math.max(old.bot.buyin||0,old.bot.funded||0);if(name&&(!c||!budget||budget>W.credit||bots().length>=MAX_BOTS))return null;
+  if(!name){const x=listPool(now).find(x=>x!==old&&!(x.bot.joinAfter>now));if(!x)return null;
+   try{const missing=Math.max(0,(old.bot.buyin||0)-x.balance);if(missing>W.credit)return null;if(missing){W.credit-=missing;x.balance+=missing;x.bot.funded=(x.bot.funded||0)+missing;audit('BOT_FUND',x,missing,{from:'cenb'});}
+    configure(x,{tableId:t.id,buyin:old.bot.buyin/100,stopLoss:old.bot.stopLoss/100,stopWin:(old.bot.stopWin||0)/100,waitForPlayers:old.bot.waitForPlayers,mode:old.bot.mode,risk:x.bot.risk||'medium',botClash:old.bot.botClash||'balanced'});
+    x.bot.enabled=true;delete x.bot.restUntil;x.bot.baseline=equity(x);x.bot.rakeBase=rakeOf(x.id);x.bot.clashBase=x.bot.clash||0;x.bot.joinAfter=now+pause(20,90);audit('BOT_MANAGE',x,0,{enabled:true,substitute:old.username,table:t.name});return x;}catch{return null;}}
   try{const x=create(c,name,budget,{tableId:t.id,buyin:old.bot.buyin/100,stopLoss:old.bot.stopLoss/100,stopWin:(old.bot.stopWin||0)/100,waitForPlayers:old.bot.waitForPlayers,mode:old.bot.mode,risk:['low','medium','high'][Math.floor(random()*3)],botClash:old.bot.botClash||'balanced'},true);
    x.bot.enabled=true;x.bot.baseline=equity(x);x.bot.rakeBase=rakeOf(x.id);x.bot.clashBase=0;x.bot.joinAfter=now+pause(20,90);audit('BOT_MANAGE',x,0,{enabled:true,substitute:old.username,table:t.name});return x;}catch{return null;}}
  function chipsToTable(b,at){const want=b.bot.addChips;delete b.bot.addChips;

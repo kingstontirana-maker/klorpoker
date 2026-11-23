@@ -202,7 +202,7 @@ fillForm.onsubmit=async e=>{e.preventDefault();if(fillForm.dataset.busy||!fillFo
  const body=Object.fromEntries(new FormData(fillForm));if(Number(body.buyinMinPercent)>Number(body.buyinMaxPercent))return toast('Minimumi i buy-in nuk mund të jetë mbi maksimumin',true);
  fillForm.dataset.busy='1';$('#fillControls').disabled=true;$('#fillResult').textContent='Po mbushen tavolinat…';
  try{const r=await api('bots/fill',body);if(!Array.isArray(r.tables)||!Number.isInteger(r.added))throw Error('Serveri nuk e konfirmoi mbushjen');
-  $('#fillResult').textContent=r.added+' bota u ulën · financim '+eur(r.funded)+' kredi virtuale.\n'+r.tables.map(t=>t.name+': '+(t.skipped?'u anashkalua · '+t.skipped:t.added+' bota u shtuan · '+t.emptySeats+' vende bosh të synuara'+(t.excess?' · '+t.excess+' bota të tepërt largohen ndërmjet duarve':''))).join('\n');
+  $('#fillResult').textContent=r.added+' bota u ulën · financim '+eur(r.funded)+' kredi virtuale.\n'+r.tables.map(t=>t.name+': '+(t.skipped?'u anashkalua · '+t.skipped:t.added+' bota u shtuan · '+t.emptySeats+' vende bosh të synuara'+(t.excess?' · '+t.excess+' bota të tepërt largohen ndërmjet duarve':'')+(t.short?' · '+t.short+' vende mbetën pa bot: nuk ka më emra në listë':''))).join('\n');
   delete fillForm.dataset.dirty;toast('Mbushja përfundoi');await refresh();
  }catch(err){$('#fillResult').textContent=err.message;toast(err.message,true);}finally{delete fillForm.dataset.busy;renderFill();}
 };

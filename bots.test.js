@@ -569,8 +569,11 @@ test('after its hands for this sitting a bot gets up, rests, and another bot tak
  manager.tick(now+91000);assert.deepEqual(seated(),['Rota2','Rota3','Rota4'],'after the pause');
  manager.tick(now+120000);assert.ok(!seated().includes('Rota1'),'the resting bot does not come back');
  // nobody free: it keeps playing a few more hands instead of leaving the seat empty
- const b=db.users.find(u=>u.username==='Rota2');manager.route('/api/bots/names',{names:'Rota1\nRota2\nRota3'},center);
+ const b=db.users.find(u=>u.username==='Rota2');manager.route('/api/bots/names',{names:'Rota2\nRota3\nRota4'},center);
  b.bot.handTarget=160;b.bot.sitHands=160;manager.tick(now+130000);assert.ok(seated().includes('Rota2'));assert.ok(b.bot.handTarget>=170&&b.bot.handTarget<=190);
+ // few names: a resting bot of the list ends its rest early and takes the seat
+ manager.route('/api/bots/names',{names:'Rota1\nRota2\nRota3\nRota4'},center);b.bot.sitHands=b.bot.handTarget;manager.tick(now+140000);
+ assert.ok(!seated().includes('Rota2'));assert.ok(!(a.bot.restUntil>now+140000));manager.tick(now+240000);assert.ok(seated().includes('Rota1'));
  const gi=manager.route('/api/bots/guard',{},center);assert.deepEqual([gi.handsMin,gi.handsMax,gi.restMin,gi.restMax],[150,170,20,60]);
  assert.throws(()=>manager.route('/api/bots/settings',{handsMin:200,handsMax:150},center),/minimum/);
 });

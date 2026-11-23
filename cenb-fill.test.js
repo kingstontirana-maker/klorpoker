@@ -66,8 +66,8 @@ test('single-table fill can occupy every seat; reducing the target releases exce
 });
 
 test('fill validates all tables before creating accounts or moving credit',()=>{
- for(const problem of ['names','percent','range','target','limit']){
-  const {route,db,center,names}=setup();route('names',{names:problem==='names'?names.slice(0,1):names});
+ for(const problem of ['percent','range','target','limit']){
+  const {route,db,center,names}=setup();route('names',{names});
   if(problem==='credit')center.balance=1;
   if(problem==='limit')route('settings',{maxBB:.5});
   const before=JSON.stringify({users:db.users,ledger:db.ledger,fill:db.botFill});
@@ -125,4 +125,16 @@ test('one fill covers the complete production table catalog and persists its con
 test('fill with little credit in CENB is refused before anything changes; the message names the shortfall',()=>{
  const {route,db,names}=setup();route('names',{names});route('wallet',{action:'return',amount:db.cenbWallet.credit/100-0.01});const before=JSON.stringify({u:db.users,w:db.cenbWallet});
  assert.throws(()=>route('fill',{tableId:'all'}),/Kreditoje CENB nga qendra/);assert.equal(JSON.stringify({u:db.users,w:db.cenbWallet}),before);
+});
+
+test('few names still fill: the list is reused (stopped, idle, then resting bots) and the rest is reported',()=>{
+ const {route,db,runtime}=setup();route('names',{names:'Few_1\nFew_2\nFew_3'});
+ const r=route('fill',{tableId:'all',emptySeats:1,mode:'seat'});
+ assert.equal(r.added,3);assert.equal(r.tables.reduce((n,t)=>n+(t.short||0),0),3,'6 seats wanted, 3 names');
+ // a resting bot of the list is used by the next fill, and its rest ends
+ const [a]=db.users.filter(u=>u.isBot);const t=[...runtime.values()].find(x=>x.seats.some(s=>s?.userId===a.id));
+ const g=t.seats.findIndex(s=>s?.userId===a.id);t.seats[g]=null;a.bot.restUntil=Date.now()+3600000;
+ const again=route('fill',{tableId:t.id,emptySeats:1,mode:'seat'});assert.equal(again.added,1);assert.ok(!(a.bot.restUntil>Date.now()));
+ // every bot of the list is at a table and no name is free: nothing to fill with
+ assert.throws(()=>route('fill',{tableId:'all',emptySeats:0,mode:'seat'}),/emër/);
 });
