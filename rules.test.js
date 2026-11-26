@@ -221,3 +221,11 @@ test('rake paid by bots stays with CENB; the centre gets only the players\' rake
  const rake=db.ledger.find(x=>x.type==='RAKE');assert.ok(rake);const fromBot=rake.allocations.filter(a=>a.bot).reduce((n,a)=>n+a.amount,0);
  assert.ok(fromBot>0);assert.equal(db.cenbRake,fromBot,'the bot\'s part stays with CENB');assert.equal(db.users[0].balance,rake.amount-fromBot,'the centre gets the human\'s part');assert.equal(rake.cenb,fromBot);
 });
+
+test('chat: a viewer sees only the messages written since it opened the table',()=>{
+ const {e,t,user}=setup([10000,10000]);
+ e.chat(t,user(0),'old message');t.chat[0].at-=60000;const opened=Date.now()-1;
+ e.chat(t,user(1),'new message');
+ assert.deepEqual(e.snapshot(t,'p1',false,opened).chat.map(m=>m.text),['new message']);
+ assert.equal(e.snapshot(t,'p1',false).chat.length,2,'without a start time nothing is cut');
+});

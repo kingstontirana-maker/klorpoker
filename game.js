@@ -298,7 +298,8 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
 
  function buyinLimits(t){return {min:t.bb*10,max:t.bb*100};}
 
- function snapshot(t,userId,seen=true){
+ // chatSince: the viewer sees only the messages written since it opened the table.
+ function snapshot(t,userId,seen=true,chatSince=0){
   const present=seen&&t.seats.find(s=>s?.userId===userId);if(present){present.lastSeen=Date.now();if(present.autoSitOut)comeBack(t,present);}
   const mine=t.seats.find(s=>s?.userId===userId),shown=new Set(t.phase==='finished'?t.lastResult?.shown||[]:t.runout?t.seats.filter(inHand).map(s=>s.id):[]);
   const game=gameOf(t),myScore=mine?.inHand&&mine.cards.length>=2&&t.board.length>=3?evaluateHand(game,mine.cards,t.board):null;
@@ -309,7 +310,7 @@ export function createEngine({db,save=()=>{},onSettle=()=>{},onEquity=()=>{},onH
    visualEvents:t.visualEvents,
    nextHandAt:['waiting','finished'].includes(t.phase)&&ready>=2?Math.max(t.lastActionAt+BETWEEN_HANDS_MS,Date.now()):null,
    legalActions:{canRaise:!!mine&&canRaise(t,mine),isBet:t.currentBet===0,toCall:clean(mine?toCall(t,mine):0),minRaiseTo:clean(t.currentBet+t.minRaise),maxRaiseTo:clean(mine?maxRaiseTo(t,mine):0),potLimit:game==='omaha'},
-   serverNow:Date.now(),actionDeadline:t.turn>=0?t.deadline:null,actionDuration:t.turn>=0?t.deadline-t.turnStartedAt:ACTION_MS,runout:!!t.runout,timeBank:Math.floor((mine?.timeBank||0)/1000),chat:t.chat,
+   serverNow:Date.now(),actionDeadline:t.turn>=0?t.deadline:null,actionDuration:t.turn>=0?t.deadline-t.turnStartedAt:ACTION_MS,runout:!!t.runout,timeBank:Math.floor((mine?.timeBank||0)/1000),chat:chatSince?(t.chat||[]).filter(m=>m.at>=chatSince):t.chat,
    waitlist:waitInfo(t,userId),
    rebuyAvailableAt:mine?.rebuyAvailableAt||null,rebuyDeadline:mine?.rebuyDeadline||null,
    sittingOut:!!mine?.sittingOut,timedOut:!!mine?.timedOut,leaving:!!mine?.leaveAfterHand,mustPost:!!mine?.mustPost,

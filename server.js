@@ -233,7 +233,7 @@ if(p==='/api/tables/delete'){roleCheck(u,'CENTER');const id=String(body.id||''),
 if(p==='/api/tables/color'){roleCheck(u,'CENTER');const t=runtime.get(String(body.id||'')),rec=db.tables.find(x=>x.id===String(body.id||''));if(!t||!rec)fail('Table not found',404);if(!validColor(body.color))fail('Invalid table colour');t.color=rec.color=body.color.toLowerCase();save();return {ok:true,color:t.color};}
 if(p==='/api/ledger'){roleCheck(u,'CENTER','ADMIN','MANAGER','AGENT','USER');return ledgerFor(u);}
 if(p.startsWith('/api/table/')){let parts=p.split('/'),t=runtime.get(parts[3]);if(!t)fail('Table not found',404);const seated=t.seats.some(s=>s?.userId===u.id);if(u.role!=='USER')fail('Use your management panel',403);if(!seated&&u.balance<=0)fail(noCredit(u),403);
-if(parts[4]==='state')return engine.snapshot(t,u.id,url.searchParams.get('bg')!=='1');
+if(parts[4]==='state')return engine.snapshot(t,u.id,url.searchParams.get('bg')!=='1',chatSince(u.id,t.id));
 if(parts[4]==='rebuy'){engine.rebuy(t,u,body.amount);return {ok:true};}
 if(['sit','start','rebuy'].includes(parts[4])&&draining)fail('The server is restarting. Please try again in a moment.',503);if(['sit','start'].includes(parts[4])&&maintenance)fail('An update is about to start. Please try again in a few minutes.',503);
 if(parts[4]==='sit'){if(seatedFromSameDevice(t,u,body.device,id=>db.users.find(x=>x.id===id)))fail('Another account is seated at this table from this device right now. Leave the table with that account first.');engine.sit(t,u,body.position,body.buyin,[...runtime.values()]);const seat=t.seats.find(s=>s?.userId===u.id);if(u.avatar)seat.avatar=u.avatar;if(/^[\w-]{8,64}$/.test(body.device||'')){seat.device=body.device;recordSeen(u,clientIp(req),body.device);save();}return {ok:true};}
@@ -262,17 +262,24 @@ setInterval(guarded('presence',()=>{const now=Date.now(),users=new Set([...table
 const tableSig=t=>[t.hand,t.phase,t.turn,t.pot,t.currentBet,t.minRaise,t.deadline,t.visualSeq,t.board.length,t.runout?.at||0,t.events.length,t.events[0]?.at||0,(t.chat||[]).length,(t.chat||[]).at(-1)?.at||0,t.waitlist?.length||0,t.waitOffer?.until||0,t.lastResult?1:0,
  ...t.seats.map(s=>s?[s.userId,s.stack,s.roundBet,s.folded?1:0,s.allIn?1:0,s.inHand?1:0,s.sittingOut?1:0,s.autoSitOut?1:0,s.timedOut?1:0,s.leaveAfterHand?1:0,s.mustPost?1:0,s.rebuyDeadline||0,s.rebuyAvailableAt||0,s.timeBank||0,s.inactiveHands||0,s.shown?1:0,s.lastAction?.at||0,s.avatar||''].join(':'):'-')].join('|');
 const pushedSig=new WeakMap();
-function pushTables(all=false){pushQueued=false;pushInspect();const sigs=new Map();for(const [res,sub] of tableSubs){const t=runtime.get(sub.tableId);let sig=null;if(t&&!all){sig=sigs.get(t);if(sig===undefined){sig=tableSig(t);sigs.set(t,sig);}if(pushedSig.get(res)===sig)continue;}const u=me(sub.token);if(!u||!t||u.role!=='USER'){res.end();tableSubs.delete(res);continue;}try{res.write('data: '+JSON.stringify(engine.snapshot(t,u.id,false))+'\n\n');pushedSig.set(res,sig??tableSig(t));}catch{tableSubs.delete(res);}}}
+function pushTables(all=false){pushQueued=false;pushInspect();const sigs=new Map();for(const [res,sub] of tableSubs){const t=runtime.get(sub.tableId);let sig=null;if(t&&!all){sig=sigs.get(t);if(sig===undefined){sig=tableSig(t);sigs.set(t,sig);}if(pushedSig.get(res)===sig)continue;}const u=me(sub.token);if(!u||!t||u.role!=='USER'){res.end();tableSubs.delete(res);continue;}try{res.write('data: '+JSON.stringify(engine.snapshot(t,u.id,false,chatSince(u.id,sub.tableId)))+'\n\n');pushedSig.set(res,sig??tableSig(t));}catch{tableSubs.delete(res);}}}
 function queuePush(){if(!pushQueued&&(tableSubs.size||inspectSubs.size)){pushQueued=true;setImmediate(guarded('live updates',pushTables));}}
 setInterval(guarded('live updates',()=>{if(tableSubs.size||inspectSubs.size)pushTables(true);}),1000).unref();
 // A connection that drops (tunnel, network change) gets time to come back before the
 // player counts as away. Closing the page on purpose still takes 5 seconds.
 const RECONNECT_GRACE_MS=20000;
+// Table chat: a player sees the messages from the moment it opens the table until it leaves it.
+// A connection that drops and comes back within the grace keeps what it had; opening the table
+// again later starts an empty chat.
+const chatViews=new Map(),chatKey=(userId,tableId)=>userId+'|'+tableId;
+function chatSince(userId,tableId,opening=false){const k=chatKey(userId,tableId),now=Date.now();let v=chatViews.get(k);
+ if(!v||opening&&v.closedAt&&now-v.closedAt>RECONNECT_GRACE_MS){v={since:now};chatViews.set(k,v);}if(opening)delete v.closedAt;return v.since;}
+setInterval(()=>{const now=Date.now();for(const [k,v] of chatViews)if(v.closedAt&&now-v.closedAt>RECONNECT_GRACE_MS)chatViews.delete(k);},60000).unref();
 function openTableStream(req,res,tableId){const token=(req.headers.authorization||'').replace(/^Bearer /,''),u=me(token);if(!u)fail('Sign in to continue.',401);if(u.role!=='USER')fail('Forbidden',403);const t=runtime.get(tableId);if(!t)fail('Table not found',404);if(!t.seats.some(s=>s?.userId===u.id)&&u.balance<=0)fail(noCredit(u),403);
  res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','connection':'keep-alive','x-accel-buffering':'no'});
- tableSubs.set(res,{token,userId:u.id,tableId});res.write('data: '+JSON.stringify(engine.snapshot(t,u.id))+'\n\n');
+ tableSubs.set(res,{token,userId:u.id,tableId});res.write('data: '+JSON.stringify(engine.snapshot(t,u.id,true,chatSince(u.id,tableId,true)))+'\n\n');
  const beat=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);beat.unref();
- res.on('close',()=>{clearInterval(beat);tableSubs.delete(res);if(![...tableSubs.values()].some(s=>s.userId===u.id&&s.tableId===tableId))engine.away(t,u,RECONNECT_GRACE_MS);});}
+ res.on('close',()=>{clearInterval(beat);tableSubs.delete(res);if(![...tableSubs.values()].some(s=>s.userId===u.id&&s.tableId===tableId)){engine.away(t,u,RECONNECT_GRACE_MS);const v=chatViews.get(chatKey(u.id,tableId));if(v)v.closedAt=Date.now();}});}
 // A table that fails is logged once and tried again; the others keep playing. Its chips
 // stay safe in the database and return to the wallets on the next start.
 setInterval(()=>{if(replaced)return;for(const t of runtime.values()){try{tickTable(t);t.tickFails=0;}catch(err){t.tickFails=(t.tickFails||0)+1;if(t.tickFails===1)noteError('table '+t.name,err);}}},250).unref();
