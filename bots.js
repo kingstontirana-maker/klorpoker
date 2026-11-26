@@ -85,7 +85,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const g=db.botGuard??={};
  if(!g.pinReset){for(const u of db.users)if(u.isBot)delete u.bot?.pinned;g.pinReset=1;}
  if(g.start!==undefined&&g.dayStart===undefined){g.dayStart=g.start;delete g.start;}
- for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,clashCapBB:10,refillMinutes:10,handsMin:150,handsMax:170,restMin:20,restMax:60,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
+ for(const [k,v] of Object.entries({returnPercent:0,dailyLimit:5000,weeklyLimit:0,monthlyLimit:0,maxBB:0,maxPerTable:2,clashCapBB:10,refillMinutes:10,handsMin:150,handsMax:170,restMin:20,restMax:60,joinPlayers:0,day:'',dayStart:0,week:'',weekStart:0,month:'',monthStart:0}))g[k]??=v;
  const PERIODS=[['day','dailyLimit','daily'],['week','weeklyLimit','weekly'],['month','monthlyLimit','monthly']];
  const tirana=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
  function keys(now){const day=tirana(now),[y,m,d]=day.split('-').map(Number),wd=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7,monday=new Date(Date.UTC(y,m-1,d-wd)).toISOString().slice(0,10);return {day,week:monday,month:day.slice(0,7)};}
@@ -227,7 +227,7 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
   const credit={funded:sum('BOT_FUND'),taken:sum('BOT_REFUND'),returned:sum('BOT_RETURN'),restored:rows.filter(x=>x.type==='BOT_RESTORE').reduce((n,x)=>n+(x.amount||0),0)/100};
   const bot=botId?list().find(b=>b.id===botId)||null:null;
   return {...P,bot,opponents,vsPlayers:Math.round(vsPlayers*100)/100,internal:{hands:internal.hands,moved:internal.moved/100},credit,moves};}
- function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,clashCapBB:g.clashCapBB,refillMinutes:g.refillMinutes,handsMin:g.handsMin,handsMax:g.handsMax,restMin:g.restMin,restMax:g.restMax,nextRefill:g.refillMinutes>0?lastRefill+g.refillMinutes*60000:null,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
+ function guardInfo(){const r=periods();return {returnPercent:g.returnPercent,dailyLimit:g.dailyLimit/100,weeklyLimit:g.weeklyLimit/100,monthlyLimit:g.monthlyLimit/100,maxBB:g.maxBB/100,maxPerTable:g.maxPerTable,clashCapBB:g.clashCapBB,refillMinutes:g.refillMinutes,handsMin:g.handsMin,handsMax:g.handsMax,restMin:g.restMin,restMax:g.restMax,joinPlayers:g.joinPlayers?1:0,nextRefill:g.refillMinutes>0?lastRefill+g.refillMinutes*60000:null,today:r.day/100,week:r.week/100,month:r.month/100,day:g.day,
   stopped:bots().filter(b=>/^House .* limit reached$/.test(b.bot.error||'')).map(b=>b.bot.error).filter((x,i,a)=>a.indexOf(x)===i)};}
 
  // ---- What bots learn about real players: only public actions, over many hands ----
@@ -250,14 +250,22 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
 
  // ---- Where a bot sits ----
  const humansAt=t=>t.seats.filter(isHuman).length,botsAt=t=>t.seats.filter(s=>s&&!isHuman(s)).length,freeAt=t=>t.seats.filter(s=>!s).length;
- const aloneDeadlines=new WeakMap(),leftAlone=new WeakSet();
+ const aloneDeadlines=new WeakMap(),leftAlone=new WeakMap();
  const crowd=t=>t.seats.length===2?2:Math.ceil(t.seats.length*.67);
  const fillPolicy=t=>db.botFill?.tables?.[t.id];
  const perTable=t=>fillPolicy(t)?Math.max(0,t.seats.length-fillPolicy(t).emptySeats-humansAt(t)):Math.max(1,Math.min(g.maxPerTable||2,t.seats.length===2?2:t.seats.length-1));
  const stakeOk=(t,b)=>!(g.maxBB>0&&t.bb>g.maxBB)&&!(b.bot.tableId==='auto'&&b.bot.maxBB>0&&t.bb>b.bot.maxBB);
  const buyinFor=(b,t)=>{const l=engine.buyinLimits(t);return b.bot.tableId==='auto'?Math.max(l.min,Math.min(l.max,b.bot.buyinBB*t.bb)):Math.min(b.bot.buyin,l.max);};
+ // botHold[table] = how many bots CENB allows there after taking one out by hand. Set when CENB stops
+ // a seated bot; cleared by a new fill of that table or by "Lejo botat"; raised when CENB seats one.
+ const holdOf=t=>db.botHold?.[t.id];
+ const held=t=>holdOf(t)!==undefined&&botsAt(t)>=holdOf(t);
+ function hold(t,n){db.botHold??={};db.botHold[t.id]=Math.max(0,n);}
  let clock=Date.now();
- const canJoin=(t,b)=>!(b.bot.restUntil>clock)&&!(b.bot.joinAfter>clock)&&(!leftAlone.has(b)||t.seats.some(Boolean))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:(humansAt(t)>=1||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
+ const canJoin=(t,b)=>!held(t)&&!(b.bot.restUntil>clock)&&!(b.bot.joinAfter>clock)&&// With joinPlayers off (the default) a real player sitting down never pulls a bot to the table: a
+ // bot that left a table because it was alone comes back where bots play (or after a few minutes),
+ // and a bot without a fill rule joins only where bots already play, unless it is set to sit and wait.
+ (!leftAlone.has(b)||(g.joinPlayers?t.seats.some(Boolean):botsAt(t)>0||clock-leftAlone.get(b)>=180000))&&stakeOk(t,b)&&(fillPolicy(t)?freeAt(t)>fillPolicy(t).emptySeats:((g.joinPlayers?humansAt(t)>=1:botsAt(t)>0)||b.bot.waitForPlayers)&&humansAt(t)<crowd(t)&&freeAt(t)>=(t.seats.length===2?1:2))&&botsAt(t)<perTable(t)&&!t.waitlist?.length&&!t.waitOffer&&b.balance>=buyinFor(b,t);
  function pickTable(b){
   // The fullest thin table first: one real player waiting alone gets a game at once.
   const options=[...runtime.values()].filter(t=>canJoin(t,b)).map(t=>({t,score:(humansAt(t)===1?3:humansAt(t)===2?2:1)-botsAt(t)*.5+random()*.4}));
@@ -338,7 +346,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   if(!Number.isSafeInteger(funding))fail('Invalid funding');need(funding);
   db.botFill??={tables:{}};db.botFill.tables??={};
   db.botFill.settings=Object.fromEntries(Object.keys(fillDefaults).map(k=>[k,c[k]]));
-  for(const report of reports)if(!report.skipped)db.botFill.tables[report.id]={emptySeats:report.emptySeats};
+  for(const report of reports)if(!report.skipped){db.botFill.tables[report.id]={emptySeats:report.emptySeats};if(db.botHold)delete db.botHold[report.id];}
   for(const job of jobs){const {t,person,budget,topup,config,report}=job;let b=person.b;
    if(!b)b=create(u,person.name,budget,config,true);
    else{if(topup){W.credit-=topup;b.balance+=topup;b.bot.funded+=topup;audit('BOT_FUND',b,topup,{from:'cenb'});}configure(b,config);}
@@ -378,6 +386,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    if(body.clashCapBB!==undefined&&body.clashCapBB!==''){const n=Number(body.clashCapBB);if(!Number.isInteger(n)||n<0||n>200)fail('Kufiri i përplasjes: 0–200 BB');next.clashCapBB=n;}
    if(body.refillMinutes!==undefined&&body.refillMinutes!==''){const n=Number(body.refillMinutes);if(![0,5,10,15,30,60].includes(n))fail('Rikreditimi automatik: 0, 5, 10, 15, 30 ose 60 minuta');next.refillMinutes=n;}
    for(const [k,lo,hi,label] of [['handsMin',0,2000,'Duart minimum'],['handsMax',0,2000,'Duart maksimum'],['restMin',1,1440,'Pushimi minimum'],['restMax',1,1440,'Pushimi maksimum']])if(body[k]!==undefined&&body[k]!==''){const n=Number(body[k]);if(!Number.isInteger(n)||n<lo||n>hi)fail(label+': '+lo+'–'+hi);next[k]=n;}
+   if(body.joinPlayers!==undefined&&body.joinPlayers!==''){const n=Number(body.joinPlayers);if(![0,1].includes(n))fail('Invalid option');next.joinPlayers=n;}
    const hMin=next.handsMin??g.handsMin,hMax=next.handsMax??g.handsMax,rMin=next.restMin??g.restMin,rMax=next.restMax??g.restMax;
    if(hMax>0&&hMin>hMax)fail('Duart minimum nuk mund të jenë mbi maksimumin');if(rMin>rMax)fail('Pushimi minimum nuk mund të jetë mbi maksimumin');
    Object.assign(g,next);save();return guardInfo();}
@@ -403,7 +412,8 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    db.ledger.push({id:crypto.randomUUID(),type:'CENB_RESTORE',amount:given,bots:free.length,rakeUsed:wallet,toProfit:left,time:Date.now()});save();
    return {ok:true,bots:free.length,seated,full:ratio===1,toBots:given/100,wallet:W.credit/100,walletChange:left/100};}
   // Tables tab: every table with every seat, and the bots that are free to be seated.
-  if(p==='/api/bots/tables'){return {tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,sb:t.sb/100,bb:t.bb/100,size:t.seats.length,min:l.min/100,max:l.max/100,live:LIVE.includes(t.phase),waiting:t.waitlist?.length||0,
+  if(p==='/api/bots/release'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);if(db.botHold)delete db.botHold[t.id];save();return {ok:true};}
+  if(p==='/api/bots/tables'){return {tables:[...runtime.values()].map(t=>{const l=engine.buyinLimits(t);return {id:t.id,name:t.name,hold:holdOf(t)??null,sb:t.sb/100,bb:t.bb/100,size:t.seats.length,min:l.min/100,max:l.max/100,live:LIVE.includes(t.phase),waiting:t.waitlist?.length||0,
     seats:t.seats.map((s,i)=>{if(!s)return null;const b=s.isBot?db.users.find(u=>u.id===s.userId):null;return {p:i,name:s.username,bot:!!s.isBot,stack:s.stack/100,out:!!s.sittingOut,...(b?{id:b.id,on:!!b.bot?.enabled,leaving:!!s.leaveAfterHand}:{})};})};}),
    free:bots().filter(b=>!seatOf(b)).map(b=>({id:b.id,name:b.username,balance:b.balance/100,risk:b.bot.risk||'medium'}))};}
   // Seat a bot on one chosen empty seat: an existing free bot, or a new one made here. The bot
@@ -419,7 +429,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     configure(b,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??(b.bot.stopLoss||b.balance)/100});}
    else{const name=String(body.name||'').trim()||freshName(),budget=body.budget===undefined||body.budget===''?buyin*2:cents(body.budget,'Budget');if(budget<buyin)fail('The budget must cover the buy-in');
     b=create(u,name,budget,{tableId:t.id,buyin:buyin/100,risk,mode,waitForPlayers:true,stopLoss:body.stopLoss??budget/100,stopWin:body.stopWin??0},true);}
-   b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;if(mode==='seat')engine.sitOut(t,b,true);
+   b.bot.enabled=true;b.bot.error=null;b.bot.pinned=t.id;engine.sit(t,b,pos,buyin/100,[...runtime.values()]);if(holdOf(t)!==undefined)hold(t,Math.max(holdOf(t),botsAt(t)));b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;if(mode==='seat')engine.sitOut(t,b,true);
    audit('BOT_MANAGE',b,0,{enabled:true,seat:pos+1,table:t.name});save();return {ok:true,bot:b.username,seat:pos+1,table:t.name};}
   // CENB wallets and the centre: credit in, credit back, profit out.
   if(p==='/api/bots/wallet'){const c=center();if(!c)fail('No center account');const a=String(body.action||'');
@@ -463,7 +473,8 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    b.balance-=n;W.credit+=n;b.bot.funded=Math.max(0,b.bot.funded-n);b.bot.baseline-=n;audit('BOT_REFUND',b,n,{from:b.id,to:'cenb'});}
   else if(p==='/api/bots/status'){if(typeof body.enabled!=='boolean')fail('Invalid status');
    if(body.enabled){if(/^House /.test(b.bot.error||''))fail('The house limit is reached: raise it or wait for the next period');if(b.bot.tableId!=='auto'&&b.balance<b.bot.buyin&&!seatOf(b))fail('The bot wallet is smaller than its buy-in');b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;}
-   b.bot.enabled=body.enabled;b.bot.error=null;if(!body.enabled){const at=seatOf(b);if(at)engine.leave(at.t,b);}audit('BOT_MANAGE',b,0,{enabled:body.enabled});}
+   if(body.enabled){const t=b.bot.tableId!=='auto'&&runtime.get(b.bot.tableId);if(t&&holdOf(t)!==undefined&&!seatOf(b))hold(t,Math.max(holdOf(t),botsAt(t)+1));}
+   b.bot.enabled=body.enabled;b.bot.error=null;if(!body.enabled){const at=seatOf(b);if(at){const n=botsAt(at.t)-1;hold(at.t,holdOf(at.t)===undefined?n:Math.min(holdOf(at.t),n));engine.leave(at.t,b);}}audit('BOT_MANAGE',b,0,{enabled:body.enabled});}
   else if(p==='/api/bots/topup'){const n=body.amount===undefined&&body.toTable?0:cents(body.amount,'Amount'),at=seatOf(b);
    if(n){need(n);W.credit-=n;b.balance+=n;b.bot.funded+=n;b.bot.baseline+=n;audit('BOT_FUND',b,n,{from:'cenb'});}
    if(body.toTable===true){if(!at)fail('The bot is not at a table');const chips=cents(body.chips??body.amount,'Chips');if(chips>b.balance)fail('The bot wallet holds only €'+(b.balance/100).toFixed(2));
@@ -566,7 +577,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
      if(-vsPlayers(b)>=b.bot.stopLoss){stop(b,'Loss limit reached',at);continue;}
      if(at.t.seats.filter(Boolean).length===1){
       if(!aloneDeadlines.has(at.s))aloneDeadlines.set(at.s,now+3000+random()*2000);
-      if(now>=aloneDeadlines.get(at.s)){engine.leave(at.t,b);leftAlone.add(b);save();}
+      if(now>=aloneDeadlines.get(at.s)){engine.leave(at.t,b);leftAlone.set(b,now);save();}
       continue;
      }
      aloneDeadlines.delete(at.s);

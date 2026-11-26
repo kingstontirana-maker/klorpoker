@@ -267,3 +267,5 @@ article.bot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:ce
 .limWide label small{display:block;font-weight:400;color:var(--muted);font-size:12px;line-height:1.4;margin-top:2px}
 
 .lseat.empty{display:grid;gap:4px;cursor:pointer;min-width:74px}.lseat.empty:hover,.lseat.empty:focus-visible{border-color:var(--gold);color:var(--gold);background:#122c20}#liveSettings{font-size:22px;padding:4px 10px}#liveSettings[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
+
+.holdNote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#ffd07a}

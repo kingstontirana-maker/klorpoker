@@ -148,7 +148,7 @@ function renderOthers(){
  $('#passForm').classList.toggle('hidden',!!data.signIn?.fromServer);
  renderReturns();
  renderFill();
- const f=$('#limitsForm');if(!f.contains(document.activeElement))for(const k of ['dailyLimit','weeklyLimit','monthlyLimit','maxBB','maxPerTable','clashCapBB','refillMinutes','handsMin','handsMax','restMin','restMax'])f[k].value=data.guard[k];
+ const f=$('#limitsForm');if(!f.contains(document.activeElement))for(const k of ['dailyLimit','weeklyLimit','monthlyLimit','maxBB','maxPerTable','clashCapBB','refillMinutes','handsMin','handsMax','restMin','restMax','joinPlayers'])f[k].value=data.guard[k];
 }
 $('#limitsForm').onsubmit=async e=>{e.preventDefault();try{await api('bots/settings',Object.fromEntries(new FormData(e.target)));toast('Limitet u ruajtën');await refresh();}catch(err){toast(err.message,true);}};
 
@@ -221,7 +221,7 @@ function renderSeats(){if(!seatData)return;const q=$('#seatSearch').value.trim()
  const prev=Number($('#seatStake').selectedOptions[0]?.previousElementSibling?.value)||0;
  const rows=seatData.tables.filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!max||(t.bb<=max&&(max===9999?t.bb>2:t.bb>prev)))&&(!freeOnly||t.seats.some(s=>!s))&&(!botsOnly||t.seats.some(s=>s?.bot)));
  $('#seatCount').textContent=rows.length+' nga '+seatData.tables.length+' tavolina · '+seatData.tables.filter(t=>t.seats.some(s=>s?.bot)).length+' me bota';
- $('#seatTables').innerHTML=rows.length?rows.map(t=>'<div class="seatRow"><div class="seatName"><b>'+safe(t.name)+'</b><button type="button" class="small gold enterBtn" data-watch="'+safe(t.id)+'">👁 Hyr</button><small>'+eur(t.sb)+' / '+eur(t.bb)+' · '+t.size+' vende'+(t.waiting?' · '+t.waiting+' në pritje':'')+(t.live?' · <span class="pill on">në lojë</span>':'')+'</small></div><div class="seatChips">'
+ $('#seatTables').innerHTML=rows.length?rows.map(t=>'<div class="seatRow"><div class="seatName"><b>'+safe(t.name)+'</b><button type="button" class="small gold enterBtn" data-watch="'+safe(t.id)+'">👁 Hyr</button><small>'+eur(t.sb)+' / '+eur(t.bb)+' · '+t.size+' vende'+(t.waiting?' · '+t.waiting+' në pritje':'')+(t.live?' · <span class="pill on">në lojë</span>':'')+'</small>'+(t.hold!=null?'<small class="holdNote">🔒 Botat e tjerë nuk ulen vetë (nxorre një bot) <button type="button" class="small" data-release="'+safe(t.id)+'">Lejo botat</button></small>':'')+'</div><div class="seatChips">'
   +t.seats.map((s,i)=>s?(s.bot?'<button type="button" class="seatChip bot'+(s.out?' out':'')+(s.leaving||!s.on?' leaving':'')+'" data-bot="'+safe(s.id||'')+'" data-bot-table="'+safe(t.id)+'" title="Shtyp për ta ndaluar"><i>'+(i+1)+'</i>'+safe(s.name)+(s.leaving||!s.on?' · ngrihet':'')+'</button>':'<span class="seatChip human'+(s.out?' out':'')+'" title="Lojtar · '+eur(s.stack)+'"><i>'+(i+1)+'</i>'+safe(s.name)+'</span>'):'<button type="button" class="seatChip empty" data-seat="'+safe(t.id)+':'+i+'"'+(t.waiting?' disabled title="Një lojtar pret radhën"':'')+'><i>'+(i+1)+'</i>＋ Ulu</button>').join('')+'</div></div>').join(''):'<div class="empty">Asnjë tavolinë nuk përputhet.</div>';}
 // Only the tables where bots sit now; the free-seats filter would hide the full ones, so it is switched off.
 $('#seatBotsOnly').addEventListener('change',()=>{if($('#seatBotsOnly').checked)$('#seatFreeOnly').checked=false;});
@@ -230,6 +230,7 @@ $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="tables"]
 setInterval(()=>loadSeats(),4000);
 const seatMode=m=>{$$('[data-seatmode]').forEach(b=>b.classList.toggle('on',b.dataset.seatmode===m));$$('[data-seatpane]').forEach(p=>p.classList.toggle('hidden',p.dataset.seatpane!==m));$('#seatForm').dataset.mode=m;};
 $('#seatDialog').addEventListener('click',e=>{const b=e.target.closest('[data-seatmode]');if(b&&!b.disabled)seatMode(b.dataset.seatmode);});
+$('#seatTables').addEventListener('click',async e=>{const r=e.target.closest('[data-release]');if(r){try{await api('bots/release',{tableId:r.dataset.release});toast('Botat mund të ulen sërish në këtë tavolinë');await loadSeats(true);}catch(err){toast(err.message,true);}return;}});
 $('#seatTables').addEventListener('click',e=>{const b=e.target.closest('[data-seat]');if(!b||b.disabled)return;const [tid,pos]=b.dataset.seat.split(':');openSeat(tid,Number(pos));});
 function openSeat(tid,pos){const t=seatData?.tables.find(x=>x.id===tid);if(!t)return;if(t.seats[pos]){toast('Ky vend është zënë',true);return;}if(t.waiting){toast('Një lojtar pret radhën',true);return;}seatPick={t,pos};
  const f=$('#seatForm');f.reset();$('#seatTitle').textContent=t.name+' · vendi '+(seatPick.pos+1);$('#seatInfo').textContent='Blinde '+eur(t.sb)+' / '+eur(t.bb)+' · buy-in '+eur(t.min)+' – '+eur(t.max);

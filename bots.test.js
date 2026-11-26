@@ -9,6 +9,8 @@ function world(opts={}){
  const center={id:'center',username:'center',role:'CENTER',balance:1000000},db={users:[center],ledger:[],rakePercent:0};
  const runtime=new Map(),engine=createEngine({db}),t=engine.makeTable('1','Test',100,200,'holdem',opts.size||6);runtime.set('1',t);
  const manager=createBots({db,runtime,engine,save:()=>{},random:opts.random||Math.random});
+ // These tests cover bots joining real players; that behaviour is an option, off by default.
+ if(opts.joinPlayers!==false)manager.route('/api/bots/settings',{joinPlayers:1},center);
  // CENB funds its bots from its own credit wallet: the test world credits it from the centre first.
  if(opts.credit!==false)manager.route('/api/bots/wallet',{action:'credit',amount:center.balance/100},center);
  const human=(i,cents=50000)=>{const u={id:'h'+i,username:'human'+i,role:'USER',balance:cents};db.users.push(u);return u;};
@@ -676,4 +678,28 @@ test('bonus recipients contain only participating non-bot players of the watched
  assert.equal(watch().testSettings.target,seated.id,'departed target does not silently become everyone');
  assert.throws(()=>configure(seated.id),/at this table/);
  configure('');assert.equal(watch().testSettings.target,'');
+});
+
+test('a bot CENB takes out by hand is not replaced until CENB decides',()=>{
+ const {center,db,t,manager}=world({size:6});
+ manager.route('/api/bots/names',{names:'Hold1\nHold2\nHold3\nHold4'},center);
+ manager.route('/api/bots/fill',{tableId:'1',emptySeats:3,mode:'play'},center);
+ manager.route('/api/bots/bulk',{count:1,budget:100,tableId:'auto',buyinBB:50,stopLoss:100},center);const spare=db.users.find(u=>u.isBot&&u.bot.tableId==='auto');spare.bot.enabled=true;spare.bot.waitForPlayers=true;
+ const seated=()=>t.seats.filter(Boolean).length;assert.equal(seated(),3);
+ const a=db.users.find(u=>u.username==='Hold1');manager.route('/api/bots/status',{id:a.id,enabled:false},center);
+ let now=Date.now();for(let i=0;i<5;i++)manager.tick(now+=1000);
+ assert.equal(seated(),2,'nobody took the seat');assert.equal(manager.route('/api/bots/tables',{},center).tables.find(x=>x.id==='1').hold,2);
+ manager.route('/api/bots/release',{tableId:'1'},center);for(let i=0;i<5;i++)manager.tick(now+=1000);
+ assert.equal(seated(),3,'after "Lejo botat" a bot sits again');
+});
+
+test('a real player sitting down does not pull a bot to the table (default)',()=>{
+ const {center,t,manager,human,engine,db}=world({joinPlayers:false});
+ manager.route('/api/bots/bulk',{count:2,budget:100,tableId:'auto',buyinBB:50,stopLoss:100},center);for(const b of db.users.filter(u=>u.isBot))b.bot.enabled=true;
+ const h=human(1);engine.sit(t,h,0,100,[t]);
+ let now=Date.now();for(let i=0;i<10;i++)manager.tick(now+=1000);
+ assert.equal(t.seats.filter(Boolean).length,1,'only the player sits');
+ assert.equal(manager.route('/api/bots/guard',{},center).joinPlayers,0);
+ manager.route('/api/bots/settings',{joinPlayers:1},center);manager.tick(now+=1000);
+ assert.ok(t.seats.filter(Boolean).length>1,'with the option on, bots join the player');
 });
