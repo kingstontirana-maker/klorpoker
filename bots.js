@@ -76,6 +76,9 @@ export function createBots({db,runtime,engine,save,olderRake,store=null,random=M
  const audit=(type,u,amount=0,extra={})=>db.ledger.push({id:crypto.randomUUID(),type,from:center()?.id,to:u.id,amount,...extra,time:Date.now()});
  const isBotId=id=>!!db.users.find(u=>u.id===id)?.isBot;
  const isHuman=s=>s&&!isBotId(s.userId);
+ const tableTests=db.botTableTests??={};
+ const testInfo=t=>{const c=tableTests[t.id]||{};return {bonus:(c.bonus||0)/100,spent:(c.spent||0)/100,remaining:Math.max(0,(c.bonus||0)-(c.spent||0))/100,target:c.target||'',botId:c.botId||'',humanStyle:!!c.humanStyle};};
+ const decisionView=(t,s,b)=>{const v=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced',g.clashCapBB);if(tableTests[t.id]?.humanStyle)delete v.outcome;return v;};
  const cents=(v,label,zero=false)=>{const n=Math.round(Number(v)*100);if(!Number.isSafeInteger(n)||n<0||(!zero&&n===0))fail(label+(zero?' must be 0 or more':' must be a positive amount'));return n;};
 
  // ---- House limits ----
@@ -428,11 +431,20 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    else fail('Unknown wallet action');save();return {ok:true,wallets:wallets()};}
   if(p==='/api/bots/profit')return profitReport(body);
   if(p==='/api/bots/report')return botReport(body);
+  if(p==='/api/bots/tabletest'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);
+   const old=tableTests[t.id]||{bonus:0,spent:0},bonus=cents(body.bonus,'Bonus',true),target=String(body.target||'');
+   if(target&&!db.users.some(u=>u.id===target&&!u.isBot&&u.role==='USER'))fail('Invalid bonus player');
+   const botId=String(body.botId??old.botId??'');
+   if(botId&&!t.seats.some(s=>s?.isBot&&s.userId===botId&&bots().some(b=>b.id===botId&&b.bot.enabled)))fail('Select an active bot at this table');
+   if(![true,false].includes(body.humanStyle))fail('Invalid human style');
+   if(bonus<old.spent)fail('Bonus cannot be less than credit already used');
+   tableTests[t.id]={bonus,spent:old.spent,target,botId,humanStyle:body.humanStyle};
+   audit('BOT_TABLE_TEST',u,0,{tableId:t.id,...tableTests[t.id]});save();return testInfo(t);}
   if(p==='/api/bots/watch'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);
    const view=engine.snapshot(t,null,false);delete view.chat;
    const info={};for(const s of t.seats){if(!s?.isBot)continue;const b=bots().find(x=>x.id===s.userId);if(!b)continue;
     info[s.id]={id:b.id,risk:b.bot.risk||'medium',botClash:b.bot.botClash||'balanced',style:STYLES[b.bot.risk]?.label||b.bot.risk,mode:b.bot.mode||'play',enabled:!!b.bot.enabled,balance:b.balance/100,stopLoss:b.bot.stopLoss/100,stopWin:(b.bot.stopWin||0)/100,session:sessionOf(b)/100,hands:b.bot.hands||0,addChips:(b.bot.addChips||0)/100,error:b.bot.error||null};}
-   return {...view,bots:info,maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
+   return {...view,bots:info,testSettings:testInfo(t),bonusPlayers:db.users.filter(u=>!u.isBot&&u.role==='USER').map(u=>({id:u.id,name:u.username})),maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
   // only:'idle' stops just the bots that are on but not at a table; the ones playing are left alone.
   if(p==='/api/bots/stopall'){const idle=body.only==='idle';let n=0;for(const b of bots())if(idle?b.bot.enabled&&!seatOf(b):b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}
@@ -573,20 +585,25 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
     const {t,s}=at;
     if(LIVE.includes(t.phase)&&t.seats[t.turn]===s&&!t.runout){
      const key=t.hand+':'+t.phase+':'+t.turnStartedAt;let plan=plans.get(s);
-     if(plan?.key!==key){const v=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced',g.clashCapBB);plan={key,v,d:null,at:0};plans.set(s,plan);
+     if(plan?.key!==key){const v=decisionView(t,s,b);plan={key,v,d:null,at:0};plans.set(s,plan);
       if(decider){const p=plan;decider(v,b.bot.risk).then(d=>{p.d=d;p.at=Math.max(Date.now(),t.turnStartedAt+think(d,v));}).catch(()=>{p.d=v.toCall?{type:'fold'}:{type:'check'};p.at=Date.now();});}
       else{plan.d=botDecision(v,b.bot.risk,random);plan.at=t.turnStartedAt+think(plan.d,v);}}
      // A decision that never came back: check when free, otherwise fold.
      if(!plan.d&&now-t.turnStartedAt>9000){plan.d=plan.v.toCall?{type:'fold'}:{type:'check'};plan.at=now;}
-     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=botClashView(botView(t,s,profileOf),isBotId,b.bot.botClash||'balanced',g.clashCapBB),d=botDecision(current,b.bot.risk,random);
+     if(plan.d&&now>=plan.at){plans.delete(s);const {v}=plan;const current=decisionView(t,s,b),d=botDecision(current,b.bot.risk,random);
       // Only humans may receive a deliberate return; avoid bot-to-bot transfers.
       const humanOnly=current.opponents.filter(o=>!o.folded).every(o=>!isBotId(o.id));
       const budget=returnBudget(b.bot,equity(b),g.returnPercent);
       const returning=d.type==='fold'&&humanOnly&&returnDecision(current,budget,random,b.bot.returnHand);
-      if(returning)d.type='call';
+      const testConfig=tableTests[t.id],active=current.opponents.filter(o=>!o.folded);
+      const bonusCost=Math.min(current.toCall,current.stack);
+      // Virtual test budget caps extra calls, not the eventual winnings of a player.
+      const bonusCall=testConfig&&(!testConfig.botId||testConfig.botId===b.id)&&active.some(o=>!isBotId(o.id)&&(!testConfig.target||o.id===testConfig.target))&&d.type==='fold'&&bonusCost>0&&bonusCost<=testConfig.bonus-testConfig.spent;
+      if(returning||bonusCall){d.type='call';delete d.amount;}
       const before=equity(b),cost=Math.min(current.toCall,current.stack);
       try{engine.act(t,b.id,d.type,d.amount);
-       if(returning){b.bot.returnHand??={tableId:t.id,hand:t.hand,equity:before,paid:0,limit:Math.floor(budget*.6)};b.bot.returnHand.paid+=cost;save();}
+       if(bonusCall){testConfig.spent+=cost;audit('BOT_TEST_BONUS',b,cost,{tableId:t.id,hand:t.hand,target:testConfig.target||'all'});save();}
+       if(returning&&!bonusCall){b.bot.returnHand??={tableId:t.id,hand:t.hand,equity:before,paid:0,limit:Math.floor(budget*.6)};b.bot.returnHand.paid+=cost;save();}
       }catch{const fallback=toCall(t,s)?current.outcome==='win'?'call':'fold':'check';engine.act(t,b.id,fallback);d.type=fallback;delete d.amount;}
       decisions.push({at:now,bot:b.username,table:t.name,hand:t.hand,street:v.phase,action:d.type,amount:d.amount??(d.type==='call'?Math.min(v.toCall,v.stack)/100:null),pot:v.pot/100,equity:d.equity==null?null:Math.round(d.equity*100)});
       if(decisions.length>200)decisions.splice(0,decisions.length-200);}}

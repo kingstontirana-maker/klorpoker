@@ -577,3 +577,81 @@ test('after its hands for this sitting a bot gets up, rests, and another bot tak
  const gi=manager.route('/api/bots/guard',{},center);assert.deepEqual([gi.handsMin,gi.handsMax,gi.restMin,gi.restMax],[150,170,20,60]);
  assert.throws(()=>manager.route('/api/bots/settings',{handsMin:200,handsMax:150},center),/minimum/);
 });
+
+
+test('virtual table bonus is validated, shared, capped and conserved across calls',()=>{
+ const {manager,center,engine,t,db,human,total}=world({size:2,random:()=>0});
+ manager.route('/api/bots/create',{name:'BonusTester',budget:500,tableId:'1',buyin:100,stopLoss:500},center);
+ const b=db.users.find(u=>u.isBot),h=human(1),other=human(2);
+ const configure=(extra={})=>manager.route('/api/bots/tabletest',{tableId:'1',bonus:6,target:h.id,humanStyle:false,...extra},center);
+ assert.throws(()=>manager.route('/api/bots/tabletest',{},{role:'USER'}),/Only the center/);
+ assert.throws(()=>configure({bonus:-1}),/Bonus/);
+ assert.throws(()=>configure({target:b.id}),/Invalid bonus player/);
+ assert.throws(()=>configure({humanStyle:'yes'}),/Invalid human style/);
+ configure({target:other.id});
+ engine.sit(t,h,0,100,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();
+ const original=total();engine.startHand(t);
+ const seat=t.seats.find(s=>s?.userId===b.id);seat.cards=['2c','3d'];t.seats[0].cards=['As','Ah'];
+ t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
+ manager.tick(t.turnStartedAt+10000);engine.act(t,h.id,'raise',4);
+ // Change the live target before the decision, without changing the hand.
+ configure();manager.tick(t.turnStartedAt+10000);
+ assert.equal(t.phase,'flop');assert.equal(db.botTableTests['1'].spent,200);
+ manager.tick(t.turnStartedAt+10000);engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
+ assert.equal(db.botTableTests['1'].spent,600);
+ manager.tick(t.turnStartedAt+10000);engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
+ assert.equal(seat.folded,true,'exhausted bonus no longer overrides fold');
+ assert.equal(db.ledger.filter(x=>x.type==='BOT_TEST_BONUS').reduce((n,x)=>n+x.amount,0),600);
+ assert.equal(total(),original);
+ assert.throws(()=>configure({bonus:5}),/already used/);
+ const reload=createBots({db,runtime:new Map([['1',t]]),engine,save:()=>{},random:()=>0});
+ const watched=reload.route('/api/bots/watch',{tableId:'1'},center);
+ assert.deepEqual(watched.testSettings,{bonus:6,spent:6,remaining:0,target:h.id,botId:'',humanStyle:false});
+ configure({bonus:10,humanStyle:true});assert.equal(db.botTableTests['1'].spent,600);
+});
+
+
+test('virtual bonus ignores a different target and human mode omits runout from worker input',()=>{
+ const {manager,center,engine,t,db,human,runtime}=world({size:2,random:()=>0});
+ manager.route('/api/bots/create',{name:'TargetTester',budget:500,tableId:'1',buyin:100,stopLoss:500},center);
+ const b=db.users.find(u=>u.isBot),h=human(1),other=human(2);
+ manager.route('/api/bots/tabletest',{tableId:'1',bonus:500,target:other.id,humanStyle:false},center);
+ engine.sit(t,h,0,100,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();engine.startHand(t);
+ const seat=t.seats.find(s=>s?.userId===b.id);seat.cards=['2c','3d'];t.seats[0].cards=['As','Ah'];t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
+ manager.tick(t.turnStartedAt+10000);engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
+ assert.equal(seat.folded,true);assert.equal(db.botTableTests['1'].spent,0);
+ // Begin another hand with the public-information strategy enabled.
+ manager.route('/api/bots/tabletest',{tableId:'1',bonus:500,target:'',humanStyle:true},center);
+ t.lastActionAt=0;engine.startHand(t);
+ let received;
+ const withWorker=createBots({db,runtime,engine,save:()=>{},random:()=>0,decider:v=>{received=v;return Promise.resolve({type:'check'});}});
+ if(t.seats[t.turn]?.userId===h.id)engine.act(t,h.id,t.currentBet-t.seats[t.turn].roundBet?'call':'check');
+ withWorker.tick(t.turnStartedAt+10000);
+ assert.ok(received);assert.equal(Object.hasOwn(received,'outcome'),false);
+ assert.deepEqual(received.cards,seat.cards);assert.ok(received.opponents.every(o=>!Object.hasOwn(o,'cards')));
+});
+
+
+test('table bonus can be restricted to one enabled seated bot',()=>{
+ for(const selected of [true,false]){
+  const {manager,center,engine,t,db,human}=world({random:()=>0});
+  const h=human(1);engine.sit(t,h,0,100,[t]);
+  manager.route('/api/bots/seat',{tableId:'1',position:1,name:'BonusFirst',budget:500,buyin:100},center);
+  manager.route('/api/bots/seat',{tableId:'1',position:2,name:'BonusSecond',budget:500,buyin:100},center);
+  const [first,second]=db.users.filter(u=>u.isBot);
+  engine.sitOut(t,second,true);
+  const configure=botId=>manager.route('/api/bots/tabletest',{tableId:'1',bonus:500,target:'',botId,humanStyle:false},center);
+  assert.throws(()=>configure(h.id),/active bot/);
+  assert.throws(()=>configure('missing'),/active bot/);
+  configure(selected?first.id:second.id);
+  assert.equal(manager.route('/api/bots/watch',{tableId:'1'},center).testSettings.botId,selected?first.id:second.id);
+  engine.startHand(t);
+  const seat=t.seats.find(s=>s?.userId===first.id);seat.cards=['2c','3d'];t.seats[0].cards=['As','Ah'];
+  t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
+  manager.tick(t.turnStartedAt+10000);engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
+  assert.equal(seat.folded,!selected);
+  assert.equal(db.botTableTests['1'].spent,selected?200:0);
+  configure('');assert.equal(db.botTableTests['1'].botId,'');
+  second.bot.enabled=false;assert.throws(()=>configure(second.id),/active bot/);
+ }
+});

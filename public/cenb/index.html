@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="sq"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png?v=2"><link rel="stylesheet" href="/cenb/cenb.css?v=1"><script type="module" src="/cenb/cenb.js?v=1"></script></head>
+<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png?v=2"><link rel="stylesheet" href="/cenb/cenb.css?v=2"><script type="module" src="/cenb/cenb.js?v=3"></script></head>
 <body>
 <section id="login"><form class="loginCard hidden" id="setupForm" autocomplete="off"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="235"><h1>CENB</h1><p>Hapja e parë: krijo hyrjen e CENB. Konfirmo një herë me llogarinë e qendrës. Pas kësaj, CENB hapet vetëm me përdoruesin dhe fjalëkalimin që zgjedh këtu.</p>
  <label>Qendra · përdoruesi<input name="centerUsername" autocomplete="username" required></label>
@@ -76,7 +76,7 @@
    <div class="seatTools"><input id="seatSearch" type="search" placeholder="Kërko tavolinë…" autocomplete="off"><select id="seatStake"><option value="">Të gjitha stake-t</option><option value="0.1">deri €0.10</option><option value="0.5">deri €0.50</option><option value="2">deri €2</option><option value="9999">mbi €2</option></select><label class="chk"><input type="checkbox" id="seatFreeOnly" checked> Vetëm me vende bosh</label><label class="chk"><input type="checkbox" id="seatBotsOnly"> Vetëm aktive me bota</label><span class="muted" id="seatCount"></span></div>
    <div id="seatTables" class="seatTables"></div>
    <h2 style="margin-top:18px">Tavolinat me lojtarë tani</h2><div class="tableWrap" id="tableList"></div></div></section>
-  <dialog id="liveDialog" class="liveDialog"><div class="liveHead"><div><h2 id="liveName">Tavolina</h2><small id="liveSub"></small></div><span class="liveTag">● LIVE</span><button type="button" class="ghost" id="liveClose">✕ Dil</button></div>
+  <dialog id="liveDialog" class="liveDialog"><div class="liveHead"><div><h2 id="liveName">Tavolina</h2><small id="liveSub"></small></div><span class="liveTag">● LIVE</span><button type="button" class="ghost" id="liveSettings" aria-label="Konfigurimet e tavolinës" title="Konfigurimet e tavolinës" aria-pressed="false">⚙</button><button type="button" class="ghost" id="liveClose">✕ Dil</button></div>
    <div class="liveBody"><div class="liveTableWrap"><div class="liveFelt" id="liveFelt"></div></div>
     <aside class="liveSide"><div class="liveCtrl" id="liveCtrl"><p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p></div>
      <h3>Ngjarjet</h3><ol class="liveEvents" id="liveEvents"></ol></aside></div></dialog>

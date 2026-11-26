@@ -230,16 +230,17 @@ $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="tables"]
 setInterval(()=>loadSeats(),4000);
 const seatMode=m=>{$$('[data-seatmode]').forEach(b=>b.classList.toggle('on',b.dataset.seatmode===m));$$('[data-seatpane]').forEach(p=>p.classList.toggle('hidden',p.dataset.seatpane!==m));$('#seatForm').dataset.mode=m;};
 $('#seatDialog').addEventListener('click',e=>{const b=e.target.closest('[data-seatmode]');if(b&&!b.disabled)seatMode(b.dataset.seatmode);});
-$('#seatTables').addEventListener('click',e=>{const b=e.target.closest('[data-seat]');if(!b||b.disabled)return;const [tid,pos]=b.dataset.seat.split(':'),t=seatData.tables.find(x=>x.id===tid);if(!t)return;seatPick={t,pos:Number(pos)};
+$('#seatTables').addEventListener('click',e=>{const b=e.target.closest('[data-seat]');if(!b||b.disabled)return;const [tid,pos]=b.dataset.seat.split(':');openSeat(tid,Number(pos));});
+function openSeat(tid,pos){const t=seatData?.tables.find(x=>x.id===tid);if(!t)return;if(t.seats[pos]){toast('Ky vend është zënë',true);return;}if(t.waiting){toast('Një lojtar pret radhën',true);return;}seatPick={t,pos};
  const f=$('#seatForm');f.reset();$('#seatTitle').textContent=t.name+' · vendi '+(seatPick.pos+1);$('#seatInfo').textContent='Blinde '+eur(t.sb)+' / '+eur(t.bb)+' · buy-in '+eur(t.min)+' – '+eur(t.max);
- f.buyin.min=t.min;f.buyin.max=t.max;f.buyin.value=(Math.round(t.max*60)/100).toFixed(2);
+ f.buyin.min=t.min;f.buyin.max=t.max;f.buyin.value=Math.max(t.min,Math.round(t.max*60)/100).toFixed(2);
  f.risk.innerHTML=Object.entries(data?.styles||{low:'Tight',medium:'Balanced',high:'Aggressive'}).map(([k,v])=>'<option value="'+k+'"'+(k==='medium'?' selected':'')+'>'+safe(v)+'</option>').join('');
  const free=seatData.free||[];f.id.innerHTML=free.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+' · '+eur(x.balance)+'</option>').join('');
- $('[data-seatmode="old"]').disabled=!free.length;$('[data-seatmode="old"]').textContent=free.length?'Bot ekzistues ('+free.length+')':'Asnjë bot i lirë';seatMode('new');$('#seatDialog').showModal();});
+ $('[data-seatmode="old"]').disabled=!free.length;$('[data-seatmode="old"]').textContent=free.length?'Bot ekzistues ('+free.length+')':'Asnjë bot i lirë';seatMode('new');$('#seatDialog').showModal();}
 $('#seatCancel').onclick=()=>$('#seatDialog').close();
 $('#seatForm').addEventListener('submit',async e=>{e.preventDefault();if(!seatPick)return;const f=e.target,old=f.dataset.mode==='old',go=$('#seatGo');
  const body={tableId:seatPick.t.id,position:seatPick.pos,buyin:f.buyin.value,risk:f.risk.value,mode:f.mode.value,...(old?{id:f.id.value}:{name:f.name.value.trim(),budget:f.budget.value})};
- go.disabled=true;try{const r=await api('bots/seat',body);$('#seatDialog').close();toast(r.bot+' u ul te '+r.table+', vendi '+r.seat);await loadSeats(true);refresh();}catch(err){toast(err.message,true);}finally{go.disabled=false;}});
+ go.disabled=true;try{const r=await api('bots/seat',body);$('#seatDialog').close();toast(r.bot+' u ul te '+r.table+', vendi '+r.seat);await loadSeats(true);await pollLive();refresh();}catch(err){toast(err.message,true);}finally{go.disabled=false;}});
 
 // A bot on the seat list: tap it to see it and stop it. It leaves the table as soon as its hand ends.
 let botPick=null;
@@ -318,7 +319,7 @@ const live={id:null,pick:null,v:null,timer:null,busy:false,formFor:null};
 const SUIT={s:'♠',h:'♥',d:'♦',c:'♣'},PHASE={waiting:'Në pritje',preflop:'Preflop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown',finished:'Dora mbaroi'};
 const lcard=c=>c==='BACK'?'<span class="lc back"></span>':'<span class="lc'+('hd'.includes(c[1])?' red':'')+'">'+(c[0]==='T'?'10':c[0])+'<i>'+SUIT[c[1]]+'</i></span>';
 const ACT={FOLD:'Fold','AUTO-FOLD':'Fold',CHECK:'Check','AUTO-CHECK':'Check',CALL:'Call',BET:'Bet',RAISE:'Raise','ALL-IN':'All-in',SB:'SB',BB:'BB'};
-function openLive(tableId,botId=null){live.id=tableId;live.pick=null;live.v=null;live.formFor=null;live.want=botId;$('#liveFelt').innerHTML='';$('#liveEvents').innerHTML='';$('#liveCtrl').innerHTML='<p class="muted">Duke hapur tavolinën…</p>';
+function openLive(tableId,botId=null){live.id=tableId;live.pick=null;live.v=null;live.formFor=null;live.want=botId;live.settings=false;$('#liveSettings').setAttribute('aria-pressed','false');$('#liveFelt').innerHTML='';$('#liveEvents').innerHTML='';$('#liveCtrl').innerHTML='<p class="muted">Duke hapur tavolinën…</p>';
  if(!$('#liveDialog').open)$('#liveDialog').showModal();clearInterval(live.timer);live.timer=setInterval(pollLive,1000);pollLive();}
 $('#liveClose').onclick=()=>$('#liveDialog').close();
 $('#liveDialog').addEventListener('close',()=>{clearInterval(live.timer);live.id=null;live.pick=null;});
@@ -333,7 +334,7 @@ function renderLive(){const v=live.v;if(!v)return;const n=v.seats.length;
  let h='<div class="lCenter"><div class="lBoard">'+v.board.map(lcard).join('')+Array(Math.max(0,5-v.board.length)).fill('<span class="lc slot"></span>').join('')+'</div><div class="lPot">Pot <b>'+eur(v.pot+v.seats.reduce((m,s)=>m+(s?.bet||0),0))+'</b></div>'
   +(v.phase==='finished'&&v.lastResult?.winnerIds?.length?'<div class="lWin">🏆 '+safe(v.lastResult.winnerIds.map(id=>v.seats.find(x=>x&&x.id===id)?.username||'').filter(Boolean).join(', '))+(v.lastResult.winningHands&&Object.values(v.lastResult.winningHands)[0]?.rank?' · '+safe(Object.values(v.lastResult.winningHands)[0].rank):'')+'</div>':'')+'</div>';
  v.seats.forEach((s,i)=>{const [x,y]=pos(i);
-  if(!s){h+='<div class="lseat empty" style="left:'+x+'%;top:'+y+'%"><small>Vend '+(i+1)+'</small></div>';return;}
+  if(!s){h+='<button type="button" data-ljoin="'+i+'" class="lseat empty" aria-label="Join · vendi '+(i+1)+'" style="left:'+x+'%;top:'+y+'%"><small>Vend '+(i+1)+'</small><b>＋ Join</b></button>';return;}
   const b=v.bots[s.id],turn=v.turn===i&&v.actionDeadline,cards=s.cards.length?s.cards:(s.inHand&&!s.folded?Array(s.cardCount).fill('BACK'):[]);
   const la=s.lastAction&&v.phase!=='waiting'?(ACT[s.lastAction.type]||s.lastAction.type)+(s.lastAction.amount?' '+eur(s.lastAction.amount):''):'';
   h+='<'+(b?'button type="button" data-lseat="'+safe(s.id)+'"':'div')+' class="lseat'+(b?' bot':'')+(turn?' turn':'')+(s.folded?' folded':'')+(s.sittingOut?' out':'')+(live.pick===s.id?' pick':'')+'" style="left:'+x+'%;top:'+y+'%">'
@@ -346,7 +347,7 @@ function renderLive(){const v=live.v;if(!v)return;const n=v.seats.length;
  $('#liveFelt').innerHTML=h;
  $('#liveEvents').innerHTML=(v.events||[]).slice(0,18).map(e=>'<li><small>'+ago(e.at)+'</small> '+safe(e.text)+'</li>').join('')||'<li class="muted">Asgjë ende.</li>';
  renderLiveCtrl();}
-function renderLiveCtrl(){const v=live.v,s=v?.seats.find(x=>x&&x.id===live.pick),b=s&&v.bots[s.id];const box=$('#liveCtrl');
+function renderLiveCtrl(){if(live.settings){renderLiveSettings();return;}const v=live.v,s=v?.seats.find(x=>x&&x.id===live.pick),b=s&&v.bots[s.id];const box=$('#liveCtrl');
  if(!b){live.formFor=null;box.innerHTML='<p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p>';return;}
  const info='<div class="lInfo"><h3>'+safe(s.username)+' <span class="pill '+(b.enabled?'on':'')+'">'+(b.enabled?'luan':'i ndalur')+'</span></h3>'
   +'<div class="lStats"><div><small>Portofoli</small><b>'+eur(b.balance)+'</b></div><div><small>Chips në tavolinë</small><b>'+eur(s.stack)+'</b></div><div><small>Kjo seancë</small>'+signed(b.session)+'</div><div><small>Duar</small><b>'+b.hands+'</b></div></div>'
@@ -361,7 +362,8 @@ function renderLiveCtrl(){const v=live.v,s=v?.seats.find(x=>x&&x.id===live.pick)
   +botClashField(b)+'<label>Mënyra<select name="mode"><option value="play"'+(b.mode==='play'?' selected':'')+'>Luan duar</option><option value="seat"'+(b.mode==='seat'?' selected':'')+'>Vetëm zë vend</option></select></label>'
   +'<label>Humbje max (€)<input name="stopLoss" type="number" min="0.01" step="0.01" value="'+b.stopLoss+'"></label><label>Fitim max (€) · 0 = pa kufi<input name="stopWin" type="number" min="0" step="0.01" value="'+b.stopWin+'"></label></div>'
   +'<div class="lBtns"><button class="small gold">Ruaj tani</button>'+(b.enabled?'<button type="button" class="small danger" data-lc="stop">■ Ndalo</button>':'<button type="button" class="small" data-lc="start">▶ Nis</button>')+'</div></form>';}
-$('#liveFelt').addEventListener('click',e=>{const c=e.target.closest('[data-lseat]');if(!c)return;live.pick=live.pick===c.dataset.lseat?null:c.dataset.lseat;renderLive();});
+$('#liveFelt').addEventListener('click',async e=>{const join=e.target.closest('[data-ljoin]');if(!join)return;const id=live.id;await loadSeats(true);if(live.id===id)openSeat(id,Number(join.dataset.ljoin));});
+$('#liveFelt').addEventListener('click',e=>{const c=e.target.closest('[data-lseat]');if(!c)return;live.settings=false;$('#liveSettings').setAttribute('aria-pressed','false');live.pick=live.pick===c.dataset.lseat?null:c.dataset.lseat;renderLive();});
 async function liveDo(fn){const bodyEl=$('#liveForm');bodyEl?.querySelectorAll('button').forEach(x=>x.disabled=true);try{await fn();live.formFor=null;await pollLive();refresh();}catch(err){toast(err.message,true);}finally{$('#liveForm')?.querySelectorAll('button').forEach(x=>x.disabled=false);}}
 $('#liveCtrl').addEventListener('click',e=>{const btn=e.target.closest('[data-lc]');if(!btn)return;const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;
  const amount=$('#liveForm [name=amount]').value.trim(),a=btn.dataset.lc;
@@ -372,7 +374,7 @@ $('#liveCtrl').addEventListener('click',e=>{const btn=e.target.closest('[data-lc
   else if(a==='out'){await api('bots/withdraw',{id:b.id,amount});toast(eur(amount)+' u tërhoqën te Kuleta e CENB');}
   else if(a==='stop'){await api('bots/status',{id:b.id,enabled:false});toast(s.username+' u ndal · ngrihet pas dorës');}
   else if(a==='start'){await api('bots/status',{id:b.id,enabled:true});toast(s.username+' u nis');}});});
-$('#liveCtrl').addEventListener('submit',e=>{e.preventDefault();const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;const f=new FormData(e.target);
+$('#liveCtrl').addEventListener('submit',e=>{if(e.target.id==='tableTestForm')return;e.preventDefault();const s=live.v?.seats.find(x=>x&&x.id===live.pick),b=s&&live.v.bots[s.id];if(!b)return;const f=new FormData(e.target);
  liveDo(async()=>{await api('bots/live',{id:b.id,risk:f.get('risk'),botClash:f.get('botClash'),mode:f.get('mode'),stopLoss:f.get('stopLoss'),stopWin:f.get('stopWin')||0});toast(s.username+' u ndryshua · luan me të tani');});});
 $('#seatTables').addEventListener('click',e=>{const w=e.target.closest('[data-watch]');if(w)openLive(w.dataset.watch);});
 
@@ -405,3 +407,14 @@ for(const id of ['#rpFrom','#rpTo'])$(id).addEventListener('change',()=>{$$('#rp
 $('#rpBot').addEventListener('change',loadReport);
 $('#rpBody').addEventListener('click',e=>{const b=e.target.closest('[data-rp-bot]');if(b){$('#rpBot').value=b.dataset.rpBot;loadReport();return;}if(e.target.closest('[data-rp-all]')){$('#rpBot').value='';loadReport();}});
 $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-tab="report"]')&&!rpBusy){if(!$('#rpFrom').value)rpPreset('today');else loadReport();}});
+
+// Table controls stay scoped to the table currently being watched.
+$('#liveSettings').onclick=()=>{live.settings=!live.settings;live.formFor=null;$('#liveSettings').setAttribute('aria-pressed',String(live.settings));renderLiveCtrl();$('.liveSide').scrollIntoView({block:'nearest',behavior:'smooth'});};
+function renderLiveSettings(){const v=live.v;if(!v)return;if($('#tableTestForm')){const status=$('#testBonusStatus'),c=v.testSettings||{};if(status)status.textContent='Përdorur '+eur(c.spent||0)+' · Mbetur '+eur(c.remaining||0);return;}
+ const bots=v.seats.filter(s=>s&&v.bots[s.id]);
+ $('#liveCtrl').innerHTML='<h3>Konfigurimet · '+safe(v.name)+'</h3><p class="muted">'+v.seats.length+' vende · Blinde '+eur(v.sb)+' / '+eur(v.bb)+' · Buy-in maksimal '+eur(v.maxBuyin)+'</p><p class="muted">Zgjidh botin për kredinë, stilin, mënyrën dhe limitet e tij.</p><div class="lBtns">'+bots.map(s=>'<button type="button" class="small" data-settings-bot="'+safe(s.id)+'">'+safe(s.username)+'</button>').join('')+'</div>'+(!bots.length?'<p class="muted">Nuk ka bota këtu. Shtyp Join te një vend bosh.</p>':'');
+ const c=v.testSettings||{};
+ $('#liveCtrl').insertAdjacentHTML('beforeend','<form id="tableTestForm" class="lForm"><h4>Testim · kredi virtuale</h4><label>Fondi bonus (€ virtuale)<input name="bonus" type="number" min="'+(c.spent||0)+'" step="0.01" required value="'+(c.bonus||0)+'"></label><label>Përfituesi<select name="target"><option value="">Të gjithë lojtarët testues</option>'+(v.bonusPlayers||[]).map(p=>'<option value="'+safe(p.id)+'"'+(c.target===p.id?' selected':'')+'>'+safe(p.name)+'</option>').join('')+'</select></label><label>Botët që përdorin bonusin<select name="botId"><option value="">Të gjithë botët e tavolinës</option>'+bots.filter(s=>v.bots[s.id].enabled).map(s=>'<option value="'+safe(v.bots[s.id].id)+'"'+(c.botId===v.bots[s.id].id?' selected':'')+'>'+safe(s.username)+'</option>').join('')+(c.botId&&!bots.some(s=>v.bots[s.id].id===c.botId&&v.bots[s.id].enabled)?'<option value="'+safe(c.botId)+'" selected>Boti i zgjedhur nuk është aktiv · zgjidh sërish</option>':'')+'</select></label><label class="chk"><input name="humanStyle" type="checkbox"'+(c.humanStyle?' checked':'')+'> Lojë humane · pa njohur rezultatin e ardhshëm</label><p id="testBonusStatus" role="status">Përdorur '+eur(c.spent||0)+' · Mbetur '+eur(c.remaining||0)+'</p><p class="lHint">Fondi është i përbashkët për botët e zgjedhur. Bonusi mbulon call-et shtesë në vend të fold-it kur përfituesi është aktiv. Nuk krijon kredi dhe nuk garanton fitim; përdor stack-un e botit dhe respekton limitet e tij. Rrit fondin për ta vazhduar. Opsioni human përdor vetëm letrat e botit dhe informacionin publik.</p><button class="small gold">Ruaj konfigurimin e testimit</button></form>');}
+$('#liveCtrl').addEventListener('submit',async e=>{if(e.target.id!=='tableTestForm')return;e.preventDefault();const f=e.target,id=live.id,button=f.querySelector('button');button.disabled=true;try{await api('bots/tabletest',{tableId:id,bonus:f.bonus.value,target:f.target.value,botId:f.botId.value,humanStyle:f.humanStyle.checked});toast('Konfigurimi i testimit u ruajt');await pollLive();}catch(err){toast(err.message,true);}finally{button.disabled=false;}});
+
+$('#liveCtrl').addEventListener('click',e=>{const b=e.target.closest('[data-settings-bot]');if(!b)return;live.settings=false;live.pick=b.dataset.settingsBot;live.formFor=null;$('#liveSettings').setAttribute('aria-pressed','false');renderLive();});
