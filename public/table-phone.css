@@ -142,3 +142,14 @@ body.fitPhone .dock.sizing .betValue input::-webkit-outer-spin-button,body.fitPh
 body.fitPhone #chatInput,body[data-view="table"] #chatInput{font-size:16px}
 /* Your own cards a little larger (60 px tall, opponents' cards unchanged). */
 body.fitPhone .tableStage{--me-hole-h:60px;--me-hole-w:43px}
+/* The raise bar on phones sits on the right, above the Raise / OK button. The slider moves up and
+   down (bottom = smallest raise, top = all-in), with + above it, - below it and the amount on top.
+   The preset sizes stand in a column on its left. The cards and the hero seat stay visible. */
+body.fitPhone .dock.sizing .betPicker{left:auto;right:calc(8px + env(safe-area-inset-right));bottom:calc(62px + env(safe-area-inset-bottom));top:auto;width:auto;height:auto;max-height:calc(100vh - 120px);display:grid;grid-template-columns:auto auto;grid-template-rows:auto 1fr auto;column-gap:8px;row-gap:6px;align-items:stretch;padding:8px;border-radius:16px}
+body.fitPhone .dock.sizing .sizingHead{grid-column:1;grid-row:1;justify-content:center}
+body.fitPhone .dock.sizing .betPresets{grid-column:1;grid-row:2;flex-direction:column;justify-content:flex-start;gap:5px}
+body.fitPhone .dock.sizing .betPresets button{width:100%}
+body.fitPhone .dock.sizing .betPicker #allIn{grid-column:1;grid-row:3;width:100%}
+body.fitPhone .dock.sizing .betSlider{grid-column:2;grid-row:1 / 4;flex-direction:column-reverse;align-items:center;gap:6px;min-height:0}
+body.fitPhone .dock.sizing .betSlider input[type=range]{writing-mode:vertical-lr;direction:rtl;flex:1 1 auto;width:30px;height:auto;min-height:110px;min-width:0;margin:0}
+body.fitPhone .dock.sizing .betValue input{width:74px;min-width:74px}
