@@ -153,3 +153,16 @@ body.fitPhone .dock.sizing .betPicker #allIn{grid-column:1;grid-row:3;width:100%
 body.fitPhone .dock.sizing .betSlider{grid-column:2;grid-row:1 / 4;flex-direction:column-reverse;align-items:center;gap:6px;min-height:0}
 body.fitPhone .dock.sizing .betSlider input[type=range]{writing-mode:vertical-lr;direction:rtl;flex:1 1 auto;width:30px;height:auto;min-height:110px;min-width:0;margin:0}
 body.fitPhone .dock.sizing .betValue input{width:74px;min-width:74px}
+/* Bigger, easier to hit with a thumb. */
+body.fitPhone .dock.sizing .betPicker{column-gap:10px;row-gap:7px;padding:10px;max-height:calc(100vh - 74px)}
+body.fitPhone .dock.sizing .sizingHead button{width:40px;height:40px;font-size:16px}
+body.fitPhone .dock.sizing .betPresets{gap:7px}
+body.fitPhone .dock.sizing .betPresets button{min-width:60px;height:40px;font-size:15px;border-radius:20px}
+body.fitPhone .dock.sizing .betPicker #allIn{height:42px;font-size:15px;border-radius:21px}
+body.fitPhone .dock.sizing .betStep{width:40px;height:40px;font-size:22px}
+body.fitPhone .dock.sizing .betValue input{width:92px;min-width:92px;height:42px;font-size:19px}
+body.fitPhone .dock.sizing .betSlider input[type=range]{-webkit-appearance:none;appearance:none;width:40px;min-height:140px;background:transparent}
+body.fitPhone .dock.sizing .betSlider input[type=range]::-webkit-slider-runnable-track{width:10px;border-radius:5px;background:linear-gradient(0deg,#5ef0a8,#2a4a40)}
+body.fitPhone .dock.sizing .betSlider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-left:-10px;border-radius:50%;background:#5ef0a8;border:3px solid #0a1411;box-shadow:0 0 0 2px #5ef0a8,0 4px 12px #000a}
+body.fitPhone .dock.sizing .betSlider input[type=range]::-moz-range-track{width:10px;border-radius:5px;background:#2a4a40}
+body.fitPhone .dock.sizing .betSlider input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#5ef0a8;border:3px solid #0a1411}
