@@ -433,7 +433,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
   if(p==='/api/bots/report')return botReport(body);
   if(p==='/api/bots/tabletest'){const t=runtime.get(String(body.tableId||''));if(!t)fail('Table not found',404);
    const old=tableTests[t.id]||{bonus:0,spent:0},bonus=cents(body.bonus,'Bonus',true),target=String(body.target||'');
-   if(target&&!db.users.some(u=>u.id===target&&!u.isBot&&u.role==='USER'))fail('Invalid bonus player');
+   if(target&&!t.seats.some(s=>s&&!s.sittingOut&&s.userId===target&&db.users.some(u=>u.id===s.userId&&!u.isBot&&u.role==='USER')))fail('Invalid bonus player: select a player at this table');
    const botId=String(body.botId??old.botId??'');
    if(botId&&!t.seats.some(s=>s?.isBot&&s.userId===botId&&bots().some(b=>b.id===botId&&b.bot.enabled)))fail('Select an active bot at this table');
    if(![true,false].includes(body.humanStyle))fail('Invalid human style');
@@ -444,7 +444,7 @@ const shouldLeave=(t,b,s)=>b.bot.pinned===t.id?!!(t.waitlist?.length||t.waitOffe
    const view=engine.snapshot(t,null,false);delete view.chat;
    const info={};for(const s of t.seats){if(!s?.isBot)continue;const b=bots().find(x=>x.id===s.userId);if(!b)continue;
     info[s.id]={id:b.id,risk:b.bot.risk||'medium',botClash:b.bot.botClash||'balanced',style:STYLES[b.bot.risk]?.label||b.bot.risk,mode:b.bot.mode||'play',enabled:!!b.bot.enabled,balance:b.balance/100,stopLoss:b.bot.stopLoss/100,stopWin:(b.bot.stopWin||0)/100,session:sessionOf(b)/100,hands:b.bot.hands||0,addChips:(b.bot.addChips||0)/100,error:b.bot.error||null};}
-   return {...view,bots:info,testSettings:testInfo(t),bonusPlayers:db.users.filter(u=>!u.isBot&&u.role==='USER').map(u=>({id:u.id,name:u.username})),maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
+   return {...view,bots:info,testSettings:testInfo(t),bonusPlayers:t.seats.filter(s=>s&&!s.sittingOut&&db.users.some(u=>u.id===s.userId&&!u.isBot&&u.role==='USER')).map(s=>({id:s.userId,name:s.username})),maxBuyin:engine.buyinLimits(t).max/100,styles:Object.fromEntries(Object.entries(STYLES).map(([k,v])=>[k,v.label]))};}
   // only:'idle' stops just the bots that are on but not at a table; the ones playing are left alone.
   if(p==='/api/bots/stopall'){const idle=body.only==='idle';let n=0;for(const b of bots())if(idle?b.bot.enabled&&!seatOf(b):b.bot.enabled||seatOf(b)){stop(b,null,seatOf(b));audit('BOT_MANAGE',b,0,{enabled:false});n++;}save();return {ok:true,stopped:n};}
   if(p==='/api/bots/startall'){let n=0;for(const b of bots())if(!b.bot.enabled&&!/^House /.test(b.bot.error||'')&&b.balance+(seatOf(b)?.s.stack||0)>0){b.bot.enabled=true;b.bot.error=null;b.bot.baseline=equity(b);b.bot.rakeBase=rakeOf(b.id);b.bot.clashBase=b.bot.clash||0;audit('BOT_MANAGE',b,0,{enabled:true});n++;}save();return {ok:true,started:n};}

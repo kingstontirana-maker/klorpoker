@@ -587,8 +587,11 @@ test('virtual table bonus is validated, shared, capped and conserved across call
  assert.throws(()=>manager.route('/api/bots/tabletest',{},{role:'USER'}),/Only the center/);
  assert.throws(()=>configure({bonus:-1}),/Bonus/);
  assert.throws(()=>configure({target:b.id}),/Invalid bonus player/);
- assert.throws(()=>configure({humanStyle:'yes'}),/Invalid human style/);
- configure({target:other.id});
+ assert.throws(()=>configure({target:'',humanStyle:'yes'}),/Invalid human style/);
+ assert.throws(()=>configure({target:other.id}),/Invalid bonus player/);
+ engine.sit(t,h,0,100,[t]);
+ configure();
+ engine.leave(t,h);
  engine.sit(t,h,0,100,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();
  const original=total();engine.startHand(t);
  const seat=t.seats.find(s=>s?.userId===b.id);seat.cards=['2c','3d'];t.seats[0].cards=['As','Ah'];
@@ -615,7 +618,9 @@ test('virtual bonus ignores a different target and human mode omits runout from 
  const {manager,center,engine,t,db,human,runtime}=world({size:2,random:()=>0});
  manager.route('/api/bots/create',{name:'TargetTester',budget:500,tableId:'1',buyin:100,stopLoss:500},center);
  const b=db.users.find(u=>u.isBot),h=human(1),other=human(2);
+ engine.sit(t,other,0,100,[t]);
  manager.route('/api/bots/tabletest',{tableId:'1',bonus:500,target:other.id,humanStyle:false},center);
+ engine.leave(t,other);
  engine.sit(t,h,0,100,[t]);manager.route('/api/bots/status',{id:b.id,enabled:true},center);manager.tick();engine.startHand(t);
  const seat=t.seats.find(s=>s?.userId===b.id);seat.cards=['2c','3d'];t.seats[0].cards=['As','Ah'];t.deck=['4c','7s','8d','9c','5c','Jh','6c','Kd'].reverse();
  manager.tick(t.turnStartedAt+10000);engine.act(t,h.id,'raise',4);manager.tick(t.turnStartedAt+10000);
@@ -654,4 +659,21 @@ test('table bonus can be restricted to one enabled seated bot',()=>{
   configure('');assert.equal(db.botTableTests['1'].botId,'');
   second.bot.enabled=false;assert.throws(()=>configure(second.id),/active bot/);
  }
+});
+
+
+test('bonus recipients contain only participating non-bot players of the watched table',()=>{
+ const {manager,center,engine,t,human}=world();
+ const seated=human(1),away=human(2),idle=human(3);
+ engine.sit(t,seated,0,100,[t]);engine.sit(t,idle,1,100,[t]);engine.sitOut(t,idle,true);
+ manager.route('/api/bots/seat',{tableId:'1',position:2,name:'ListBot',budget:500,buyin:100},center);
+ const watch=()=>manager.route('/api/bots/watch',{tableId:'1'},center);
+ assert.deepEqual(watch().bonusPlayers,[{id:seated.id,name:seated.username}]);
+ const configure=target=>manager.route('/api/bots/tabletest',{tableId:'1',bonus:500,target,humanStyle:false},center);
+ assert.throws(()=>configure(away.id),/at this table/);assert.throws(()=>configure(idle.id),/at this table/);
+ configure(seated.id);engine.leave(t,seated);
+ assert.deepEqual(watch().bonusPlayers,[]);
+ assert.equal(watch().testSettings.target,seated.id,'departed target does not silently become everyone');
+ assert.throws(()=>configure(seated.id),/at this table/);
+ configure('');assert.equal(watch().testSettings.target,'');
 });
