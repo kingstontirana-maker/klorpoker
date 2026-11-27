@@ -328,6 +328,11 @@ async function pollLive(){if(!live.id||live.busy||document.hidden)return;live.bu
  try{const v=await api('bots/watch',{tableId:id});if(live.id!==id)return;live.v=v;
   if(live.want){const s=v.seats.find(x=>x&&v.bots[x.id]?.id===live.want);if(s)live.pick=s.id;live.want=null;}
   renderLive();}catch(err){toast(err.message,true);if(/not found/i.test(err.message))$('#liveDialog').close();}finally{live.busy=false;}}
+function playerResultMarkup(r){return r?'<span>Fitime <b>'+eur(r.won)+'</b></span><span>Humbje <b>'+eur(r.lost)+'</b></span><span>Neto '+signed(r.net)+'</span><small>'+r.hands+' duar</small>':'<span>Rezultati nuk është i disponueshëm.</span>';}
+let liveResultPlayer=null;
+function renderPlayerResult(){const s=live.v?.seats.find(s=>s?.id===liveResultPlayer);if(!s)return;$('#playerResultName').textContent=s.username;$('#playerResultBody').innerHTML=playerResultMarkup(live.v.playerResults?.[s.id]?.today);}
+$('#playerResultClose').onclick=()=>$('#playerResultDialog').close();
+$('#liveFelt').addEventListener('click',e=>{const seat=e.target.closest('[data-lplayer]');if(!seat)return;liveResultPlayer=seat.dataset.lplayer;renderPlayerResult();if(!$('#playerResultDialog').open)$('#playerResultDialog').showModal();});
 function renderLive(){const v=live.v;if(!v)return;const n=v.seats.length;
  $('#liveName').textContent=v.name;$('#liveSub').textContent=eur(v.sb)+' / '+eur(v.bb)+' · '+(v.game==='omaha'?'Omaha':"Hold'em")+' · dora #'+v.hand+' · '+(PHASE[v.phase]||v.phase);
  const pos=i=>{const a=Math.PI/2+i*2*Math.PI/n;return [50+43*Math.cos(a),50+39*Math.sin(a)];};
@@ -338,15 +343,17 @@ function renderLive(){const v=live.v;if(!v)return;const n=v.seats.length;
   if(!s){h+='<button type="button" data-ljoin="'+i+'" class="lseat empty" aria-label="Join · vendi '+(i+1)+'" style="left:'+x+'%;top:'+y+'%"><small>Vend '+(i+1)+'</small><b>＋ Join</b></button>';return;}
   const b=v.bots[s.id],turn=v.turn===i&&v.actionDeadline,cards=s.cards.length?s.cards:(s.inHand&&!s.folded?Array(s.cardCount).fill('BACK'):[]);
   const la=s.lastAction&&v.phase!=='waiting'?(ACT[s.lastAction.type]||s.lastAction.type)+(s.lastAction.amount?' '+eur(s.lastAction.amount):''):'';
-  h+='<'+(b?'button type="button" data-lseat="'+safe(s.id)+'"':'div')+' class="lseat'+(b?' bot':'')+(turn?' turn':'')+(s.folded?' folded':'')+(s.sittingOut?' out':'')+(live.pick===s.id?' pick':'')+'" style="left:'+x+'%;top:'+y+'%">'
+  h+='<'+(b?'button type="button" data-lseat="'+safe(s.id)+'"':'button type="button" data-lplayer="'+safe(s.id)+'"')+' class="lseat'+(b?' bot':' human')+(turn?' turn':'')+(s.folded?' folded':'')+(s.sittingOut?' out':'')+(live.pick===s.id?' pick':'')+'" style="left:'+x+'%;top:'+y+'%">'
    +'<span class="lcards">'+cards.map(lcard).join('')+'</span><span class="lname">'+safe(s.username)+'</span>'
    +(b?'<em class="lbot'+(b.enabled?'':' off')+'">BOT · '+safe(b.style)+(b.mode==='seat'?' · vetëm vend':'')+(b.enabled?'':' · i ndalur')+'</em>':'<em class="lhuman">Lojtar</em>')
    +'<b class="lstack">'+eur(s.stack)+'</b>'+(s.sittingOut?'<small class="lact">jashtë loje</small>':la?'<small class="lact">'+safe(la)+'</small>':'')
-   +(turn?'<i class="ltime" style="--p:'+left+'"></i>':'')+'</'+(b?'button':'div')+'>';
+   +(!b?'<span class="lplayerResult"><strong>Kjo tavolinë · gjithsej</strong>'+playerResultMarkup(v.playerResults?.[s.id]?.table)+'<small>Kliko për sot</small></span>':'')
+   +(turn?'<i class="ltime" style="--p:'+left+'"></i>':'')+'</button>';
   if(s.bet>0){h+='<span class="lbet" style="left:'+(50+(x-50)*.58)+'%;top:'+(50+(y-50)*.58)+'%">'+eur(s.bet)+'</span>';}
   if(v.button===i){h+='<span class="ldealer" style="left:'+(50+(x-50)*.74+5)+'%;top:'+(50+(y-50)*.74)+'%">D</span>';}});
  $('#liveFelt').innerHTML=h;
  $('#liveEvents').innerHTML=(v.events||[]).slice(0,18).map(e=>'<li><small>'+ago(e.at)+'</small> '+safe(e.text)+'</li>').join('')||'<li class="muted">Asgjë ende.</li>';
+ if($('#playerResultDialog').open)renderPlayerResult();
  renderLiveCtrl();}
 function renderLiveCtrl(){if(live.settings){renderLiveSettings();return;}const v=live.v,s=v?.seats.find(x=>x&&x.id===live.pick),b=s&&v.bots[s.id];const box=$('#liveCtrl');
  if(!b){live.formFor=null;box.innerHTML='<p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p>';return;}

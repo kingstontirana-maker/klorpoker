@@ -269,3 +269,5 @@ article.bot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:ce
 .lseat.empty{display:grid;gap:4px;cursor:pointer;min-width:74px}.lseat.empty:hover,.lseat.empty:focus-visible{border-color:var(--gold);color:var(--gold);background:#122c20}#liveSettings{font-size:22px;padding:4px 10px}#liveSettings[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}
 
 .holdNote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#ffd07a}
+
+.lseat.human{overflow:visible;cursor:pointer}.lseat.human:hover,.lseat.human:focus{z-index:20;border-color:var(--gold);opacity:1}.lplayerResult{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:210px;background:#091710;border:1px solid var(--gold);border-radius:10px;padding:12px;box-shadow:0 8px 24px #0009;gap:6px}.lplayerResult:after{content:"";position:absolute;top:100%;left:0;width:100%;height:10px}.lseat.human:hover .lplayerResult,.lseat.human:focus .lplayerResult{display:grid}.lplayerResult span,#playerResultBody>span{display:flex;justify-content:space-between;gap:16px}#playerResultBody{display:grid;gap:12px;padding:16px 0}

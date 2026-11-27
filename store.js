@@ -136,6 +136,10 @@ export function openStore(file){
   resolveReport:owned((id,by,outcome)=>{sql.prepare("UPDATE chat_reports SET status='closed',resolved_by=?,resolved_at=?,outcome=? WHERE id=?").run(by,Date.now(),outcome,id);}),
   // A player's own hands and numbers.
   playerHands:(userId,before,limit)=>sql.prepare('SELECT h.data FROM hand_players p JOIN hands h ON h.id=p.hand_id WHERE p.user_id=? AND p.hand_id<? ORDER BY p.hand_id DESC LIMIT ?').all(userId,Number.isFinite(before)?before:Number.MAX_SAFE_INTEGER,limit).map(r=>JSON.parse(r.data)),
+  playerLiveResults(userId,tableId,since){
+   const totals=(filter,args)=>({...sql.prepare(`SELECT COUNT(*) AS hands,COALESCE(SUM(CASE WHEN p.result>0 THEN p.result ELSE 0 END),0) AS won,COALESCE(SUM(CASE WHEN p.result<0 THEN -p.result ELSE 0 END),0) AS lost,COALESCE(SUM(p.result),0) AS net FROM hand_players p JOIN hands h ON h.id=p.hand_id WHERE p.user_id=? AND ${filter}`).get(userId,...args)});
+   return {table:totals('h.table_id=?',[String(tableId)]),today:totals('p.started_at>=?',[since])};
+  },
   playerStats(userId,since=0){const t=sql.prepare('SELECT COUNT(*) AS hands,COALESCE(SUM(won),0) AS won,COALESCE(SUM(vpip),0) AS vpip,COALESCE(SUM(result),0) AS net,COALESCE(MAX(result),0) AS best,COALESCE(MIN(result),0) AS worst FROM hand_players WHERE user_id=? AND started_at>=?').get(userId,since);return {...t,days:sql.prepare("SELECT date(started_at/1000,'unixepoch') AS day,COUNT(*) AS hands,SUM(result) AS net FROM hand_players WHERE user_id=? AND started_at>=? GROUP BY day ORDER BY day").all(userId,since).map(d=>({...d}))};},
   // Totals per player over a period, and pairs of players who shared hands.
   playerTotals:(since=0,until=Number.MAX_SAFE_INTEGER)=>sql.prepare(TOTALS_SQL).all(since,until).map(r=>({...r})),

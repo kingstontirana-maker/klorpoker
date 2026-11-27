@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="sq"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png?v=2"><link rel="stylesheet" href="/cenb/cenb.css?v=2"><script type="module" src="/cenb/cenb.js?v=4"></script></head>
+<title>CENB · Suprem Poker</title><link rel="icon" href="/icon.png?v=2"><link rel="stylesheet" href="/cenb/cenb.css?v=3"><script type="module" src="/cenb/cenb.js?v=5"></script></head>
 <body>
 <section id="login"><form class="loginCard hidden" id="setupForm" autocomplete="off"><img src="/logo.webp" alt="Suprem Poker" width="1000" height="235"><h1>CENB</h1><p>Hapja e parë: krijo hyrjen e CENB. Konfirmo një herë me llogarinë e qendrës. Pas kësaj, CENB hapet vetëm me përdoruesin dhe fjalëkalimin që zgjedh këtu.</p>
  <label>Qendra · përdoruesi<input name="centerUsername" autocomplete="username" required></label>
@@ -80,6 +80,7 @@
    <div class="liveBody"><div class="liveTableWrap"><div class="liveFelt" id="liveFelt"></div></div>
     <aside class="liveSide"><div class="liveCtrl" id="liveCtrl"><p class="muted">Shtyp një bot në tavolinë për ta kontrolluar: kredi, stili, limitet.</p></div>
      <h3>Ngjarjet</h3><ol class="liveEvents" id="liveEvents"></ol></aside></div></dialog>
+  <dialog id="playerResultDialog" class="seatDialog"><h2 id="playerResultName"></h2><p>Sot · të gjitha tavolinat · ora e Tiranës</p><div id="playerResultBody" aria-live="polite"></div><p class="muted">Vetëm duart e përfunduara. Neto përfshin rake-un.</p><button type="button" id="playerResultClose">Mbyll</button></dialog>
   <dialog id="stopDialog" class="seatDialog"><form method="dialog"><h2>Ndalo botat</h2><p class="muted">Botat e ndalur nuk ulen më në tavolina derisa t'i nisësh sërish.</p>
    <div class="rcChoices"><button type="button" class="rcChoice" data-st="idle"><b>Vetëm botat që nuk janë në lojë</b><span id="stIdle"></span><small>Botat e ndezur që presin ose kërkojnë tavolinë. Ata që luajnë në tavolina nuk preken.</small></button>
    <button type="button" class="rcChoice danger" data-st="all"><b>Të gjithë botat</b><span id="stAll"></span><small>Ndalen të gjithë. Ata që janë në një dorë ngrihen kur mbaron dora.</small></button></div>
